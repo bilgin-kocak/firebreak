@@ -166,7 +166,7 @@ export const executeWorkflow = async (
       if (isCancelled(signal)) return fail("EXECUTION_CANCELLED");
     } catch (error) {
       if (isCancelled(signal)) return fail("EXECUTION_CANCELLED");
-      context.progress.push({ operationId: operation.id, status: "failed" });
+      recordProgress(context, { operationId: operation.id, status: "failed" });
       return fail("OPERATION_FAILED", error instanceof Error ? error.message : "Operation failed");
     }
   }

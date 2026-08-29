@@ -222,6 +222,26 @@ describe("workflow executor", () => {
     expect(context.portalState?.parking_permit_renewal).toBe(portalStateBefore);
   });
 
+  it("notifies the observer once about a normal failed operation while preserving rollback", async () => {
+    const context = createContext();
+    const draftBefore = structuredClone(context.serviceDrafts.parking_permit_renewal);
+    const observed: Array<{ operationId: string; status: string }> = [];
+    context.resident.vehicles = [];
+    context.onProgress = (entry) => observed.push(entry);
+
+    const result = await executeWorkflow(canonicalProposal(), { durationMonths: 12 }, context);
+
+    expect(result).toMatchObject({ code: "OPERATION_FAILED", submitted: false });
+    expect(context.serviceDrafts.parking_permit_renewal).toEqual(draftBefore);
+    expect(context.progress).toContainEqual({
+      operationId: "permit.set_vehicle",
+      status: "failed",
+    });
+    expect(observed.filter((entry) => entry.operationId === "permit.set_vehicle")).toEqual([
+      { operationId: "permit.set_vehicle", status: "failed" },
+    ]);
+  });
+
   it("stages an Address Change through the shared executor without submitting", async () => {
     const context = createContext();
 
