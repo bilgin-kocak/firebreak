@@ -26,8 +26,9 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
   const returnToEdit = useAppStore((state) => state.human.returnProposalToEdit);
   const reject = useAppStore((state) => state.human.rejectProposal);
   const close = useCallback(() => setDialog("proposalSheetOpen", false), [setDialog]);
-  const dialogRef = useDialogFocus(open, close);
-  if (!open || !proposal) return null;
+  const renderedOpen = open && Boolean(proposal);
+  const dialogRef = useDialogFocus(renderedOpen, close);
+  if (!renderedOpen || !proposal) return null;
   const blueprint = getServiceBlueprint(proposal.serviceId);
   const currentChecks = journeyChecks[proposal.viewId] ?? [];
   const blockingChecks = currentChecks.filter((check) => check.status === "fail");
@@ -40,16 +41,23 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
   });
   const literalValue = (value: unknown): string => {
     const serialized = JSON.stringify(value);
-    return (serialized ?? "undefined").slice(0, 160);
+    return serialized ?? "undefined";
   };
   const approve = async () => {
     try {
       await onApprove(proposal.id);
       onMessage(`${proposal.name} registered.`);
     } catch (error) {
+      // Revalidation can move this proposal back to draft while registration
+      // awaits browser work. Reconcile the UI state even though the proposal
+      // is no longer renderable so no detached dialog remains on the stack.
+      setDialog("proposalSheetOpen", false);
       onMessage(error instanceof Error ? error.message : "The workflow could not be registered.");
     }
   };
+  const approvalReason = validation.valid
+    ? undefined
+    : `Resolve ${validation.errors.length} validation ${validation.errors.length === 1 ? "error" : "errors"} and ${blockingChecks.length} blocking ${blockingChecks.length === 1 ? "check" : "checks"} before approval.`;
   return (
     <div className="dialog-backdrop proposal-backdrop">
       <div
@@ -143,10 +151,16 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
                             <span>Argument: {binding.argument}</span>
                             <span>Source: {binding.source}</span>
                             <span>Key: {binding.key ?? "—"}</span>
-                            <span>
-                              Value:{" "}
-                              {binding.source === "literal" ? literalValue(binding.value) : "—"}
-                            </span>
+                            {binding.source === "literal" ? (
+                              <span className="binding-value">
+                                Value:{" "}
+                                <code aria-label="Literal binding value">
+                                  {literalValue(binding.value)}
+                                </code>
+                              </span>
+                            ) : (
+                              <span>Value: —</span>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -199,6 +213,11 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
           </section>
         </div>
         <footer className="dialog-actions">
+          {approvalReason ? (
+            <p className="approval-disabled-reason" id="proposal-approval-reason">
+              {approvalReason}
+            </p>
+          ) : null}
           <button
             className="button button-secondary"
             type="button"
@@ -217,6 +236,8 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
             className="button button-primary"
             data-autofocus
             type="button"
+            disabled={!validation.valid}
+            aria-describedby={approvalReason ? "proposal-approval-reason" : undefined}
             onClick={() => void approve()}
           >
             Approve &amp; Register

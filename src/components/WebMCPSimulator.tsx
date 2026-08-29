@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { AppRuntime } from "../app/runtime";
 import { canonicalPreferences } from "../domain/seed";
 import { useAppStore } from "../store/useAppStore";
+import { createSchemaInputSample } from "../webmcp/toolInputSample";
 import type { WebMCPToolMetadata } from "../webmcp/types";
 import { useDialogFocus } from "./useDialogFocus";
 
@@ -68,29 +69,6 @@ const canonicalStageInput = (viewId: string) => ({
   stopAt: "review",
 });
 
-const schemaSample = (schema: Record<string, unknown>): unknown => {
-  if ("const" in schema) return schema.const;
-  const choices = Array.isArray(schema.enum) ? schema.enum : [];
-  if (choices.length) return choices.at(-1);
-  if (schema.type === "boolean") return true;
-  if (schema.type === "number" || schema.type === "integer") return 1;
-  if (schema.type === "array") {
-    const item = schema.items;
-    return schema.minItems && item && typeof item === "object"
-      ? [schemaSample(item as Record<string, unknown>)]
-      : [];
-  }
-  if (schema.type === "object") {
-    const properties =
-      schema.properties && typeof schema.properties === "object"
-        ? (schema.properties as Record<string, Record<string, unknown>>)
-        : {};
-    const required = Array.isArray(schema.required) ? (schema.required as string[]) : [];
-    return Object.fromEntries(required.map((key) => [key, schemaSample(properties[key] ?? {})]));
-  }
-  return "sample";
-};
-
 const sampleInputForTool = (
   tool: WebMCPToolMetadata,
   activeViewId: string | null,
@@ -115,7 +93,7 @@ const sampleInputForTool = (
     case "list_workflow_tools":
       return { includeDisabled: true };
     default:
-      return schemaSample(tool.inputSchema) as Record<string, unknown>;
+      return createSchemaInputSample(tool.inputSchema) as Record<string, unknown>;
   }
 };
 

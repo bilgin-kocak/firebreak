@@ -21,10 +21,7 @@ export const FinalConfirmationDialog = ({
   const confirmAddress = useAppStore((state) => state.human.confirmAddressSubmission);
   const close = useCallback(() => setDialog("finalConfirmationOpen", false), [setDialog]);
   const findFallback = useCallback(
-    () =>
-      document.querySelector<HTMLElement>(
-        "#adaptive-title, #permit-flow-title, #address-flow-title, #main-content",
-      ),
+    () => document.querySelector<HTMLElement>("#submission-success-heading"),
     [],
   );
   const dialogRef = useDialogFocus(open, close, undefined, findFallback);

@@ -144,7 +144,7 @@ describe("CivicWeave application", () => {
     expect(await screen.findByText("NST-PP-2026-08421")).toBeInTheDocument();
   });
 
-  it("returns final-confirmation focus to its review control on Escape and confirmation", async () => {
+  it("returns final-confirmation focus to review on Escape and to read-only success after submit", async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole("button", { name: /start parking permit renewal/i }));
@@ -163,7 +163,22 @@ describe("CivicWeave application", () => {
       name: /confirm fictional submission/i,
     });
     await user.click(within(confirmation).getByRole("button", { name: /confirm & submit/i }));
-    await waitFor(() => expect(review).toHaveFocus());
+    const successHeading = await screen.findByRole("heading", { name: /submission confirmed/i });
+    await waitFor(() => expect(successHeading).toHaveFocus());
+    expect(review).not.toBeInTheDocument();
+    const main = screen.getByRole("main");
+    expect(within(main).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(within(main).queryByRole("radio")).not.toBeInTheDocument();
+
+    const submittedDraft = structuredClone(
+      useAppStore.getState().serviceDrafts.parking_permit_renewal,
+    );
+    expect(() =>
+      useAppStore
+        .getState()
+        .human.setDraftField("parking_permit_renewal", "contactEmail", "unsafe-edit@example.test"),
+    ).toThrow(/submitted draft cannot be edited/i);
+    expect(useAppStore.getState().serviceDrafts.parking_permit_renewal).toEqual(submittedDraft);
   });
 
   it("completes the generic manual address flow", async () => {
@@ -313,7 +328,15 @@ describe("CivicWeave application", () => {
     expect(within(confirmation).getByText(/awaiting your confirmation/i)).toBeInTheDocument();
     expect(screen.queryByText("NST-PP-2026-08421")).not.toBeInTheDocument();
     await user.click(within(confirmation).getByRole("button", { name: /confirm & submit/i }));
-    expect(await screen.findByText("NST-PP-2026-08421")).toBeInTheDocument();
+    const success = await screen.findByRole("region", { name: /submission confirmed/i });
+    expect(within(success).getByText("NST-PP-2026-08421")).toBeInTheDocument();
+    expect(within(screen.getByRole("main")).queryByRole("radio")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("main")).queryByRole("button", { name: /review draft/i }),
+    ).not.toBeInTheDocument();
+    expect(() =>
+      useAppStore.getState().human.setDraftField("parking_permit_renewal", "durationMonths", 6),
+    ).toThrow(/submitted draft cannot be edited/i);
   });
 
   it("traps proposal focus, closes on Escape, and returns focus to the staging control", async () => {
@@ -410,11 +433,102 @@ describe("CivicWeave application", () => {
     expect(within(sheet).getAllByText(/source: portal_state/i)).toHaveLength(2);
     expect(within(sheet).getByText(/key: currentVehicleId/i)).toBeInTheDocument();
     expect(within(sheet).getByText(/source: literal/i)).toBeInTheDocument();
-    expect(within(sheet).getByText(/value: "<script>unsafe\(\)<\/script>"/i)).toBeInTheDocument();
+    expect(within(sheet).getByLabelText(/literal binding value/i)).toHaveTextContent(
+      '"<script>unsafe()</script>"',
+    );
     expect(sheet.querySelector("script")).toBeNull();
     expect(within(sheet).getByText(/^2 current validation errors$/i)).toBeInTheDocument();
     expect(within(sheet).getByText(/^1 blocking journey checks$/i)).toBeInTheDocument();
     expect(within(sheet).getByText("Stored validation detail")).toBeInTheDocument();
+    const approve = within(sheet).getByRole("button", { name: /approve & register/i });
+    expect(approve).toBeDisabled();
+    expect(approve).toHaveAccessibleDescription(
+      /resolve 2 validation errors and 1 blocking check/i,
+    );
+  });
+
+  it("renders a complete long literal binding value without executing its markup", async () => {
+    const user = userEvent.setup();
+    const longEmail = `${"a".repeat(64)}@${"b".repeat(63)}.${"c".repeat(125)}`;
+    expect(longEmail).toHaveLength(254);
+    render(<App />);
+    await compileAndCheck(user);
+    await runSimulatorStep(user, /stage guided tool/i);
+    const proposal = Object.values(useAppStore.getState().proposals).find(
+      (item) => item.status === "awaiting_approval",
+    );
+    expect(proposal).toBeDefined();
+
+    act(() => {
+      useAppStore.setState((state) => ({
+        proposals: {
+          ...state.proposals,
+          [proposal!.id]: {
+            ...proposal!,
+            operations: proposal!.operations.map((operation) =>
+              operation.operationId === "permit.set_contact"
+                ? {
+                    ...operation,
+                    bindings: [{ argument: "email", source: "literal" as const, value: longEmail }],
+                  }
+                : operation,
+            ),
+          },
+        },
+      }));
+    });
+
+    const sheet = await screen.findByRole("dialog", { name: /review reusable tool/i });
+    const literal = within(sheet).getByLabelText(/literal binding value/i);
+    expect(literal).toHaveTextContent(JSON.stringify(longEmail));
+    expect(literal.textContent).toBe(JSON.stringify(longEmail));
+    expect(literal.textContent?.endsWith(`${"c".repeat(125)}"`)).toBe(true);
+    expect(sheet.querySelector("script")).toBeNull();
+  });
+
+  it("cleans up proposal focus and dialog state when approval revalidation loses a race", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await compileAndCheck(user);
+    const simulator = await screen.findByRole("dialog", { name: /webmcp simulator/i });
+    const stageButton = within(simulator).getByRole("button", { name: /stage guided tool/i });
+    await user.click(stageButton);
+    const sheet = await screen.findByRole("dialog", { name: /review reusable tool/i });
+    const proposal = Object.values(useAppStore.getState().proposals).find(
+      (item) => item.status === "awaiting_approval",
+    );
+    expect(proposal).toBeDefined();
+
+    fireEvent.click(within(sheet).getByRole("button", { name: /approve & register/i }));
+    act(() => {
+      useAppStore.setState((state) => ({
+        journeyChecks: {
+          ...state.journeyChecks,
+          [proposal!.viewId]: [
+            {
+              id: "large_target_size",
+              title: "Large controls are available",
+              status: "fail",
+              detail: "A newly measured control is too small.",
+            },
+          ],
+        },
+      }));
+    });
+
+    await waitFor(() => expect(sheet).not.toBeInTheDocument());
+    expect(useAppStore.getState().dialogs.proposalSheetOpen).toBe(false);
+    expect(useAppStore.getState().proposals[proposal!.id]?.status).toBe("draft");
+    await waitFor(() =>
+      expect(useAppStore.getState().webmcp.registeredToolNames).not.toContain(
+        "renew_permit_guided",
+      ),
+    );
+    await waitFor(() => expect(stageButton).toHaveFocus());
+    await user.keyboard("{Tab}");
+    expect(simulator).toContainElement(document.activeElement as HTMLElement);
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(simulator).not.toBeInTheDocument());
   });
 
   it("prefills every static simulator tool with canonical JSON and shows complete annotations", async () => {

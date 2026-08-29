@@ -53,7 +53,16 @@ export const useDialogFocus = (
         if (index >= 0) dialogStack.splice(index, 1);
       }
       if (capturedTarget?.isConnected) capturedTarget.focus();
-      else getFallbackTarget?.()?.focus();
+      else {
+        const fallback = getFallbackTarget?.();
+        if (fallback?.isConnected) fallback.focus();
+        else {
+          // A successful action can replace the entire view in the same React
+          // commit that removes this dialog. Let that replacement mount before
+          // resolving its meaningful focus destination.
+          window.setTimeout(() => getFallbackTarget?.()?.focus(), 0);
+        }
+      }
     };
   }, [getFallbackTarget, onClose, open, returnTarget]);
 

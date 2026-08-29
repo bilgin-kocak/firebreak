@@ -8,6 +8,7 @@ import { DynamicToolManager } from "./dynamicToolManager";
 import { createMemoryAdapter } from "./memoryAdapter";
 import { registerStaticTools } from "./registerStaticTools";
 import { ToolRegistry } from "./registry";
+import { createSchemaInputSample } from "./toolInputSample";
 
 const canonicalProposalInput = {
   name: "renew_permit_guided",
@@ -132,6 +133,63 @@ const stageAddressProposal = async () => {
   });
   const proposalId = Object.keys(getAppState().proposals)[0];
   if (!proposalId) throw new Error("Address proposal was not staged");
+  return { adapter, registry, proposalId };
+};
+
+const stageEmailProposal = async () => {
+  const adapter = createMemoryAdapter();
+  const registry = new ToolRegistry(adapter);
+  await registerStaticTools(registry);
+  await adapter.executeTool("compile_task_view", {
+    serviceId: "parking_permit_renewal",
+    title: "Renew your parking permit",
+    goal: "Prepare a renewal and stop for human review.",
+    preferences: canonicalPreferencesFixture,
+    fieldOrder: ["vehicleId", "permitDurationMonths", "contactEmail", "currentPermitSummary"],
+    hiddenOptionalFields: ["communicationPreference"],
+    copyOverrides: [],
+    requireHumanConfirmation: true,
+  });
+  const viewId = getAppState().activeViewId;
+  if (!viewId) throw new Error("Email view was not created");
+  await adapter.executeTool("run_journey_checks", { viewId });
+  await adapter.executeTool("stage_workflow_tool", {
+    viewId,
+    name: "renew_permit_email_guided",
+    title: "Guided permit renewal by email",
+    description: "Prepare a parking permit renewal with a supplied email and stop for review.",
+    parameters: [
+      {
+        name: "contactEmail",
+        fieldId: "contactEmail",
+        description: "Email for renewal notices.",
+        required: true,
+      },
+    ],
+    operations: [
+      { operationId: "permit.load_current", bindings: [] },
+      {
+        operationId: "permit.set_vehicle",
+        bindings: [{ argument: "vehicleId", source: "portal_state", key: "currentVehicleId" }],
+      },
+      {
+        operationId: "permit.set_duration",
+        bindings: [{ argument: "months", source: "literal", value: 12 }],
+      },
+      {
+        operationId: "permit.set_contact",
+        bindings: [{ argument: "email", source: "tool_input", key: "contactEmail" }],
+      },
+      { operationId: "permit.calculate_fee", bindings: [] },
+      { operationId: "permit.save_draft", bindings: [] },
+      { operationId: "permit.stage_review", bindings: [] },
+    ],
+    stopAt: "review",
+  });
+  const proposalId = Object.values(getAppState().proposals).find(
+    (proposal) => proposal.status === "awaiting_approval",
+  )?.id;
+  if (!proposalId) throw new Error("Email proposal was not staged");
   return { adapter, registry, proposalId };
 };
 
@@ -585,5 +643,58 @@ describe("DynamicToolManager", () => {
       saved: true,
       status: "staged_for_review",
     });
+  });
+
+  it("creates a schema-valid simulator sample for a dynamic email tool", async () => {
+    const { adapter, registry, proposalId } = await stageEmailProposal();
+    const manager = new DynamicToolManager(registry);
+    await manager.approveAndRegister(proposalId);
+    const tool = (await adapter.getTools()).find(
+      (candidate) => candidate.name === "renew_permit_email_guided",
+    );
+    if (!tool) throw new Error("Email tool was not registered");
+
+    const sample = createSchemaInputSample(tool.inputSchema) as Record<string, unknown>;
+    expect(sample).toEqual({ contactEmail: "resident@example.test" });
+    await expect(adapter.executeTool(tool.name, sample)).resolves.toMatchObject({
+      ok: true,
+      code: "DRAFT_STAGED",
+    });
+    expect(getAppState().serviceDrafts.parking_permit_renewal?.contactEmail).toBe(
+      "resident@example.test",
+    );
+  });
+
+  it("creates schema-valid constrained strings and dates for a dynamic address tool", async () => {
+    const { adapter, registry, proposalId } = await stageAddressProposal();
+    const manager = new DynamicToolManager(registry);
+    await manager.approveAndRegister(proposalId);
+    const tool = (await adapter.getTools()).find(
+      (candidate) => candidate.name === "change_address_guided",
+    );
+    if (!tool) throw new Error("Address tool was not registered");
+
+    const sample = createSchemaInputSample(tool.inputSchema) as Record<string, unknown>;
+    expect(sample).toMatchObject({ effectiveDate: "2026-09-01" });
+    expect(String(sample.street).length).toBeGreaterThanOrEqual(3);
+    expect(String(sample.city).length).toBeGreaterThanOrEqual(2);
+    expect(String(sample.postalCode).length).toBeGreaterThanOrEqual(3);
+    await expect(adapter.executeTool(tool.name, sample)).resolves.toMatchObject({
+      ok: true,
+      code: "DRAFT_STAGED",
+    });
+  });
+
+  it("honors enum, primitive type, length, and trusted pattern constraints in samples", () => {
+    expect(createSchemaInputSample({ type: "integer", enum: [6, 12] })).toBe(12);
+    expect(createSchemaInputSample({ type: "boolean" })).toBe(true);
+    const sample = createSchemaInputSample({
+      type: "string",
+      minLength: 5,
+      maxLength: 8,
+      pattern: "^[A-Z0-9]+$",
+    });
+    expect(sample).toMatch(/^[A-Z0-9]+$/);
+    expect(String(sample)).toHaveLength(5);
   });
 });
