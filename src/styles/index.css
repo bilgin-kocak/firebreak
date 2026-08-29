@@ -1901,21 +1901,39 @@ pre {
   font-size: 0.68rem;
 }
 .toast-region {
-  position: fixed;
-  z-index: 160;
-  right: 18px;
-  bottom: 18px;
-  pointer-events: none;
+  width: 100%;
+  max-width: 1680px;
+  margin: 0 auto;
+  display: grid;
 }
 .toast {
-  max-width: min(420px, calc(100vw - 36px));
-  padding: 11px 14px;
+  min-height: 52px;
+  margin: 10px clamp(18px, 3vw, 42px) 0;
+  padding: 4px 4px 4px 14px;
   border-radius: 9px;
   background: var(--navy);
   color: white;
   box-shadow: var(--shadow);
   font-size: 0.75rem;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.toast button {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+.toast button:focus-visible {
+  outline-color: white;
 }
 
 @keyframes view-enter {

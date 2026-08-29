@@ -130,6 +130,15 @@ const screenshot = async (page: Page, testInfo: TestInfo, name: string) => {
   await page.screenshot({ path: testInfo.outputPath(name), fullPage: true });
 };
 
+const boxesOverlap = (
+  left: { x: number; y: number; width: number; height: number },
+  right: { x: number; y: number; width: number; height: number },
+) =>
+  left.x < right.x + right.width &&
+  left.x + left.width > right.x &&
+  left.y < right.y + right.height &&
+  left.y + left.height > right.y;
+
 test("canonical two-prompt journey compiles, approves, invokes, and submits through the human gate", async ({
   page,
 }, testInfo) => {
@@ -304,7 +313,21 @@ test("canonical two-prompt journey compiles, approves, invokes, and submits thro
   await expect(
     page.getByText("Your fictional Northstar City permit renewal was submitted."),
   ).toBeVisible();
+  const successToast = page.locator(".toast");
+  const desktopRailPanel = page.locator('.right-rail [role="tabpanel"]');
+  await expect(successToast).toBeVisible();
+  await expect(page.locator(".toast-region")).toHaveAttribute("aria-live", "polite");
+  const successToastBox = await successToast.boundingBox();
+  const desktopRailPanelBox = await desktopRailPanel.boundingBox();
+  expect(successToastBox).not.toBeNull();
+  expect(desktopRailPanelBox).not.toBeNull();
+  expect(boxesOverlap(successToastBox!, desktopRailPanelBox!)).toBe(false);
   await screenshot(page, testInfo, "canonical-submitted-desktop.png");
+
+  const dismissNotification = page.getByRole("button", { name: "Dismiss notification" });
+  await expect(dismissNotification).toBeVisible();
+  await dismissNotification.press("Enter");
+  await expect(successToast).toBeHidden();
 
   expect(runtimeErrors).toEqual([]);
 });

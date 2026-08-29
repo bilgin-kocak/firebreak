@@ -84,6 +84,15 @@ const expectNoHorizontalOverflow = async (page: Page) => {
 const screenshot = (page: Page, testInfo: TestInfo, name: string) =>
   page.screenshot({ path: testInfo.outputPath(name), fullPage: true });
 
+const boxesOverlap = (
+  left: { x: number; y: number; width: number; height: number },
+  right: { x: number; y: number; width: number; height: number },
+) =>
+  left.x < right.x + right.width &&
+  left.x + left.width > right.x &&
+  left.y < right.y + right.height &&
+  left.y + left.height > right.y;
+
 test("desktop 1440 by 1000 dense, adaptive, and proposal states do not overflow", async ({
   page,
 }, testInfo) => {
@@ -144,5 +153,13 @@ test("mobile 390 by 844 keeps every canonical state in bounds and captures the j
   await confirmation.getByRole("button", { name: "Confirm & Submit" }).click();
   await expect(page.getByRole("heading", { name: "Submission confirmed" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
+  const successToast = page.locator(".toast");
+  const submittedNote = page.locator(".submitted-readonly-note");
+  await expect(successToast).toBeVisible();
+  const successToastBox = await successToast.boundingBox();
+  const submittedNoteBox = await submittedNote.boundingBox();
+  expect(successToastBox).not.toBeNull();
+  expect(submittedNoteBox).not.toBeNull();
+  expect(boxesOverlap(successToastBox!, submittedNoteBox!)).toBe(false);
   await screenshot(page, testInfo, "responsive-submitted-mobile.png");
 });

@@ -113,6 +113,7 @@ export const App = () => {
         onReset={() => void resetDemo()}
         onOpenSimulator={() => setSimulatorOpen(true)}
       />
+      <ToastRegion message={toast} onDismiss={() => setToast("")} />
       <div className="workspace-grid">
         <div className="workspace-primary">
           <UnsupportedBrowserNotice mode={mode} />
@@ -154,7 +155,6 @@ export const App = () => {
         onClose={closeDelete}
         onDelete={deleteTool}
       />
-      <ToastRegion message={toast} />
     </div>
   );
 };
