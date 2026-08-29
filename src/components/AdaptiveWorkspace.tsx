@@ -1,0 +1,185 @@
+import { ArrowLeft, ArrowRight, BadgeCheck, ShieldCheck, WandSparkles } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
+import { parkingPermitFees } from "../domain/seed";
+import { getServiceBlueprint } from "../domain/serviceBlueprints";
+import type { FieldDefinition } from "../domain/types";
+import { resolveFieldCopy } from "../domain/viewCompiler";
+import { useAppStore } from "../store/useAppStore";
+import { AdaptiveField } from "./AdaptiveField";
+import { AdaptiveStep } from "./AdaptiveStep";
+import { LockButton } from "./LockButton";
+
+const draftValue = (
+  field: FieldDefinition,
+  draft: Record<string, unknown>,
+  resident: ReturnType<typeof useAppStore.getState>["resident"],
+): unknown => {
+  if (field.id === "permitDurationMonths") return draft.durationMonths;
+  if (field.id === "vehicleId") return draft.vehicleId ?? resident.activeParkingPermit.vehicleId;
+  if (field.id === "contactEmail") return draft.contactEmail ?? resident.email;
+  if (field.id === "currentPermitSummary")
+    return {
+      zone: resident.activeParkingPermit.zone,
+      expiresOn: resident.activeParkingPermit.expiresOn,
+      plate: resident.vehicles[0]?.plate ?? "",
+    };
+  if (field.id === "currentAddressSummary") return resident.address;
+  return draft[field.id];
+};
+
+export const AdaptiveWorkspace = () => {
+  const activeViewId = useAppStore((state) => state.activeViewId);
+  const view = useAppStore((state) => (activeViewId ? state.views[activeViewId] : undefined));
+  const resident = useAppStore((state) => state.resident);
+  const storedDraft = useAppStore((state) =>
+    view ? state.serviceDrafts[view.serviceId] : undefined,
+  );
+  const draft = storedDraft ?? {};
+  const human = useAppStore((state) => state.human);
+  const stage = useAppStore((state) => state.stageDraftForReview);
+  const [stepIndex, setStepIndex] = useState(0);
+  useEffect(() => setStepIndex(0), [view?.id]);
+  const blueprint = useMemo(() => (view ? getServiceBlueprint(view.serviceId) : undefined), [view]);
+  if (!view || !blueprint) return null;
+  const visibleFields = view.fieldOrder
+    .filter((id) => !view.hiddenOptionalFields.includes(id))
+    .map((id) => blueprint.fields.find((field) => field.id === id))
+    .filter((field): field is FieldDefinition => Boolean(field));
+  const grouped = view.preferences.navigationStyle === "grouped";
+  const currentFields = grouped
+    ? visibleFields
+    : [visibleFields[Math.min(stepIndex, visibleFields.length - 1)]].filter(
+        (field): field is FieldDefinition => Boolean(field),
+      );
+  const setValue = (fieldId: string, value: unknown) => {
+    if (fieldId === "permitDurationMonths") {
+      const months = value === 6 || value === 12 ? value : Number(value);
+      human.editDraft(view.serviceId, {
+        permitDurationMonths: months,
+        durationMonths: months,
+        fee: months === 6 || months === 12 ? parkingPermitFees[months] : undefined,
+      });
+    } else human.setDraftField(view.serviceId, fieldId, value);
+  };
+  const toggleLock = (elementId: string) =>
+    view.lockedElementIds.includes(elementId)
+      ? human.unlockElement(view.id, elementId)
+      : human.lockElement(view.id, elementId);
+  const prepareReview = () => {
+    if (view.serviceId === "parking_permit_renewal") {
+      const duration =
+        draft.durationMonths === 6 || draft.durationMonths === 12 ? draft.durationMonths : 12;
+      human.editDraft(view.serviceId, {
+        vehicleId: draft.vehicleId ?? resident.activeParkingPermit.vehicleId,
+        durationMonths: duration,
+        permitDurationMonths: duration,
+        contactEmail: draft.contactEmail ?? resident.email,
+        fee: parkingPermitFees[duration],
+      });
+    }
+    stage(view.serviceId);
+  };
+  return (
+    <section
+      id="adaptive-workspace"
+      className={`adaptive-workspace controls-${view.preferences.controlStyle}`}
+      aria-labelledby="adaptive-title"
+    >
+      <div className="adaptive-hero">
+        <div className="adaptive-kicker">
+          <WandSparkles size={18} /> Compiled adaptive view
+        </div>
+        <div className="adaptive-title-row">
+          <div>
+            <h1 id="adaptive-title">{view.title}</h1>
+            <p>{view.goal}</p>
+          </div>
+          <LockButton
+            label="generated title"
+            locked={view.lockedElementIds.includes("title")}
+            onToggle={() => toggleLock("title")}
+          />
+        </div>
+        <div className="preference-chips">
+          <span>{view.preferences.textSize} text</span>
+          <span>{view.preferences.languageStyle} language</span>
+          <span>{grouped ? "grouped fields" : "one question at a time"}</span>
+          <span>human confirmation</span>
+        </div>
+      </div>
+      <div className="trusted-notice">
+        <ShieldCheck size={19} />
+        <p>
+          <strong>Generated from trusted portal fields.</strong>
+          <span>No arbitrary code, markup, or submission action was created.</span>
+        </p>
+      </div>
+      {view.preferences.showProgress && !grouped ? (
+        <div className="adaptive-progress">
+          <div>
+            <span>
+              Step {stepIndex + 1} of {visibleFields.length}
+            </span>
+            <span>{Math.round(((stepIndex + 1) / visibleFields.length) * 100)}%</span>
+          </div>
+          <progress aria-label="Task progress" max={visibleFields.length} value={stepIndex + 1} />
+        </div>
+      ) : null}
+      <div className="adaptive-fields">
+        {currentFields.map((field, localIndex) => {
+          const copy = resolveFieldCopy(view, field.id);
+          const actualIndex = grouped ? localIndex : stepIndex;
+          return (
+            <AdaptiveStep
+              key={field.id}
+              index={actualIndex}
+              total={visibleFields.length}
+              fieldId={field.id}
+              locked={view.lockedElementIds.includes(`field:${field.id}`)}
+              copyLocked={view.lockedElementIds.includes(`copy:${field.id}`)}
+              onToggleFieldLock={() => toggleLock(`field:${field.id}`)}
+              onToggleCopyLock={() => toggleLock(`copy:${field.id}`)}
+            >
+              <AdaptiveField
+                field={field}
+                label={copy.label}
+                helpText={copy.helpText}
+                value={draftValue(field, draft, resident)}
+                large={view.preferences.controlStyle === "large_cards"}
+                onChange={(value) => setValue(field.id, value)}
+              />
+            </AdaptiveStep>
+          );
+        })}
+      </div>
+      <div className="adaptive-navigation">
+        {!grouped ? (
+          <button
+            className="button button-secondary"
+            type="button"
+            disabled={stepIndex === 0}
+            onClick={() => setStepIndex((index) => Math.max(0, index - 1))}
+          >
+            <ArrowLeft size={18} /> Previous question
+          </button>
+        ) : (
+          <span />
+        )}
+        {!grouped && stepIndex < visibleFields.length - 1 ? (
+          <button
+            className="button button-primary"
+            type="button"
+            onClick={() => setStepIndex((index) => Math.min(visibleFields.length - 1, index + 1))}
+          >
+            Next question <ArrowRight size={18} />
+          </button>
+        ) : (
+          <button className="button button-primary" type="button" onClick={prepareReview}>
+            <BadgeCheck size={18} /> Review draft
+          </button>
+        )}
+      </div>
+    </section>
+  );
+};
