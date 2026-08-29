@@ -9,6 +9,9 @@ Implementation planning is complete. The full 2,253-line build specification has
 ## Completed
 
 - Read `CivicWeave_Complete_Build_Spec.md` completely before changing project files.
+- Established the Task 1 strict React/Vite/TypeScript foundation with required package scripts, ESLint, Prettier, Vitest, and Playwright configuration.
+- Added Zod-backed domain contracts, exact fictional seed data, canonical preferences, deterministic clock/ID seams, and generic blueprints for Parking Permit Renewal and Address Change.
+- Verified Task 1 with lint, Prettier, strict typecheck, and five focused domain-contract tests.
 - Classified the work as an architectural build with the supplied specification as the approved product design.
 - Mapped all Section 26 P0 acceptance criteria into the implementation plan.
 - Chosen the required client-side React, strict TypeScript, schema-interpreted architecture.
@@ -16,7 +19,7 @@ Implementation planning is complete. The full 2,253-line build specification has
 
 ## In progress
 
-- Strict project foundation, dependency setup, and initial failing domain tests.
+- Safe interface compiler, atomic patching, and deterministic checks.
 
 ## Remaining
 
@@ -29,7 +32,7 @@ Implementation planning is complete. The full 2,253-line build specification has
 
 ## Current failures
 
-- The application and test harness do not yet exist; all required checks are pending initial setup.
+- Application UI, browser coverage, and the remaining domain modules are not implemented yet; their checks are pending their assigned tasks.
 
 ## Unavoidable deviations
 

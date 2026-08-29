@@ -1,0 +1,7 @@
+dist
+node_modules
+playwright-report
+test-results
+package-lock.json
+CivicWeave_Complete_Build_Spec.md
+docs/superpowers/plans/
