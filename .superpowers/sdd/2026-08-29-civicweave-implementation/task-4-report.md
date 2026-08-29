@@ -48,3 +48,42 @@
 
 - The full production build cannot pass until the task responsible for `src/main.tsx` adds that missing application entry.
 - WebMCP registration will need to wire its dynamic-manager unregister function into `registerDynamicToolUnregister`; Task 4 provides the seam but does not implement WebMCP registration.
+
+## Fix Round 1
+
+### Root Causes
+
+- Draft staging previously set `staged_for_review` unconditionally, and edits could reopen a submitted portal state.
+- Activity redaction only replaced same-line email/payload fragments, leaving JSON keys and multiline form data visible.
+- Human actions lived beside agent actions in the same exported store projection.
+- Proposal status was accepted from callers rather than advanced through enforced transitions.
+- Reset awaited the dynamic unregister hook without a recovery path.
+
+### Changes
+
+- Enforced staged-review draft requirements for both services and stable `DomainError` codes for forbidden state transitions.
+- Moved edit, lock/unlock, approval/rejection, disable/delete, and final confirmation into `state.human`; `getAppState()` now returns a deliberately narrower `ToolAppState` with no human capabilities.
+- Added proposal transitions `draft → validated → awaiting_approval → registered → disabled`, plus the rejection branch and human-only delete.
+- Replaced partial activity redaction with a conservative allowlist sanitizer: JSON, assignments, bracketed data, form-data/body/payload labels, multiline text, and email-like text become `Details redacted for privacy.` before persistence.
+- Added chronological ordering selector/action, explicit metric actions, and reset cleanup in `try/catch/finally`.
+
+### Red / Green Evidence
+
+1. Red — `npm test -- src/store/useAppStore.test.ts`
+   - `7 failed`: idle staging did not throw; WebMCP projection exposed human actions; proposal transition/metric/order APIs were absent; raw payload kept `secret`; unregister rejection escaped reset.
+2. Green — `npm test -- src/store/useAppStore.test.ts src/store/persistence.test.ts`
+   - `2 passed`, `21 passed`.
+3. Full verification — `npm run typecheck && npm run lint && npm run format:check && npm test`
+   - Typecheck exit 0; lint exit 0; Prettier clean; `7 passed`, `80 passed`.
+
+### Exact Commands and Output
+
+- `npm test -- src/store/useAppStore.test.ts src/store/persistence.test.ts` — 2 files passed, 21 tests passed.
+- `npm run typecheck` — exit 0.
+- `npm run lint` — exit 0, zero warnings.
+- `npm run format:check` — `All matched files use Prettier code style!`
+- `npm test` — 7 test files passed, 80 tests passed.
+
+### Remaining Concern
+
+- Dynamic registration/disable/delete implementation must invoke the relevant browser adapter unregister lifecycle around the human-only store methods; this store supplies the capability boundary and reset hook, while the WebMCP task owns adapter lifecycle wiring.

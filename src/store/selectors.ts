@@ -6,6 +6,8 @@ export const selectCurrentService = (state: AppState) => state.currentService;
 export const selectActiveView = (state: AppState) =>
   state.activeViewId ? state.views[state.activeViewId] : undefined;
 export const selectActivity = (state: AppState) => state.activity;
+export const selectOrderedActivity = (state: Pick<AppState, "activity" | "rightRail">) =>
+  state.rightRail.chronological ? [...state.activity].reverse() : state.activity;
 export const selectRightRailTab = (state: AppState): RightRailTab => state.rightRail.activeTab;
 export const selectApprovedWorkflowTools = (state: AppState) => state.approvedWorkflowTools;
 export const selectWebMCPMetadata = (state: AppState) => state.webmcp;
