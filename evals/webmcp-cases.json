@@ -301,7 +301,7 @@
     "expectedOutcome": {
       "ok": false,
       "code": "INVALID_TOOL_INPUT",
-      "retryable": false
+      "retryable": true
     }
   },
   {
