@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { executeWorkflow, type WorkflowExecutionContext } from "./workflowExecutor";
+import { operationRegistry } from "./operationRegistry";
 import type { WorkflowToolProposal } from "./types";
 import { cloneSeedResident } from "./seed";
 
@@ -36,6 +37,53 @@ const canonicalProposal = (): WorkflowToolProposal => ({
     { operationId: "permit.calculate_fee", bindings: [] },
     { operationId: "permit.save_draft", bindings: [] },
     { operationId: "permit.stage_review", bindings: [] },
+  ],
+  stopAt: "review",
+  status: "awaiting_approval",
+  validationErrors: [],
+  createdAt: "2026-08-29T10:00:00.000Z",
+});
+
+const addressProposal = (): WorkflowToolProposal => ({
+  id: "workflow_address",
+  viewId: "view_address",
+  serviceId: "address_change",
+  name: "update_address_guided",
+  title: "Guided address change",
+  description: "Prepare an address change and stop for human review.",
+  parameters: [
+    { name: "street", fieldId: "newStreet", description: "New street address.", required: true },
+    { name: "city", fieldId: "newCity", description: "New city.", required: true },
+    {
+      name: "postalCode",
+      fieldId: "newPostalCode",
+      description: "New postal code.",
+      required: true,
+    },
+    {
+      name: "effectiveDate",
+      fieldId: "effectiveDate",
+      description: "Date the address takes effect.",
+      required: true,
+    },
+  ],
+  operations: [
+    { operationId: "address.load_current", bindings: [] },
+    {
+      operationId: "address.set_new",
+      bindings: [
+        { argument: "street", source: "tool_input", key: "street" },
+        { argument: "city", source: "tool_input", key: "city" },
+        { argument: "postalCode", source: "tool_input", key: "postalCode" },
+      ],
+    },
+    {
+      operationId: "address.set_effective_date",
+      bindings: [{ argument: "effectiveDate", source: "tool_input", key: "effectiveDate" }],
+    },
+    { operationId: "address.validate", bindings: [] },
+    { operationId: "address.save_draft", bindings: [] },
+    { operationId: "address.stage_review", bindings: [] },
   ],
   stopAt: "review",
   status: "awaiting_approval",
@@ -154,5 +202,104 @@ describe("workflow executor", () => {
 
     expect(result).toMatchObject({ code: "OPERATION_FAILED", submitted: false });
     expect(context.serviceDrafts.parking_permit_renewal).toEqual({ preserved: "before-run" });
+  });
+
+  it("rolls back draft and portal state when a progress observer throws after a mutation", async () => {
+    const context = createContext();
+    const draftBefore = structuredClone(context.serviceDrafts.parking_permit_renewal);
+    const portalStateBefore = context.portalState?.parking_permit_renewal;
+    context.onProgress = (entry) => {
+      if (entry.operationId === "permit.set_vehicle") throw new Error("timeline unavailable");
+    };
+
+    await expect(
+      executeWorkflow(canonicalProposal(), { durationMonths: 12 }, context),
+    ).resolves.toMatchObject({
+      code: "OPERATION_FAILED",
+      submitted: false,
+    });
+    expect(context.serviceDrafts.parking_permit_renewal).toEqual(draftBefore);
+    expect(context.portalState?.parking_permit_renewal).toBe(portalStateBefore);
+  });
+
+  it("stages an Address Change through the shared executor without submitting", async () => {
+    const context = createContext();
+
+    const result = await executeWorkflow(
+      addressProposal(),
+      {
+        street: "500 Market Street",
+        city: "Northstar",
+        postalCode: "NS 20419",
+        effectiveDate: "2026-10-01",
+      },
+      context,
+    );
+
+    expect(result).toMatchObject({
+      code: "DRAFT_STAGED",
+      status: "awaiting_user_confirmation",
+      submitted: false,
+    });
+    expect(context.serviceDrafts.address_change).toMatchObject({
+      street: "500 Market Street",
+      city: "Northstar",
+      postalCode: "NS 20419",
+      effectiveDate: "2026-10-01",
+      saved: true,
+      status: "staged_for_review",
+    });
+  });
+
+  it("rolls back an Address Change on cancellation through the same executor", async () => {
+    const context = createContext();
+    context.serviceDrafts.address_change = { preserved: "address-before" };
+    context.portalState = { ...context.portalState, address_change: "idle" };
+    const draftBefore = structuredClone(context.serviceDrafts.address_change);
+    const portalStateBefore = context.portalState.address_change;
+    const controller = new AbortController();
+    context.onProgress = (entry) => {
+      if (entry.operationId === "address.set_new") controller.abort();
+    };
+
+    const result = await executeWorkflow(
+      addressProposal(),
+      {
+        street: "500 Market Street",
+        city: "Northstar",
+        postalCode: "NS 20419",
+        effectiveDate: "2026-10-01",
+      },
+      context,
+      controller.signal,
+    );
+
+    expect(result).toMatchObject({ code: "EXECUTION_CANCELLED", submitted: false });
+    expect(context.serviceDrafts.address_change).toEqual(draftBefore);
+    expect(context.portalState.address_change).toBe(portalStateBefore);
+  });
+
+  it("rejects impossible calendar dates in dynamic input and direct operation execution", async () => {
+    const context = createContext();
+    const addressBefore = context.serviceDrafts.address_change;
+
+    const result = await executeWorkflow(
+      addressProposal(),
+      {
+        street: "500 Market Street",
+        city: "Northstar",
+        postalCode: "NS 20419",
+        effectiveDate: "2026-02-30",
+      },
+      context,
+    );
+
+    expect(result).toMatchObject({ code: "OPERATION_FAILED", submitted: false });
+    expect(context.serviceDrafts.address_change).toBe(addressBefore);
+    await expect(
+      operationRegistry["address.set_effective_date"]?.execute(context, {
+        effectiveDate: "2026-99-99",
+      }),
+    ).rejects.toThrow("Effective date is invalid");
   });
 });

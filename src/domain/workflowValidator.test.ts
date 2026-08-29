@@ -46,6 +46,53 @@ const canonicalProposal = (): WorkflowToolProposal => ({
   createdAt: now.toISOString(),
 });
 
+const addressProposal = (): WorkflowToolProposal => ({
+  id: "workflow_address",
+  viewId: "view_address",
+  serviceId: "address_change",
+  name: "update_address_guided",
+  title: "Guided address change",
+  description: "Prepare an address change and stop for human review.",
+  parameters: [
+    { name: "street", fieldId: "newStreet", description: "New street address.", required: true },
+    { name: "city", fieldId: "newCity", description: "New city.", required: true },
+    {
+      name: "postalCode",
+      fieldId: "newPostalCode",
+      description: "New postal code.",
+      required: true,
+    },
+    {
+      name: "effectiveDate",
+      fieldId: "effectiveDate",
+      description: "Date the address takes effect.",
+      required: true,
+    },
+  ],
+  operations: [
+    { operationId: "address.load_current", bindings: [] },
+    {
+      operationId: "address.set_new",
+      bindings: [
+        { argument: "street", source: "tool_input", key: "street" },
+        { argument: "city", source: "tool_input", key: "city" },
+        { argument: "postalCode", source: "tool_input", key: "postalCode" },
+      ],
+    },
+    {
+      operationId: "address.set_effective_date",
+      bindings: [{ argument: "effectiveDate", source: "tool_input", key: "effectiveDate" }],
+    },
+    { operationId: "address.validate", bindings: [] },
+    { operationId: "address.save_draft", bindings: [] },
+    { operationId: "address.stage_review", bindings: [] },
+  ],
+  stopAt: "review",
+  status: "draft",
+  validationErrors: [],
+  createdAt: now.toISOString(),
+});
+
 describe("trusted operation registry", () => {
   it("keeps both final submission operations human-only and non-compilable", () => {
     expect(operationRegistry["permit.submit"]).toMatchObject({
@@ -131,6 +178,46 @@ describe("workflow proposal validator", () => {
     proposal.operations[2] = {
       operationId: "permit.set_duration",
       bindings: [{ argument: "months", source: "literal", value: 9 }],
+    };
+
+    expect(validateWorkflowProposal(proposal).errors).toContainEqual(
+      expect.objectContaining({ code: "INVALID_BINDING" }),
+    );
+  });
+
+  it("rejects allowlisted portal state whose trusted value schema cannot satisfy an argument", () => {
+    const proposal = canonicalProposal();
+    proposal.operations[2] = {
+      operationId: "permit.set_duration",
+      bindings: [{ argument: "months", source: "portal_state", key: "currentVehicleId" }],
+    };
+
+    expect(validateWorkflowProposal(proposal).errors).toContainEqual(
+      expect.objectContaining({ code: "INVALID_BINDING" }),
+    );
+  });
+
+  it("rejects a tool-input field whose length range can exceed the operation argument", () => {
+    const proposal = addressProposal();
+    proposal.operations[1] = {
+      operationId: "address.set_new",
+      bindings: [
+        { argument: "street", source: "tool_input", key: "street" },
+        { argument: "city", source: "tool_input", key: "city" },
+        { argument: "postalCode", source: "tool_input", key: "street" },
+      ],
+    };
+
+    expect(validateWorkflowProposal(proposal).errors).toContainEqual(
+      expect.objectContaining({ code: "INVALID_BINDING" }),
+    );
+  });
+
+  it("rejects impossible calendar dates in literal bindings", () => {
+    const proposal = addressProposal();
+    proposal.operations[2] = {
+      operationId: "address.set_effective_date",
+      bindings: [{ argument: "effectiveDate", source: "literal", value: "2026-02-30" }],
     };
 
     expect(validateWorkflowProposal(proposal).errors).toContainEqual(

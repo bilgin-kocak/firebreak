@@ -91,9 +91,17 @@ const resolveArguments = (
 
 const isCancelled = (signal?: AbortSignal): boolean => signal?.aborted === true;
 
-const progress = (context: WorkflowExecutionContext, entry: WorkflowProgressEntry): void => {
+const recordProgress = (
+  context: WorkflowExecutionContext,
+  entry: WorkflowProgressEntry,
+): string | undefined => {
   context.progress.push(entry);
-  context.onProgress?.(entry);
+  try {
+    context.onProgress?.(entry);
+    return undefined;
+  } catch {
+    return "Workflow progress observer failed";
+  }
 };
 
 export const executeWorkflow = async (
@@ -150,11 +158,15 @@ export const executeWorkflow = async (
       const args = resolveArguments(step, proposal, input, context);
       await operation.execute(context, args, signal);
       completedOperationIds.push(operation.id);
-      progress(context, { operationId: operation.id, status: "completed" });
+      const observerError = recordProgress(context, {
+        operationId: operation.id,
+        status: "completed",
+      });
+      if (observerError) return fail("OPERATION_FAILED", observerError);
       if (isCancelled(signal)) return fail("EXECUTION_CANCELLED");
     } catch (error) {
       if (isCancelled(signal)) return fail("EXECUTION_CANCELLED");
-      progress(context, { operationId: operation.id, status: "failed" });
+      context.progress.push({ operationId: operation.id, status: "failed" });
       return fail("OPERATION_FAILED", error instanceof Error ? error.message : "Operation failed");
     }
   }

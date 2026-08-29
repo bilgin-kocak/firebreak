@@ -55,18 +55,35 @@ const fieldInputSchema = (serviceId: ServiceId, fieldId: string): JsonSchema | u
     type: "string",
     minLength: field.validation.minLength,
     maxLength: field.validation.maxLength,
+    pattern: field.validation.pattern,
   };
 };
 
-const schemasCompatible = (parameterSchema: JsonSchema, argumentSchema: JsonSchema): boolean => {
-  if (parameterSchema.type !== argumentSchema.type) return false;
-  if (argumentSchema.enum) {
-    return (
-      parameterSchema.enum !== undefined &&
-      parameterSchema.enum.every((value) => argumentSchema.enum?.includes(value))
-    );
+/** Returns true only when every value admitted by sourceSchema is valid for argumentSchema. */
+const schemasCompatible = (sourceSchema: JsonSchema, argumentSchema: JsonSchema): boolean => {
+  if (sourceSchema.type !== argumentSchema.type) return false;
+  if (sourceSchema.enum !== undefined) {
+    return sourceSchema.enum.every((value) => validateJsonSchema(argumentSchema, value));
   }
-  if (argumentSchema.format && parameterSchema.format !== argumentSchema.format) return false;
+  if (argumentSchema.enum !== undefined) return false;
+  if (argumentSchema.format !== undefined && sourceSchema.format !== argumentSchema.format) {
+    return false;
+  }
+  if (
+    argumentSchema.minLength !== undefined &&
+    (sourceSchema.minLength === undefined || sourceSchema.minLength < argumentSchema.minLength)
+  ) {
+    return false;
+  }
+  if (
+    argumentSchema.maxLength !== undefined &&
+    (sourceSchema.maxLength === undefined || sourceSchema.maxLength > argumentSchema.maxLength)
+  ) {
+    return false;
+  }
+  if (argumentSchema.pattern !== undefined && sourceSchema.pattern !== argumentSchema.pattern) {
+    return false;
+  }
   return true;
 };
 
@@ -234,11 +251,14 @@ export const validateWorkflowProposal = (
         }
       }
       if (binding.source === "portal_state") {
-        if (!binding.key || !(binding.key in portalStateAllowlist[proposal.serviceId])) {
+        const sourceSchema = binding.key
+          ? portalStateAllowlist[proposal.serviceId][binding.key]
+          : undefined;
+        if (!sourceSchema || !schemasCompatible(sourceSchema, argumentSchema)) {
           add(
             errors,
             "INVALID_BINDING",
-            `Portal-state binding for ${argument} is not allowlisted.`,
+            `Portal-state binding for ${argument} is not allowlisted or compatible.`,
             `operations.${index}`,
           );
         }

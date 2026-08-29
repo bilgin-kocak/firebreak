@@ -7,6 +7,7 @@ export type JsonSchema = {
   format?: "email" | "date";
   minLength?: number;
   maxLength?: number;
+  pattern?: string;
   properties?: Record<string, JsonSchema>;
   required?: readonly string[];
   additionalProperties?: boolean;
@@ -50,13 +51,20 @@ export interface OperationDefinition {
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
+const isCalendarDate = (value: string): boolean => {
+  if (!datePattern.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+};
+
 export const validateJsonSchema = (schema: JsonSchema, value: unknown): boolean => {
   if (schema.type === "string") {
     if (typeof value !== "string") return false;
     if (schema.minLength !== undefined && value.length < schema.minLength) return false;
     if (schema.maxLength !== undefined && value.length > schema.maxLength) return false;
     if (schema.format === "email" && !emailPattern.test(value)) return false;
-    if (schema.format === "date" && !datePattern.test(value)) return false;
+    if (schema.format === "date" && !isCalendarDate(value)) return false;
+    if (schema.pattern !== undefined && !new RegExp(schema.pattern).test(value)) return false;
   }
   if (schema.type === "integer" && (!Number.isInteger(value) || typeof value !== "number")) {
     return false;
@@ -434,15 +442,16 @@ export const operationRegistry: Record<string, OperationDefinition> = {
   }),
 };
 
-export const portalStateAllowlist: Record<ServiceId, Record<string, unknown>> = {
+/** Trusted source schemas make portal-state bindings as narrow as tool-input bindings. */
+export const portalStateAllowlist: Record<ServiceId, Record<string, JsonSchema>> = {
   parking_permit_renewal: {
-    currentVehicleId: "currentVehicleId",
-    contactEmail: "contactEmail",
+    currentVehicleId: { type: "string", minLength: 1 },
+    contactEmail: { type: "string", format: "email", maxLength: 254 },
   },
   address_change: {
-    currentStreet: "currentStreet",
-    currentCity: "currentCity",
-    currentPostalCode: "currentPostalCode",
+    currentStreet: { type: "string", minLength: 3, maxLength: 120 },
+    currentCity: { type: "string", minLength: 2, maxLength: 80 },
+    currentPostalCode: { type: "string", minLength: 3, maxLength: 16 },
   },
 };
 
