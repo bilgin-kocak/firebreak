@@ -50,6 +50,19 @@ describe("safe task view compiler", () => {
     );
   });
 
+  it("breaks if an agent supplies an untrusted presentation property", () => {
+    expect(() =>
+      compile({
+        preferences: {
+          ...preferences,
+          component: "<script>alert(1)</script>",
+          selector: "#adaptive-view",
+          url: "https://untrusted.example",
+        } as ViewPreference,
+      }),
+    ).toThrow(expect.objectContaining({ code: "VIEW_VALIDATION_FAILED" }));
+  });
+
   it("breaks with a domain error if the requested service is unknown", () => {
     expect(() =>
       compile({

@@ -1,5 +1,5 @@
 import { getServiceBlueprint, serviceBlueprints } from "./serviceBlueprints";
-import { viewPatchSchema } from "./schemas";
+import { viewPatchSchema, viewPreferenceSchema } from "./schemas";
 import type { CopyOverride, TaskViewDefinition, ViewPatch, ViewPreference } from "./types";
 import { DomainError } from "./types";
 import { validateTaskView } from "./viewValidator";
@@ -42,6 +42,36 @@ const ensureKnown = (fieldId: string, knownIds: Set<string>): void => {
 };
 
 const unique = (ids: string[]): string[] => [...new Set(ids)];
+
+const preferenceKeys: Array<keyof ViewPreference> = [
+  "textSize",
+  "languageStyle",
+  "navigationStyle",
+  "controlStyle",
+  "showProgress",
+  "preserveBranding",
+];
+
+const normalizePreferences = (preferences: unknown): ViewPreference => {
+  if (
+    typeof preferences !== "object" ||
+    preferences === null ||
+    Object.keys(preferences).some((key) => !preferenceKeys.includes(key as keyof ViewPreference))
+  ) {
+    throw new DomainError("VIEW_VALIDATION_FAILED", "Preferences contain an untrusted key.");
+  }
+  const parsed = viewPreferenceSchema.safeParse(preferences);
+  if (!parsed.success) {
+    throw new DomainError(
+      "VIEW_VALIDATION_FAILED",
+      "Preferences do not match trusted view options.",
+      {
+        errors: parsed.error.issues.map((issue) => issue.message),
+      },
+    );
+  }
+  return parsed.data;
+};
 
 const normalizeCopyOverrides = (
   copyOverrides: CopyOverride[],
@@ -121,7 +151,7 @@ export const compileTaskView = (input: CompileTaskViewInput, now: Date): TaskVie
     serviceId: input.serviceId,
     title: normalizeText(input.title, 100, "Title"),
     goal: normalizeText(input.goal, 240, "Goal"),
-    preferences: { ...input.preferences },
+    preferences: normalizePreferences(input.preferences),
     fieldOrder,
     hiddenOptionalFields: unique(input.hiddenOptionalFields),
     copyOverrides: normalizeCopyOverrides(input.copyOverrides, knownIds),

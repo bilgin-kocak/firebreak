@@ -1,4 +1,4 @@
-import { getServiceBlueprint } from "./serviceBlueprints";
+import { getServiceBlueprint, serviceBlueprints } from "./serviceBlueprints";
 import { taskViewDefinitionSchema } from "./schemas";
 import type { TaskViewDefinition } from "./types";
 
@@ -18,6 +18,10 @@ export const validateTaskView = (view: TaskViewDefinition): TaskViewValidationRe
     errors.push(...parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`));
   }
 
+  if (!(view.serviceId in serviceBlueprints)) {
+    errors.push(`Unknown service: ${String(view.serviceId)}`);
+    return { valid: false, errors };
+  }
   const blueprint = getServiceBlueprint(view.serviceId);
   const knownIds = new Set(blueprint.fields.map((field) => field.id));
   const requiredIds = blueprint.fields.filter((field) => field.required).map((field) => field.id);
@@ -42,19 +46,33 @@ export const validateTaskView = (view: TaskViewDefinition): TaskViewValidationRe
     if (!knownIds.has(copy.fieldId)) errors.push(`Unknown copy field: ${copy.fieldId}`);
     if (
       copy.label !== undefined &&
-      (typeof copy.label !== "string" || copy.label.trim().length > 100)
+      (typeof copy.label !== "string" ||
+        !copy.label.trim() ||
+        copy.label !== copy.label.trim() ||
+        copy.label.length > 100)
     ) {
       errors.push(`Unsafe copy label: ${copy.fieldId}`);
     }
     if (
       copy.helpText !== undefined &&
-      (typeof copy.helpText !== "string" || copy.helpText.trim().length > 240)
+      (typeof copy.helpText !== "string" ||
+        !copy.helpText.trim() ||
+        copy.helpText !== copy.helpText.trim() ||
+        copy.helpText.length > 240)
     ) {
       errors.push(`Unsafe copy help text: ${copy.fieldId}`);
     }
   }
   if (new Set(view.copyOverrides.map((copy) => copy.fieldId)).size !== view.copyOverrides.length) {
     errors.push("Copy overrides must be unique per field");
+  }
+
+  const validLockTargets = new Set([
+    "title",
+    ...blueprint.fields.flatMap((field) => [`field:${field.id}`, `copy:${field.id}`]),
+  ]);
+  for (const lock of view.lockedElementIds) {
+    if (!validLockTargets.has(lock)) errors.push(`Invalid lock target: ${lock}`);
   }
 
   return { valid: errors.length === 0, errors };

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { compileTaskView } from "./viewCompiler";
 import { runJourneyChecks } from "./journeyChecks";
+import { validateTaskView } from "./viewValidator";
 
 const canonicalView = () =>
   compileTaskView(
@@ -64,6 +65,15 @@ describe("deterministic journey checks", () => {
     expect(check(checks, "locked_elements_preserved")?.status).toBe("fail");
   });
 
+  it("breaks if a lock target includes an unenforceable trailing segment", async () => {
+    const view = { ...canonicalView(), lockedElementIds: ["field:vehicleId:extra"] };
+
+    expect(validateTaskView(view).valid).toBe(false);
+    expect(
+      (await result(view)).find((item) => item.id === "locked_elements_preserved")?.status,
+    ).toBe("fail");
+  });
+
   it("breaks if trusted field IDs are unknown or duplicated", async () => {
     const checks = await result({
       ...canonicalView(),
@@ -81,6 +91,28 @@ describe("deterministic journey checks", () => {
     });
 
     expect(check(checks, "copy_lengths_safe")?.status).toBe("fail");
+  });
+
+  it("breaks if stored copy is whitespace-only or not already trimmed", async () => {
+    const view = {
+      ...canonicalView(),
+      copyOverrides: [{ fieldId: "vehicleId", label: "  Your vehicle  ", helpText: "   " }],
+    };
+
+    expect(validateTaskView(view).valid).toBe(false);
+    expect(check(await result(view), "copy_lengths_safe")?.status).toBe("fail");
+  });
+
+  it("returns validation and failed checks for an unknown restored service instead of throwing", async () => {
+    const restoredView = {
+      ...canonicalView(),
+      serviceId: "untrusted_service",
+    } as unknown as ReturnType<typeof canonicalView>;
+
+    expect(validateTaskView(restoredView).valid).toBe(false);
+    await expect(runJourneyChecks(restoredView, {})).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "field_ids_known", status: "fail" })]),
+    );
   });
 
   it("breaks if rendered labels are unavailable", async () => {

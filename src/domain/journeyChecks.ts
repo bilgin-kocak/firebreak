@@ -1,4 +1,4 @@
-import { getServiceBlueprint } from "./serviceBlueprints";
+import { getServiceBlueprint, serviceBlueprints } from "./serviceBlueprints";
 import type { TaskViewDefinition } from "./types";
 
 export interface JourneyCheckResult {
@@ -47,6 +47,17 @@ export const runJourneyChecks = async (
   view: TaskViewDefinition,
   context: JourneyCheckContext,
 ): Promise<JourneyCheckResult[]> => {
+  if (!(view.serviceId in serviceBlueprints)) {
+    return [
+      result(
+        "field_ids_known",
+        "Field IDs are trusted",
+        "fail",
+        "The view references an unknown service.",
+        [String(view.serviceId)],
+      ),
+    ];
+  }
   const blueprint = getServiceBlueprint(view.serviceId);
   const knownIds = new Set(blueprint.fields.map((field) => field.id));
   const requiredIds = blueprint.fields.filter((field) => field.required).map((field) => field.id);
@@ -59,15 +70,21 @@ export const runJourneyChecks = async (
     (copy) =>
       !knownIds.has(copy.fieldId) ||
       (copy.label !== undefined &&
-        (typeof copy.label !== "string" || copy.label.trim().length > 100)) ||
+        (typeof copy.label !== "string" ||
+          !copy.label.trim() ||
+          copy.label !== copy.label.trim() ||
+          copy.label.length > 100)) ||
       (copy.helpText !== undefined &&
-        (typeof copy.helpText !== "string" || copy.helpText.trim().length > 240)),
+        (typeof copy.helpText !== "string" ||
+          !copy.helpText.trim() ||
+          copy.helpText !== copy.helpText.trim() ||
+          copy.helpText.length > 240)),
   );
-  const invalidLocks = view.lockedElementIds.filter((lock) => {
-    if (lock === "title") return false;
-    const [kind, fieldId] = lock.split(":");
-    return (kind !== "field" && kind !== "copy") || !fieldId || !knownIds.has(fieldId);
-  });
+  const validLockTargets = new Set([
+    "title",
+    ...blueprint.fields.flatMap((field) => [`field:${field.id}`, `copy:${field.id}`]),
+  ]);
+  const invalidLocks = view.lockedElementIds.filter((lock) => !validLockTargets.has(lock));
 
   checks.push(
     result(
