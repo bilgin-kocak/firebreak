@@ -24,7 +24,12 @@ const staticDescriptions: Record<(typeof STATIC_TOOL_NAMES)[number], string> = {
 export const ToolSurface = ({ onDisable, onDelete, onCopied }: ToolSurfaceProps) => {
   const registered = useAppStore((state) => state.webmcp.registeredToolNames);
   const approved = useAppStore((state) => state.approvedWorkflowTools);
+  const proposals = useAppStore((state) => state.proposals);
   const lastChange = useAppStore((state) => state.webmcp.lastToolChangeAt);
+  const validationErrorProposals = Object.values(proposals).filter(
+    (proposal) => proposal.validationErrors.length > 0 && !approved[proposal.name],
+  );
+  const hasCompiledRows = Object.values(approved).length > 0 || validationErrorProposals.length > 0;
   return (
     <section className="rail-panel" aria-labelledby="tool-surface-heading">
       <div className="rail-panel-heading">
@@ -68,7 +73,7 @@ export const ToolSurface = ({ onDisable, onDelete, onCopied }: ToolSurfaceProps)
         ))}
       </ul>
       <h3 className="tool-group-heading">Compiled</h3>
-      {Object.values(approved).length ? (
+      {hasCompiledRows ? (
         <>
           <ul className="tool-list">
             {Object.values(approved).map((tool) => (
@@ -104,8 +109,28 @@ export const ToolSurface = ({ onDisable, onDelete, onCopied }: ToolSurfaceProps)
                 </div>
               </li>
             ))}
+            {validationErrorProposals.map((proposal) => (
+              <li
+                key={proposal.id}
+                data-testid={`tool-row-${proposal.name}-validation-error`}
+                className="tool-row compiled-row validation-error-row"
+              >
+                <span className="tool-icon">
+                  <Braces size={16} />
+                </span>
+                <div>
+                  <code>{proposal.name}</code>
+                  <p>{proposal.description}</p>
+                  <span className="tool-meta">
+                    <span>Compiled proposal</span>
+                    <span>Write</span>
+                    <span>Validation error</span>
+                  </span>
+                </div>
+              </li>
+            ))}
           </ul>
-          {approved.renew_permit_guided ? (
+          {approved.renew_permit_guided?.enabled ? (
             <div className="compiled-prompt">
               <DemoPromptCard
                 number={2}

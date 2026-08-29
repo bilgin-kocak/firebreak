@@ -145,6 +145,12 @@ test("large-card adaptive controls meet the 44 by 44 pixel target minimum", asyn
   );
   expect(sizes.length).toBeGreaterThan(0);
   expect(sizes.filter(({ width, height }) => width < 44 || height < 44)).toEqual([]);
+  expect(
+    sizes.filter(
+      ({ label, width, height }) =>
+        label?.toLowerCase().includes("lock") && (width < 45 || height < 45),
+    ),
+  ).toEqual([]);
 });
 
 test("the primary human lock, registration, and submission gates are keyboard-only operable", async ({

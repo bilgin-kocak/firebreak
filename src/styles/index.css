@@ -999,8 +999,8 @@ dd {
   min-height: 48px;
 }
 .controls-large_cards .lock-button {
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 46px;
+  min-height: 46px;
 }
 
 .metrics-strip {
@@ -1351,6 +1351,14 @@ code {
 .compiled-row {
   border-color: #c9caf2;
   background: #fcfcff;
+}
+.validation-error-row {
+  border-color: #e8bac1;
+  background: #fff7f8;
+}
+.validation-error-row .tool-meta > span:last-child {
+  color: var(--danger);
+  background: #fbe8eb;
 }
 .row-actions {
   display: flex;

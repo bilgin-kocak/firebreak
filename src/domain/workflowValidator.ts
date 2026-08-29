@@ -129,7 +129,6 @@ export const validateWorkflowProposal = (
     add(errors, "TOOL_NAME_COLLISION", "Tool name collides with a registered tool.", "name");
   }
   if (
-    !proposal.title.trim() ||
     proposal.title.length > 100 ||
     !proposal.description.trim() ||
     proposal.description.length > 500
@@ -137,7 +136,7 @@ export const validateWorkflowProposal = (
     add(
       errors,
       "INVALID_WORKFLOW_NAME",
-      "Workflow title and description must be bounded nonempty text.",
+      "Workflow text exceeds its safe budget or the description is empty.",
     );
   }
   if (proposal.operations.length > 8) {
@@ -159,7 +158,6 @@ export const validateWorkflowProposal = (
       !/^[a-z][a-zA-Z0-9]*$/.test(parameter.name) ||
       parameter.name.length === 0 ||
       parameter.description.length > 150 ||
-      !parameter.description.trim() ||
       !field ||
       parameterNames.has(parameter.name)
     ) {
@@ -184,10 +182,7 @@ export const validateWorkflowProposal = (
       );
       return;
     }
-    if (
-      operation.serviceId !== proposal.serviceId ||
-      !blueprint.allowedOperationIds.includes(operation.id)
-    ) {
+    if (operation.serviceId !== proposal.serviceId) {
       add(
         errors,
         "CROSS_SERVICE_OPERATION",

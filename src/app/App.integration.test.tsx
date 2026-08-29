@@ -158,9 +158,10 @@ describe("CivicWeave application", () => {
 
     expect(screen.getByRole("banner")).toHaveTextContent("Northstar City Services");
     expect(screen.getByRole("heading", { name: /welcome, maya chen/i })).toBeInTheDocument();
+    expect(screen.getByText("Saturday, August 29")).toBeInTheDocument();
     expect(screen.getAllByTestId("service-card")).toHaveLength(6);
     expect(screen.getByText(promptA)).toBeInTheDocument();
-    expect(screen.getByText(promptB)).toBeInTheDocument();
+    expect(screen.queryByText(promptB)).not.toBeInTheDocument();
     expect(screen.getByRole("contentinfo")).toHaveTextContent(
       "CivicWeave and Northstar City are fictional",
     );
@@ -169,6 +170,35 @@ describe("CivicWeave application", () => {
 
     await user.click(screen.getByRole("button", { name: /copy prompt 1/i }));
     expect(writeText).toHaveBeenCalledWith(promptA);
+  });
+
+  it("implements roving keyboard navigation for the Right Rail tabs", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("7 registered tools");
+
+    const activity = screen.getByRole("tab", { name: "Activity" });
+    const tools = screen.getByRole("tab", { name: "Tool Surface" });
+    const checks = screen.getByRole("tab", { name: "Checks" });
+    expect(activity).toHaveAttribute("tabindex", "0");
+    expect(tools).toHaveAttribute("tabindex", "-1");
+    expect(checks).toHaveAttribute("tabindex", "-1");
+
+    activity.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(tools).toHaveFocus();
+    expect(tools).toHaveAttribute("aria-selected", "true");
+    expect(tools).toHaveAttribute("tabindex", "0");
+    expect(activity).toHaveAttribute("tabindex", "-1");
+
+    await user.keyboard("{End}");
+    expect(checks).toHaveFocus();
+    expect(checks).toHaveAttribute("aria-selected", "true");
+
+    await user.keyboard("{Home}");
+    expect(activity).toHaveFocus();
+    await user.keyboard("{ArrowLeft}");
+    expect(checks).toHaveFocus();
   });
 
   it("completes the manual parking flow only after a human confirmation", async () => {
@@ -606,6 +636,10 @@ describe("CivicWeave application", () => {
     expect(simulator).toContainElement(document.activeElement as HTMLElement);
     await user.keyboard("{Escape}");
     await waitFor(() => expect(simulator).not.toBeInTheDocument());
+    await user.click(screen.getByRole("tab", { name: /tool surface/i }));
+    expect(screen.getByTestId(`tool-row-${proposal!.name}-validation-error`)).toHaveTextContent(
+      "Validation error",
+    );
   });
 
   it("returns a proposal to edit and removes its focus trap when fresh checks fail before registration", async () => {
@@ -802,8 +836,10 @@ describe("CivicWeave application", () => {
     await user.click(screen.getByRole("tab", { name: /tool surface/i }));
 
     const toolRow = screen.getByTestId("tool-row-renew_permit_guided");
+    expect(screen.getByText(promptB)).toBeInTheDocument();
     await user.click(within(toolRow).getByRole("button", { name: /disable/i }));
     expect(toolRow).toHaveTextContent("Disabled");
+    expect(screen.queryByText(promptB)).not.toBeInTheDocument();
     const deleteButton = within(toolRow).getByRole("button", { name: /delete/i });
     await user.click(deleteButton);
     let confirmDelete = await screen.findByRole("dialog", { name: /delete compiled tool/i });

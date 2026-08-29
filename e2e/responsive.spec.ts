@@ -96,6 +96,7 @@ const boxesOverlap = (
 test("desktop 1440 by 1000 dense, adaptive, and proposal states do not overflow", async ({
   page,
 }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await boot(page);
   await expectNoHorizontalOverflow(page);
@@ -121,6 +122,7 @@ test("desktop 1440 by 1000 dense, adaptive, and proposal states do not overflow"
 test("mobile 390 by 844 keeps every canonical state in bounds and captures the journey", async ({
   page,
 }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 390, height: 844 });
   await boot(page);
   await expectNoHorizontalOverflow(page);

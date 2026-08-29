@@ -111,6 +111,14 @@ describe("workflow proposal validator", () => {
     expect(validateWorkflowProposal(canonicalProposal()).valid).toBe(true);
   });
 
+  it("accepts optional blank workflow titles and parameter descriptions", () => {
+    const proposal = canonicalProposal();
+    proposal.title = "";
+    proposal.parameters[0]!.description = "";
+
+    expect(validateWorkflowProposal(proposal).valid).toBe(true);
+  });
+
   it("rejects names that do not meet the tool-name contract", () => {
     const proposal = canonicalProposal();
     proposal.name = "Renew Permit!";
@@ -142,9 +150,11 @@ describe("workflow proposal validator", () => {
     const proposal = canonicalProposal();
     proposal.operations.splice(-1, 0, { operationId: "permit.submit", bindings: [] });
 
-    expect(validateWorkflowProposal(proposal).errors).toContainEqual(
-      expect.objectContaining({ code: "HUMAN_ONLY_OPERATION" }),
-    );
+    const submitErrorCodes = validateWorkflowProposal(proposal)
+      .errors.filter((error) => error.path === "operations.6")
+      .map((error) => error.code);
+    expect(submitErrorCodes).toContain("HUMAN_ONLY_OPERATION");
+    expect(submitErrorCodes).not.toContain("CROSS_SERVICE_OPERATION");
   });
 
   it("requires dependencies to occur before the operation that needs them", () => {

@@ -123,7 +123,7 @@ const workflowOperationStepSchema = z.object({
 const workflowParameterSchema = z.object({
   name: z.string().min(1),
   fieldId: z.string().min(1),
-  description: z.string().min(1).max(150),
+  description: z.string().max(150),
   required: z.boolean(),
 });
 
@@ -132,7 +132,7 @@ export const workflowToolProposalSchema = z.object({
   viewId: z.string().min(1),
   serviceId: serviceIdSchema,
   name: z.string().min(1).max(30),
-  title: z.string().min(1).max(100),
+  title: z.string().max(100),
   description: z.string().min(1).max(500),
   parameters: z.array(workflowParameterSchema).max(6),
   operations: z.array(workflowOperationStepSchema).min(1).max(8),

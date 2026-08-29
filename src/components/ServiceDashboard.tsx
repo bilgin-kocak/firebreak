@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import type { ServiceId } from "../domain/types";
+import { useAppStore } from "../store/useAppStore";
 import { DemoPromptCard } from "./DemoPromptCard";
 
 export const PROMPT_A =
@@ -55,98 +56,105 @@ const services = [
   },
 ];
 
-export const ServiceDashboard = ({ onStart, onCopied }: ServiceDashboardProps) => (
-  <div className="dashboard-view">
-    <section className="welcome-panel" aria-labelledby="welcome-title">
-      <div>
-        <p className="eyebrow">Friday, August 29</p>
-        <h1 id="welcome-title">Welcome, Maya Chen</h1>
-        <p>Access your resident services, records, and saved drafts in one place.</p>
-      </div>
-      <div className="deadline-card">
-        <span className="deadline-date">
-          <strong>18</strong>SEP
-        </span>
-        <p>
-          <strong>Parking permit expires soon</strong>
-          <span>Resident Zone B · 20 days remaining</span>
-        </p>
-      </div>
-    </section>
-
-    <section className="prompt-section" aria-labelledby="try-title">
-      <div className="section-heading">
+export const ServiceDashboard = ({ onStart, onCopied }: ServiceDashboardProps) => {
+  const guidedToolEnabled = useAppStore(
+    (state) => state.approvedWorkflowTools.renew_permit_guided?.enabled === true,
+  );
+  return (
+    <div className="dashboard-view">
+      <section className="welcome-panel" aria-labelledby="welcome-title">
         <div>
-          <p className="eyebrow">Agent-assisted path</p>
-          <h2 id="try-title">Try with ChatGPT</h2>
+          <p className="eyebrow">Saturday, August 29</p>
+          <h1 id="welcome-title">Welcome, Maya Chen</h1>
+          <p>Access your resident services, records, and saved drafts in one place.</p>
         </div>
-        <span className="safe-note">No code generation · Human approval required</span>
-      </div>
-      <div className="prompt-grid">
-        <DemoPromptCard
-          number={1}
-          title="Build a guided permit journey"
-          prompt={PROMPT_A}
-          onCopied={onCopied}
-        />
-        <DemoPromptCard
-          number={2}
-          title="Use the tool you approved"
-          prompt={PROMPT_B}
-          onCopied={onCopied}
-        />
-      </div>
-      <div className="capability-ribbon" aria-label="CivicWeave safety path">
-        {[
-          ["Intent", "Your goal"],
-          ["Trusted fields", "Portal-owned"],
-          ["Checks", "Deterministic"],
-          ["Live tool", "Human-approved"],
-        ].map(([title, detail], index) => (
-          <div className="ribbon-stage" key={title}>
-            <span>{index + 1}</span>
-            <p>
-              <strong>{title}</strong>
-              <small>{detail}</small>
-            </p>
+        <div className="deadline-card">
+          <span className="deadline-date">
+            <strong>18</strong>SEP
+          </span>
+          <p>
+            <strong>Parking permit expires soon</strong>
+            <span>Resident Zone B · 20 days remaining</span>
+          </p>
+        </div>
+      </section>
+
+      <section className="prompt-section" aria-labelledby="try-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Agent-assisted path</p>
+            <h2 id="try-title">Try with ChatGPT</h2>
           </div>
-        ))}
-      </div>
-    </section>
-
-    <section aria-labelledby="services-title">
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Common tasks</p>
-          <h2 id="services-title">City services</h2>
+          <span className="safe-note">No code generation · Human approval required</span>
         </div>
-        <a href="#all-services">
-          View all services <ArrowRight size={16} />
-        </a>
-      </div>
-      <div className="service-grid">
-        {services.map(({ title, description, icon: Icon, serviceId }) => (
-          <article className="service-card" data-testid="service-card" key={title}>
-            <span className="service-icon" aria-hidden="true">
-              <Icon size={22} />
-            </span>
-            <h3>{title}</h3>
-            <p>{description}</p>
-            {serviceId ? (
-              <button
-                className="service-link"
-                type="button"
-                onClick={() => onStart(serviceId)}
-                aria-label={`Start ${title}`}
-              >
-                Start service <ArrowRight size={16} />
-              </button>
-            ) : (
-              <span className="info-only">Information only in this demo</span>
-            )}
-          </article>
-        ))}
-      </div>
-    </section>
-  </div>
-);
+        <div className="prompt-grid">
+          <DemoPromptCard
+            number={1}
+            title="Build a guided permit journey"
+            prompt={PROMPT_A}
+            onCopied={onCopied}
+          />
+          {guidedToolEnabled ? (
+            <DemoPromptCard
+              number={2}
+              title="Use the tool you approved"
+              prompt={PROMPT_B}
+              onCopied={onCopied}
+            />
+          ) : null}
+        </div>
+        <div className="capability-ribbon" aria-label="CivicWeave safety path">
+          {[
+            ["Intent", "Your goal"],
+            ["Trusted fields", "Portal-owned"],
+            ["Checks", "Deterministic"],
+            ["Live tool", "Human-approved"],
+          ].map(([title, detail], index) => (
+            <div className="ribbon-stage" key={title}>
+              <span>{index + 1}</span>
+              <p>
+                <strong>{title}</strong>
+                <small>{detail}</small>
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="services-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Common tasks</p>
+            <h2 id="services-title">City services</h2>
+          </div>
+          <a href="#all-services">
+            View all services <ArrowRight size={16} />
+          </a>
+        </div>
+        <div className="service-grid">
+          {services.map(({ title, description, icon: Icon, serviceId }) => (
+            <article className="service-card" data-testid="service-card" key={title}>
+              <span className="service-icon" aria-hidden="true">
+                <Icon size={22} />
+              </span>
+              <h3>{title}</h3>
+              <p>{description}</p>
+              {serviceId ? (
+                <button
+                  className="service-link"
+                  type="button"
+                  onClick={() => onStart(serviceId)}
+                  aria-label={`Start ${title}`}
+                >
+                  Start service <ArrowRight size={16} />
+                </button>
+              ) : (
+                <span className="info-only">Information only in this demo</span>
+              )}
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+};

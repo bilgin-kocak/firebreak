@@ -23,6 +23,26 @@ describe("service blueprints", () => {
     ]);
   });
 
+  it("defines the complete six-field Address Change contract", () => {
+    const address = getServiceBlueprint("address_change");
+
+    expect(
+      address.fields.map(({ id, kind, required, source }) => ({ id, kind, required, source })),
+    ).toEqual([
+      {
+        id: "currentAddressSummary",
+        kind: "readonly_summary",
+        required: true,
+        source: "portal_state",
+      },
+      { id: "newStreet", kind: "text", required: true, source: "user_input" },
+      { id: "newCity", kind: "text", required: true, source: "user_input" },
+      { id: "newPostalCode", kind: "text", required: true, source: "user_input" },
+      { id: "effectiveDate", kind: "date", required: true, source: "user_input" },
+      { id: "updateVoterRecord", kind: "boolean", required: false, source: "user_input" },
+    ]);
+  });
+
   it("models the parking permit journey as thirteen interactions", () => {
     const parking = getServiceBlueprint("parking_permit_renewal");
 

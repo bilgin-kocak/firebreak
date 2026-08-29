@@ -134,6 +134,22 @@ describe("WebMCP tool registry", () => {
     });
   });
 
+  it("does not report a successful registration for a pre-aborted signal", async () => {
+    const registry = new ToolRegistry(createMemoryAdapter());
+    const controller = new AbortController();
+    controller.abort();
+
+    await registry.register(definition(), { signal: controller.signal });
+
+    expect(registry.getRegistrations()).toEqual([]);
+    expect(getAppState().webmcp.registeredToolNames).toEqual([]);
+    expect(
+      getAppState().activity.filter(
+        (entry) => entry.kind === "tool_registered" && entry.toolName === "inspect_portal",
+      ),
+    ).toEqual([]);
+  });
+
   it("reserves a name while permissive adapter registration is pending", async () => {
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => {

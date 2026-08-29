@@ -109,13 +109,15 @@ export class ToolRegistry {
       });
       if (controller) this.controllers.set(definition.name, controller);
       await this.reconcile();
-      this.getState().logActivity({
-        actor: "system",
-        kind: "tool_registered",
-        title: "WebMCP tool registered",
-        toolName: definition.name,
-        status: "success",
-      });
+      if (this.registrations.has(definition.name)) {
+        this.getState().logActivity({
+          actor: "system",
+          kind: "tool_registered",
+          title: "WebMCP tool registered",
+          toolName: definition.name,
+          status: "success",
+        });
+      }
     } finally {
       this.pendingNames.delete(definition.name);
     }
