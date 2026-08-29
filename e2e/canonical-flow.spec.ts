@@ -127,6 +127,16 @@ export const installNativeLikeContext = async (page: Page): Promise<void> => {
 };
 
 const screenshot = async (page: Page, testInfo: TestInfo, name: string) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await page.locator("body").evaluate(async (body) => {
+    await Promise.all(
+      body
+        .getAnimations({ subtree: true })
+        .map((animation) => animation.finished.catch(() => undefined)),
+    );
+  });
   await page.screenshot({ path: testInfo.outputPath(name), fullPage: true });
 };
 
@@ -142,6 +152,7 @@ const boxesOverlap = (
 test("canonical two-prompt journey compiles, approves, invokes, and submits through the human gate", async ({
   page,
 }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await installNativeLikeContext(page);
   const runtimeErrors: string[] = [];

@@ -912,6 +912,34 @@ dd {
   color: var(--ink-muted);
   font-size: 0.72rem;
 }
+.adaptive-staged-hero .eyebrow {
+  color: #c8cbff;
+}
+.adaptive-staged-hero h1 {
+  color: white;
+}
+.adaptive-staged-hero > p:last-child {
+  margin: 8px 0 0;
+  color: #c6d4e0;
+}
+.adaptive-staged-summary {
+  display: grid;
+  gap: 20px;
+  padding: clamp(22px, 4vw, 42px);
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: var(--surface);
+}
+.adaptive-staged-summary h2 {
+  font-size: 1.05rem;
+}
+.adaptive-staged-summary .review-list {
+  margin-top: 0;
+}
+.adaptive-staged-summary .button {
+  width: fit-content;
+  min-height: 48px;
+}
 .adaptive-progress {
   padding: 17px 23px 0;
   border-left: 1px solid var(--border);

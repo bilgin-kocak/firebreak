@@ -14,14 +14,14 @@ Authoritative command: `npm run check`
 - ESLint: passed with zero warnings.
 - Prettier: all matched files conform.
 - Strict TypeScript: passed with no diagnostics.
-- Vitest: `16` files passed; `169` tests passed.
+- Vitest: `16` files passed; `177` tests passed.
 - Production build: passed; Vite transformed `1,645` modules.
-- Playwright: `13` tests passed using `4` workers in `28.0s`.
-- Accessibility: dense, adaptive, proposal, and submitted browser states have zero serious or critical axe violations in the tested canonical screens.
+- Playwright: `14` tests passed using `4` workers in `31.6s`.
+- Accessibility: dense, adaptive, staged-review, proposal, and submitted browser states have zero serious or critical axe violations in the tested canonical screens.
 - Runtime: canonical `console` error and `pageerror` collections were both empty.
 - Target size: the original browser assertion requiring every large-card target to be at least `44 × 44` CSS px passes. Large-card lock controls additionally pass a `45 × 45` safety-margin assertion after their CSS minimum was raised to `46 × 46`.
 - Evals: `18` valid fixtures with `18` unique IDs.
-- Build advisory: Vite reports the non-blocking main-chunk size advisory (`1,016.50 kB` minified, `285.18 kB` gzip), primarily because the deterministic browser axe scanner is shipped client-side.
+- Build advisory: Vite reports the non-blocking main-chunk size advisory (`1,022.22 kB` minified, `286.53 kB` gzip), primarily because the deterministic browser axe scanner is shipped client-side.
 
 ## Section 26 acceptance evidence
 
@@ -37,28 +37,29 @@ Authoritative command: `npm run check`
 | Validated schema and approved components only      | `viewCompiler.test.ts`, `journeyChecks.test.ts`, strict tool schemas, and the `FieldKind`-only registry in `AdaptiveField.tsx` cover this boundary.                                                                                                                 |
 | Human edit and lock controls                       | App integration and canonical Playwright coverage edit adaptive values and lock the vehicle through visible controls.                                                                                                                                               |
 | Agent patches cannot overwrite locks               | `viewCompiler.test.ts`, `staticTools.test.ts`, and the canonical E2E assert atomic `LOCKED_BY_USER` behavior and lock preservation.                                                                                                                                 |
-| Visible deterministic checks                       | The Checks rail and proposal capture show results; canonical E2E requires zero blocking failures before staging.                                                                                                                                                    |
+| Staged adaptive review remains recoverable         | App integration and persistence Playwright coverage prove **Keep as draft** and Escape leave a visible, focused **Return to review** action, including after reload, without mutating the staged draft.                                                             |
+| Visible deterministic checks                       | The Checks rail and proposal capture show results; staging and approval require a nonempty proof for the exact current view revision, while patch/lock/unlock invalidation and stale async results are covered by static-tool tests.                                |
 | Honest manual/adaptive/compiled metrics            | `MetricsStrip` labels modeled counts, displays all six actual metrics, and is asserted in App integration and final screenshots.                                                                                                                                    |
 
 ### WebMCP
 
-| Criterion                                         | Final evidence                                                                                                                                      |
-| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Direct top-level native registration              | `src/webmcp/nativeAdapter.ts` directly calls `document.modelContext.registerTool(...)`; no iframe or production monkey-patch exists.                |
-| Exactly seven static tools                        | `staticTools.test.ts` and canonical Playwright enumeration assert the exact seven stable names.                                                     |
-| Narrow schemas with `additionalProperties: false` | Static registry tests reject extra executable-looking properties; derived dynamic schema tests assert the same closed boundary.                     |
-| Read/write annotations                            | `staticTools.test.ts` and simulator integration verify `readOnlyHint` and `untrustedContentHint` metadata.                                          |
-| Tool calls update UI and Activity                 | The registry records timing, metrics, and activity; canonical screenshots and tests show shared live entries.                                       |
-| Dynamic `AbortController` lifecycle               | `dynamicToolManager.test.ts`, memory-adapter tests, and persistence Playwright coverage prove registration-signal unregistration.                   |
-| Visible `toolchange` listener                     | Canonical E2E observes the browser event and the separate visible Activity entry.                                                                   |
-| Staging cannot approve/register                   | Static-tool tests and canonical E2E prove `stage_workflow_tool` opens review while the dynamic name is absent.                                      |
-| Registration approval is human-only               | Approval is only the proposal-sheet button; no static or dynamic approval tool is defined.                                                          |
-| Approval registers `renew_permit_guided`          | Canonical E2E clicks **Approve & Register** and observes the eighth live tool.                                                                      |
-| New tool appears and runs in the same session     | Canonical E2E asserts the Tool Surface row and invokes it through the same `document.modelContext`.                                                 |
-| Dynamic execution stops at review                 | Manager and canonical tests require `DRAFT_STAGED`, `awaiting_user_confirmation`, fee `60`, and `submitted: false`.                                 |
-| Final submission is human UI only                 | Executor/validator tests exclude submit operations; only the visible **Confirm & Submit** action reaches the final store action.                    |
-| Disable/delete unregister                         | Persistence E2E proves Disable aborts registration; App integration covers human-confirmed Delete and metadata removal.                             |
-| Native detection and memory simulator             | Canonical tests use the native-like top-level mock; App/runtime and ordinary-browser Playwright tests use the same definitions through memory mode. |
+| Criterion                                         | Final evidence                                                                                                                                             |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Direct top-level native registration              | `src/webmcp/nativeAdapter.ts` directly calls `document.modelContext.registerTool(...)`; no iframe or production monkey-patch exists.                       |
+| Exactly seven static tools                        | `staticTools.test.ts` and canonical Playwright enumeration assert the exact seven stable names.                                                            |
+| Narrow schemas with `additionalProperties: false` | Static registry tests reject extra executable-looking properties; derived dynamic schema tests assert the same closed boundary.                            |
+| Read/write annotations                            | `staticTools.test.ts` and simulator integration verify `readOnlyHint` and `untrustedContentHint` metadata.                                                 |
+| Tool calls update UI and Activity                 | The registry records timing, metrics, and activity; canonical screenshots and tests show shared live entries.                                              |
+| Dynamic `AbortController` lifecycle               | `dynamicToolManager.test.ts`, memory-adapter tests, and persistence Playwright coverage prove registration-signal unregistration.                          |
+| Visible `toolchange` listener                     | Canonical E2E observes the browser event and the separate visible Activity entry.                                                                          |
+| Staging cannot approve/register                   | Static-tool tests and canonical E2E prove `stage_workflow_tool` requires a current explicit check proof and opens review while the dynamic name is absent. |
+| Registration approval is human-only               | Approval is only the proposal-sheet button; no static or dynamic approval tool is defined.                                                                 |
+| Approval registers `renew_permit_guided`          | Canonical E2E clicks **Approve & Register** and observes the eighth live tool.                                                                             |
+| New tool appears and runs in the same session     | Canonical E2E asserts the Tool Surface row and invokes it through the same `document.modelContext`.                                                        |
+| Dynamic execution stops at review                 | Manager and canonical tests require `DRAFT_STAGED`, `awaiting_user_confirmation`, fee `60`, and `submitted: false`.                                        |
+| Final submission is human UI only                 | Executor/validator tests exclude submit operations; only the visible **Confirm & Submit** action reaches the final store action.                           |
+| Disable/delete unregister                         | Persistence E2E proves Disable aborts registration; App integration covers human-confirmed Delete and metadata removal.                                    |
+| Native detection and memory simulator             | Canonical tests use the native-like top-level mock; App/runtime and ordinary-browser Playwright tests use the same definitions through memory mode.        |
 
 ### Safety
 
@@ -69,23 +70,24 @@ Authoritative command: `npm run check`
 | Human-only operations blocked                                        | Validator and executor tests require the precise `HUMAN_ONLY_OPERATION`; a same-service submit no longer emits a misleading cross-service error.           |
 | Failure/cancellation rollback                                        | `workflowExecutor.test.ts` asserts exact draft and portal-state rollback for both services, observer failures, and cancellation.                           |
 | Required fields cannot be hidden                                     | Compiler, validator, static-tool, and eval cases cover compile and patch failure.                                                                          |
+| Checks are bound to the current view revision                        | Missing/empty proof, update/lock/unlock invalidation, stale async writes, approval after invalidation, and successful reruns have focused regressions.     |
 | Explicit final confirmation                                          | Manual, adaptive, and dynamic paths all stop at the accessible confirmation dialog before the human button.                                                |
 | Fictional data and no affiliation implication                        | Header subtitle, simulator notice, submission copy, README, and persistent footer state the fictional boundary.                                            |
 
 ### Quality
 
-| Criterion                           | Final evidence                                                                                                                                                                         |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Strict TypeScript                   | Fresh `npm run check`: passed.                                                                                                                                                         |
-| ESLint zero warnings                | Fresh `npm run check`: passed.                                                                                                                                                         |
-| Prettier                            | Fresh `npm run check`: passed.                                                                                                                                                         |
-| Unit and integration tests          | `16` Vitest files and `169` tests passed.                                                                                                                                              |
-| Playwright tests                    | All `13` passed using the authoritative four-worker run.                                                                                                                               |
-| Production build                    | Passed with `1,645` modules transformed.                                                                                                                                               |
-| No serious/critical axe findings    | Playwright scans dense, adaptive, proposal, and submitted canonical states; all passed.                                                                                                |
-| Desktop/mobile presentation         | All ten named screenshots were freshly recaptured and inspected; no overflow, clipping in the live viewport, obscured controls, mid-fade adaptive state, or contrast defect was found. |
-| No canonical runtime console errors | `e2e/canonical-flow.spec.ts` records and asserts an empty error collection.                                                                                                            |
-| Reload and reset                    | Persistence Playwright tests cover approval re-registration, Disable, exact four-key clearing, and seven-tool reset.                                                                   |
+| Criterion                           | Final evidence                                                                                                                                                                                 |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Strict TypeScript                   | Fresh `npm run check`: passed.                                                                                                                                                                 |
+| ESLint zero warnings                | Fresh `npm run check`: passed.                                                                                                                                                                 |
+| Prettier                            | Fresh `npm run check`: passed.                                                                                                                                                                 |
+| Unit and integration tests          | `16` Vitest files and `177` tests passed.                                                                                                                                                      |
+| Playwright tests                    | All `14` passed using the authoritative four-worker run.                                                                                                                                       |
+| Production build                    | Passed with `1,645` modules transformed.                                                                                                                                                       |
+| No serious/critical axe findings    | Playwright scans dense, adaptive, proposal, and submitted canonical states; all passed.                                                                                                        |
+| Desktop/mobile presentation         | All twelve named screenshots were freshly recaptured and inspected; no overflow, clipping in the live viewport, obscured controls, mid-fade adaptive state, or contrast defect was found.      |
+| No canonical runtime console errors | `e2e/canonical-flow.spec.ts` records and asserts an empty error collection.                                                                                                                    |
+| Reload, recovery, and reset         | Persistence tests cover approved re-registration, staged adaptive review recovery, Disable, exact four-key clearing, seven-tool reset, and safe reconciliation of dangling/corrupt view state. |
 
 ### Submission assets
 
@@ -111,6 +113,7 @@ Desktop:
 - `/Users/bilginkocak/hobby/civicweave/test-results/canonical-flow-canonical-t-c61d4-mits-through-the-human-gate-chromium/canonical-submitted-desktop.png`
 - `/Users/bilginkocak/hobby/civicweave/test-results/responsive-desktop-1440-by-9aae9-osal-states-do-not-overflow-chromium/responsive-dense-desktop.png`
 - `/Users/bilginkocak/hobby/civicweave/test-results/responsive-desktop-1440-by-9aae9-osal-states-do-not-overflow-chromium/responsive-proposal-desktop.png`
+- `/Users/bilginkocak/hobby/civicweave/test-results/persistence-a-staged-adapt-919c5-iew-before-and-after-reload-chromium/adaptive-staged-desktop.png`
 
 Mobile (`390 × 844` viewport):
 
@@ -118,8 +121,9 @@ Mobile (`390 × 844` viewport):
 - `/Users/bilginkocak/hobby/civicweave/test-results/responsive-mobile-390-by-8-f82aa-ds-and-captures-the-journey-chromium/responsive-adaptive-mobile.png`
 - `/Users/bilginkocak/hobby/civicweave/test-results/responsive-mobile-390-by-8-f82aa-ds-and-captures-the-journey-chromium/responsive-proposal-mobile.png`
 - `/Users/bilginkocak/hobby/civicweave/test-results/responsive-mobile-390-by-8-f82aa-ds-and-captures-the-journey-chromium/responsive-submitted-mobile.png`
+- `/Users/bilginkocak/hobby/civicweave/test-results/persistence-a-staged-adapt-919c5-iew-before-and-after-reload-chromium/adaptive-staged-reload-mobile.png`
 
-The responsive capture suite emulates `prefers-reduced-motion: reduce` before loading the page, so `responsive-adaptive-mobile.png` is fully opaque and cannot be captured during the 240 ms entrance animation. Desktop and mobile dense, adaptive, proposal, and submitted surfaces were inspected at original resolution. Focus indicators, dialogs, in-flow status announcement, sticky actions, internal rail scrolling, disclaimer, and the 70/30-to-stacked layout are visually sound.
+The canonical, responsive, and staged-review capture paths emulate `prefers-reduced-motion: reduce`, wait for animations, and capture from a stable scroll origin, so adaptive surfaces are fully opaque and cannot be caught during the 240 ms entrance animation. All twelve desktop and mobile dense, adaptive, staged-review, proposal, and submitted captures were inspected at original resolution. Focus indicators, dialogs, staged-review actions, in-flow status announcement, sticky actions, internal rail scrolling, disclaimer, and the 70/30-to-stacked layout are visually sound.
 
 ## Unavoidable deviations
 
@@ -134,7 +138,7 @@ Environment note: a sandboxed browser run cannot bind `127.0.0.1:5173` (`EPERM`)
 3. **Yes.** The canonical view visibly applies xlarge text, large controls, plain language, one-question navigation, and progress.
 4. **Yes.** Native status, typed Tool Surface metadata, Activity entries, and model-context E2E calls make WebMCP usage explicit.
 5. **Yes.** The human vehicle lock is visible and a conflicting agent patch returns `LOCKED_BY_USER` atomically.
-6. **Yes.** Fifteen deterministic checks cover completeness, safety, presentation, locks, and mounted axe results.
+6. **Yes.** Fifteen deterministic checks cover completeness, safety, presentation, locks, and mounted axe results; a nonempty passing proof must match the exact current view revision before staging or approval.
 7. **Yes.** `stage_workflow_tool` stops at the proposal sheet before registration.
 8. **Yes.** Approval exists only as a human proposal-sheet control.
 9. **Yes.** Approval creates the new live `renew_permit_guided` registration.
@@ -143,5 +147,5 @@ Environment note: a sandboxed browser run cannot bind `127.0.0.1:5173` (`EPERM`)
 12. **Yes.** The dynamic tool returns `awaiting_user_confirmation` and cannot call `permit.submit`.
 13. **Yes.** Final submission exists only behind the visible human confirmation dialog.
 14. **Yes.** Ordinary-browser simulator mode runs the same definitions and handlers without monkey-patching `document.modelContext`.
-15. **Yes.** The fresh full `npm run check` exits 0 with `169` Vitest and `13` Playwright tests passing.
+15. **Yes.** The fresh full `npm run check` exits 0 with `177` Vitest and `14` Playwright tests passing.
 16. **Yes.** README/submission claims are bounded to implemented, testable behavior and explicitly qualify modeled metrics, eval fixtures, deterministic accessibility checks, browser compatibility, and fictional services.

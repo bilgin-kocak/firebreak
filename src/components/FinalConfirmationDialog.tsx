@@ -25,11 +25,17 @@ export const FinalConfirmationDialog = ({
   }, [open]);
   const close = useCallback(() => setDialog("finalConfirmationOpen", false), [setDialog]);
   const findFallback = useCallback(
-    () => document.querySelector<HTMLElement>("#submission-success-heading"),
+    () =>
+      document.querySelector<HTMLElement>(
+        "#adaptive-return-to-review, #submission-success-heading",
+      ),
     [],
   );
-  const preferSuccess = useCallback(() => submittedRef.current, []);
-  const dialogRef = useDialogFocus(open, close, undefined, findFallback, preferSuccess);
+  const preferRenderedFallback = useCallback(
+    () => submittedRef.current || useAppStore.getState().activeViewId !== null,
+    [],
+  );
+  const dialogRef = useDialogFocus(open, close, undefined, findFallback, preferRenderedFallback);
   if (!open || !serviceId) return null;
   const confirm = () => {
     submittedRef.current = true;

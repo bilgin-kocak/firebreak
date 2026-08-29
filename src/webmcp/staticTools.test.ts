@@ -150,7 +150,7 @@ describe("seven static WebMCP tools", () => {
     expect(getAppState()).toMatchObject({
       portalMode: "adaptive_view_active",
       activeViewId: viewId,
-      views: { [viewId]: { preferences: { textSize: "xlarge" }, revision: 1 } },
+      views: { [viewId]: { preferences: { textSize: "xlarge" }, revision: 2 } },
     });
     expect(getAppState().views[viewId]?.lockedElementIds).toEqual(["field:vehicleId"]);
   });
@@ -178,7 +178,7 @@ describe("seven static WebMCP tools", () => {
       code: "LOCKED_BY_USER",
       details: { lockedElementIds: ["field:vehicleId"] },
     });
-    expect(getAppState().views[viewId]).toMatchObject({ title: "Renew my permit", revision: 1 });
+    expect(getAppState().views[viewId]).toMatchObject({ title: "Renew my permit", revision: 2 });
     expect(getAppState().metrics.humanLocksPreserved).toBe(1);
   });
 
@@ -207,6 +207,107 @@ describe("seven static WebMCP tools", () => {
     expect(useAppStore.getState().dialogs.proposalSheetOpen).toBe(true);
     expect(getAppState().approvedWorkflowTools).toEqual({});
     expect((await adapter.getTools()).map((tool) => tool.name)).toEqual(names);
+  });
+
+  it("refuses to stage before an explicit current journey-check run", async () => {
+    const { adapter } = await setup();
+    const viewId = await compileView(adapter);
+
+    await expect(
+      adapter.executeTool("stage_workflow_tool", proposalInput(viewId)),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "CHECKS_FAILED",
+      message: expect.stringMatching(/run journey checks.*retry/i),
+    });
+    expect(getAppState().proposals).toEqual({});
+  });
+
+  it("invalidates check proof after patch and lock mutations, then accepts a fresh rerun", async () => {
+    const { adapter } = await setup();
+    const viewId = await compileView(adapter);
+
+    await adapter.executeTool("run_journey_checks", { viewId });
+    await adapter.executeTool("patch_task_view", {
+      viewId,
+      patches: [{ type: "set_title", title: "Renew my accessible permit" }],
+    });
+    await expect(
+      adapter.executeTool("stage_workflow_tool", proposalInput(viewId)),
+    ).resolves.toMatchObject({ ok: false, code: "CHECKS_FAILED" });
+
+    await adapter.executeTool("run_journey_checks", { viewId });
+    useAppStore.getState().human.lockElement(viewId, "field:vehicleId");
+    await expect(
+      adapter.executeTool("stage_workflow_tool", proposalInput(viewId)),
+    ).resolves.toMatchObject({ ok: false, code: "CHECKS_FAILED" });
+
+    await adapter.executeTool("run_journey_checks", { viewId });
+    useAppStore.getState().human.unlockElement(viewId, "field:vehicleId");
+    await expect(
+      adapter.executeTool("stage_workflow_tool", proposalInput(viewId)),
+    ).resolves.toMatchObject({ ok: false, code: "CHECKS_FAILED" });
+
+    await adapter.executeTool("run_journey_checks", { viewId });
+    await expect(
+      adapter.executeTool("stage_workflow_tool", proposalInput(viewId)),
+    ).resolves.toMatchObject({ ok: true, code: "WORKFLOW_STAGED" });
+  });
+
+  it("discards an asynchronous check result when the checked view changes", async () => {
+    let releaseContext!: () => void;
+    const contextPending = new Promise<void>((resolve) => {
+      releaseContext = resolve;
+    });
+    const getContext = vi.fn(async () => {
+      await contextPending;
+      return {
+        presentation: {
+          labelsPresent: true,
+          headingOrderValid: true,
+          focusableControlsReachable: true,
+          largeTargetsPresent: true,
+          progressPresent: true,
+        },
+        dom: { mounted: true, runAxe: async () => ({ violations: [] }) },
+      };
+    });
+    const { adapter } = await setup({ journeyChecksProvider: { getContext } });
+    const viewId = await compileView(adapter);
+
+    const pendingChecks = adapter.executeTool("run_journey_checks", {
+      viewId,
+      includeDomChecks: true,
+    });
+    await vi.waitFor(() => expect(getContext).toHaveBeenCalledOnce());
+    useAppStore.getState().human.lockElement(viewId, "field:vehicleId");
+    releaseContext();
+
+    await expect(pendingChecks).resolves.toMatchObject({
+      ok: false,
+      code: "CHECKS_FAILED",
+      message: expect.stringMatching(/changed.*run journey checks again/i),
+    });
+    expect(getAppState().journeyChecks[viewId]).toBeUndefined();
+  });
+
+  it("requires current check proof at approval after a view mutation", async () => {
+    const { adapter } = await setup();
+    const viewId = await compileView(adapter);
+    await adapter.executeTool("run_journey_checks", { viewId });
+    await adapter.executeTool("stage_workflow_tool", proposalInput(viewId));
+    const proposal = Object.values(getAppState().proposals)[0];
+    if (!proposal) throw new Error("Expected a staged proposal fixture");
+
+    useAppStore.getState().human.lockElement(viewId, "field:vehicleId");
+    expect(() => useAppStore.getState().human.approveProposal(proposal.id)).toThrow(
+      /CHECKS_FAILED.*run journey checks.*retry/i,
+    );
+    expect(getAppState().proposals[proposal.id]?.status).toBe("awaiting_approval");
+    expect(getAppState().approvedWorkflowTools).toEqual({});
+
+    await adapter.executeTool("run_journey_checks", { viewId });
+    expect(useAppStore.getState().human.approveProposal(proposal.id).status).toBe("registered");
   });
 
   it("runs a trusted injected DOM scan only when includeDomChecks is true", async () => {

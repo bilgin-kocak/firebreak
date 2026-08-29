@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { operationRegistry } from "../domain/operationRegistry";
 import { getServiceBlueprint } from "../domain/serviceBlueprints";
 import { validateWorkflowProposal } from "../domain/workflowValidator";
-import { useAppStore } from "../store/useAppStore";
+import { getCurrentJourneyChecks, useAppStore } from "../store/useAppStore";
 import { STATIC_TOOL_NAMES } from "../webmcp/staticToolDefinitions";
 import { useDialogFocus } from "./useDialogFocus";
 
@@ -22,6 +22,8 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
   const proposals = useAppStore((state) => state.proposals);
   const approved = useAppStore((state) => state.approvedWorkflowTools);
   const journeyChecks = useAppStore((state) => state.journeyChecks);
+  const journeyCheckRevisions = useAppStore((state) => state.journeyCheckRevisions);
+  const views = useAppStore((state) => state.views);
   const proposal = Object.values(proposals)
     .filter((item) => item.status === "awaiting_approval")
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
@@ -34,7 +36,8 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
   const dialogRef = useDialogFocus(renderedOpen, close);
   if (!renderedOpen || !proposal) return null;
   const blueprint = getServiceBlueprint(proposal.serviceId);
-  const currentChecks = journeyChecks[proposal.viewId] ?? [];
+  const currentChecks =
+    getCurrentJourneyChecks({ views, journeyChecks, journeyCheckRevisions }, proposal.viewId) ?? [];
   const blockingChecks = currentChecks.filter((check) => check.status === "fail");
   const validation = validateWorkflowProposal(proposal, {
     staticToolNames: STATIC_TOOL_NAMES,
@@ -42,6 +45,7 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
       .filter((tool) => tool.enabled)
       .map((tool) => tool.name),
     journeyChecks: currentChecks,
+    requireJourneyCheckProof: true,
   });
   const literalValue = (value: unknown): string => {
     const serialized = JSON.stringify(value);

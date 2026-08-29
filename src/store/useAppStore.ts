@@ -67,6 +67,7 @@ export interface AppState {
   views: Record<string, TaskViewDefinition>;
   activeViewId: string | null;
   journeyChecks: Record<string, JourneyCheckResult[]>;
+  journeyCheckRevisions: Record<string, number>;
   proposals: Record<string, WorkflowToolProposal>;
   approvedWorkflowTools: Record<string, ApprovedWorkflowTool>;
   webmcp: {
@@ -95,7 +96,7 @@ export interface AppState {
   setActiveView(viewId: string | null): void;
   stageDraftForReview(serviceId: ServiceId): void;
   stageWorkflowDraftForReview(serviceId: ServiceId, draft: Draft): void;
-  setJourneyChecks(viewId: string, checks: JourneyCheckResult[]): void;
+  setJourneyChecks(viewId: string, viewRevision: number, checks: JourneyCheckResult[]): boolean;
   createProposal(proposal: WorkflowToolProposal): void;
   validateProposal(proposalId: string): void;
   requestProposalApproval(proposalId: string): void;
@@ -125,6 +126,7 @@ export type ToolAppState = Pick<
   | "views"
   | "activeViewId"
   | "journeyChecks"
+  | "journeyCheckRevisions"
   | "proposals"
   | "approvedWorkflowTools"
   | "webmcp"
@@ -164,6 +166,7 @@ const seedState = () => ({
   views: {},
   activeViewId: null,
   journeyChecks: {},
+  journeyCheckRevisions: {},
   proposals: {},
   approvedWorkflowTools: {},
   webmcp: { mode: "memory" as const, registeredToolNames: [], lastToolChangeAt: null },
@@ -217,7 +220,7 @@ const recoveryEntry = (): ActivityEntry => ({
   actor: "system",
   kind: "tool_failed",
   title: "Recovered from invalid saved data",
-  detail: "PERSISTENCE_RECOVERY: invalid saved data was discarded safely.",
+  detail: "PERSISTENCE_RECOVERY: invalid or inconsistent saved data was discarded safely.",
   status: "warning",
 });
 const transitionError = (
@@ -260,26 +263,93 @@ const initialState = () => {
   const tools = loadWorkflowTools(persistenceStorage);
   const activity = loadActivity(persistenceStorage);
   const restored = session.data;
-  return {
+  const viewsById = Object.fromEntries(views.data.map((view) => [view.id, view]));
+  const activeView = restored?.activeViewId ? viewsById[restored.activeViewId] : undefined;
+  const activeViewIsValid = Boolean(
+    activeView && restored?.currentService && activeView.serviceId === restored.currentService,
+  );
+  const activeViewId = activeViewIsValid ? (restored?.activeViewId ?? null) : null;
+  const proposals = Object.fromEntries(
+    Object.entries(restored?.proposals ?? {}).filter(([, proposal]) => {
+      const proposalView = viewsById[proposal.viewId];
+      return proposalView?.serviceId === proposal.serviceId;
+    }),
+  );
+  const approvedWorkflowTools = Object.fromEntries(
+    tools.data
+      .filter((tool) => viewsById[tool.viewId]?.serviceId === tool.serviceId)
+      .map((tool) => [tool.name, tool]),
+  );
+  let portalMode = restored?.portalMode ?? seed.portalMode;
+  const currentService = restored?.currentService ?? null;
+  const currentDraft = currentService ? restored?.serviceDrafts[currentService] : undefined;
+  if (!activeViewId && portalMode === "adaptive_view_active") {
+    portalMode = currentService
+      ? currentDraft
+        ? "draft_in_progress"
+        : "manual_flow_active"
+      : "idle";
+  }
+  if (
+    portalMode === "staged_for_review" &&
+    (!currentService ||
+      currentDraft?.status !== "staged_for_review" ||
+      !validateDraftForReview(currentService, currentDraft, restored?.resident ?? seed.resident)
+        .valid)
+  ) {
+    portalMode = currentService
+      ? currentDraft
+        ? "draft_in_progress"
+        : "manual_flow_active"
+      : "idle";
+  }
+  if (!currentService && portalMode !== "idle") portalMode = "idle";
+  const reconciliationRecovered = Boolean(
+    restored &&
+    (restored.activeViewId !== activeViewId ||
+      Object.keys(restored.proposals).length !== Object.keys(proposals).length ||
+      tools.data.length !== Object.keys(approvedWorkflowTools).length ||
+      restored.portalMode !== portalMode),
+  );
+  const recovered =
+    session.recovered ||
+    views.recovered ||
+    tools.recovered ||
+    activity.recovered ||
+    reconciliationRecovered;
+  const reconciledActivity = recovered ? [recoveryEntry(), ...activity.data] : activity.data;
+  const reconciled = {
     ...seed,
     ...(restored
       ? {
           resident: restored.resident,
-          currentService: restored.currentService,
-          portalMode: restored.portalMode,
+          currentService,
+          portalMode,
           serviceDrafts: restored.serviceDrafts,
-          activeViewId: restored.activeViewId,
-          proposals: restored.proposals,
+          activeViewId,
+          proposals,
           metrics: restored.metrics,
         }
       : {}),
-    views: Object.fromEntries(views.data.map((view) => [view.id, view])),
-    approvedWorkflowTools: Object.fromEntries(tools.data.map((tool) => [tool.name, tool])),
-    activity:
-      session.recovered || views.recovered || tools.recovered || activity.recovered
-        ? [recoveryEntry(), ...activity.data]
-        : activity.data,
+    views: viewsById,
+    approvedWorkflowTools,
+    activity: reconciledActivity,
   };
+  if (recovered) {
+    saveSession(persistenceStorage, {
+      resident: reconciled.resident,
+      currentService: reconciled.currentService,
+      portalMode: reconciled.portalMode,
+      serviceDrafts: reconciled.serviceDrafts,
+      activeViewId: reconciled.activeViewId,
+      proposals: reconciled.proposals,
+      metrics: reconciled.metrics,
+    });
+    saveViews(persistenceStorage, Object.values(reconciled.views));
+    saveWorkflowTools(persistenceStorage, Object.values(reconciled.approvedWorkflowTools));
+    saveActivity(persistenceStorage, reconciled.activity);
+  }
+  return reconciled;
 };
 const persist = (state: AppState) => {
   saveSession(persistenceStorage, toPersistedSession(state));
@@ -298,14 +368,48 @@ const staticToolNames = [
   "list_workflow_tools",
 ];
 
+export const getCurrentJourneyChecks = (
+  state: Pick<AppState, "views" | "journeyChecks" | "journeyCheckRevisions">,
+  viewId: string,
+): JourneyCheckResult[] | undefined => {
+  const view = state.views[viewId];
+  const checks = state.journeyChecks[viewId];
+  return view && checks?.length && state.journeyCheckRevisions[viewId] === view.revision
+    ? checks
+    : undefined;
+};
+
 const validateProposalInState = (state: AppState, proposal: WorkflowToolProposal) =>
   validateWorkflowProposal(proposal, {
     staticToolNames,
     enabledCompiledToolNames: Object.values(state.approvedWorkflowTools)
       .filter((tool) => tool.enabled)
       .map((tool) => tool.name),
-    journeyChecks: state.journeyChecks[proposal.viewId],
+    journeyChecks: getCurrentJourneyChecks(state, proposal.viewId),
+    requireJourneyCheckProof: true,
   });
+
+const invalidatedCheckState = (state: AppState, viewId: string) => {
+  const journeyChecks = { ...state.journeyChecks };
+  const journeyCheckRevisions = { ...state.journeyCheckRevisions };
+  delete journeyChecks[viewId];
+  delete journeyCheckRevisions[viewId];
+  return {
+    journeyChecks,
+    journeyCheckRevisions,
+    metrics:
+      state.activeViewId === viewId ? { ...state.metrics, blockingChecks: 0 } : state.metrics,
+  };
+};
+
+const checkFailure = (validation: ReturnType<typeof validateWorkflowProposal>) =>
+  validation.errors.find((error) => error.code === "CHECKS_FAILED");
+
+const currentChecksError = (message?: string) =>
+  new DomainError(
+    "CHECKS_FAILED",
+    `CHECKS_FAILED: ${message ?? "Run journey checks for the current view, then retry."}`,
+  );
 
 export const useAppStore = create<AppState>((set, get) => {
   const human: HumanEventActions = {
@@ -347,8 +451,14 @@ export const useAppStore = create<AppState>((set, get) => {
       set((state) => ({
         views: {
           ...state.views,
-          [viewId]: { ...view, lockedElementIds: [...view.lockedElementIds, elementId] },
+          [viewId]: {
+            ...view,
+            lockedElementIds: [...view.lockedElementIds, elementId],
+            revision: view.revision + 1,
+            updatedAt: systemClock.now().toISOString(),
+          },
         },
+        ...invalidatedCheckState(state, viewId),
       }));
       get().logActivity({
         actor: "human",
@@ -367,8 +477,11 @@ export const useAppStore = create<AppState>((set, get) => {
           [viewId]: {
             ...view,
             lockedElementIds: view.lockedElementIds.filter((id) => id !== elementId),
+            revision: view.revision + 1,
+            updatedAt: systemClock.now().toISOString(),
           },
         },
+        ...invalidatedCheckState(state, viewId),
       }));
       get().logActivity({
         actor: "human",
@@ -382,19 +495,22 @@ export const useAppStore = create<AppState>((set, get) => {
       const proposal = get().proposals[proposalId];
       if (!proposal || proposal.status !== "awaiting_approval")
         throw transitionError("HUMAN_APPROVAL_REQUIRED", "Only a staged proposal can be approved.");
+      const hasCurrentProof = Boolean(getCurrentJourneyChecks(get(), proposal.viewId)?.length);
       const validation = validateProposalInState(get(), proposal);
       if (!validation.valid) {
+        const checksError = checkFailure(validation);
         set((state) => ({
           proposals: {
             ...state.proposals,
             [proposalId]: {
               ...proposal,
-              status: "draft",
+              status: checksError && !hasCurrentProof ? "awaiting_approval" : "draft",
               validationErrors: validation.errors.map((error) => error.code),
             },
           },
         }));
         persist(get());
+        if (checksError) throw currentChecksError(checksError.message);
         throw new DomainError(
           "VIEW_VALIDATION_FAILED",
           "VIEW_VALIDATION_FAILED: The proposal must pass current validation before approval.",
@@ -538,7 +654,8 @@ export const useAppStore = create<AppState>((set, get) => {
         webmcp: state.webmcp,
         dialogs: state.dialogs,
         rightRail: state.rightRail,
-        journeyChecks: state.journeyChecks,
+        journeyChecks: {},
+        journeyCheckRevisions: {},
       }));
     },
     startManualFlow(serviceId) {
@@ -568,6 +685,7 @@ export const useAppStore = create<AppState>((set, get) => {
         activeViewId: view.id,
         currentService: view.serviceId,
         portalMode: "adaptive_view_active",
+        ...invalidatedCheckState(state, view.id),
       }));
       get().logActivity({
         actor: "agent",
@@ -591,7 +709,10 @@ export const useAppStore = create<AppState>((set, get) => {
           "VIEW_VALIDATION_FAILED: Only the active view may be safely updated.",
         );
       }
-      set((state) => ({ views: { ...state.views, [view.id]: view } }));
+      set((state) => ({
+        views: { ...state.views, [view.id]: view },
+        ...invalidatedCheckState(state, view.id),
+      }));
       get().logActivity({
         actor: "agent",
         kind: "view_patched",
@@ -654,10 +775,13 @@ export const useAppStore = create<AppState>((set, get) => {
       });
       persist(get());
     },
-    setJourneyChecks(viewId, checks) {
+    setJourneyChecks(viewId, viewRevision, checks) {
+      const view = get().views[viewId];
+      if (!view || view.revision !== viewRevision || checks.length === 0) return false;
       const blockingChecks = checks.filter((check) => check.status === "fail").length;
       set((state) => ({
         journeyChecks: { ...state.journeyChecks, [viewId]: checks },
+        journeyCheckRevisions: { ...state.journeyCheckRevisions, [viewId]: viewRevision },
         metrics: { ...state.metrics, blockingChecks },
         rightRail: { ...state.rightRail, activeTab: "checks" },
       }));
@@ -668,6 +792,7 @@ export const useAppStore = create<AppState>((set, get) => {
         status: blockingChecks ? "warning" : "success",
       });
       persist(get());
+      return true;
     },
     createProposal(proposal) {
       if (proposal.status !== "draft")
@@ -681,6 +806,7 @@ export const useAppStore = create<AppState>((set, get) => {
         throw transitionError("HUMAN_APPROVAL_REQUIRED", "Only a draft proposal can be validated.");
       const validation = validateProposalInState(get(), proposal);
       if (!validation.valid) {
+        const checksError = checkFailure(validation);
         set((state) => ({
           proposals: {
             ...state.proposals,
@@ -691,6 +817,7 @@ export const useAppStore = create<AppState>((set, get) => {
           },
         }));
         persist(get());
+        if (checksError) throw currentChecksError(checksError.message);
         throw new DomainError(
           "VIEW_VALIDATION_FAILED",
           "VIEW_VALIDATION_FAILED: The workflow proposal is not safe to validate.",
@@ -713,17 +840,19 @@ export const useAppStore = create<AppState>((set, get) => {
         );
       const validation = validateProposalInState(get(), proposal);
       if (!validation.valid) {
+        const checksError = checkFailure(validation);
         set((state) => ({
           proposals: {
             ...state.proposals,
             [proposalId]: {
               ...proposal,
-              status: "draft",
+              status: checksError ? "validated" : "draft",
               validationErrors: validation.errors.map((error) => error.code),
             },
           },
         }));
         persist(get());
+        if (checksError) throw currentChecksError(checksError.message);
         throw new DomainError(
           "VIEW_VALIDATION_FAILED",
           "VIEW_VALIDATION_FAILED: The workflow proposal changed and must be validated again.",
@@ -894,6 +1023,7 @@ export const getAppState = (): ToolAppState => {
     views: state.views,
     activeViewId: state.activeViewId,
     journeyChecks: state.journeyChecks,
+    journeyCheckRevisions: state.journeyCheckRevisions,
     proposals: state.proposals,
     approvedWorkflowTools: state.approvedWorkflowTools,
     webmcp: state.webmcp,

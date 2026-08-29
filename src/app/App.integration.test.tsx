@@ -369,6 +369,59 @@ describe("CivicWeave application", () => {
     expect(screen.getByLabelText(/12 months/i)).toBeChecked();
   });
 
+  it("keeps a staged adaptive draft visible and lets only the human reopen its existing review", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await compileAndCheck(user);
+    await user.click(
+      within(await screen.findByRole("dialog", { name: /webmcp simulator/i })).getByRole("button", {
+        name: /close simulator/i,
+      }),
+    );
+
+    await user.click(screen.getByRole("button", { name: /next question/i }));
+    await user.click(screen.getByLabelText(/12 months/i));
+    await user.click(screen.getByRole("button", { name: /next question/i }));
+    await user.click(screen.getByRole("button", { name: /next question/i }));
+    await user.click(screen.getByRole("button", { name: /next question/i }));
+    await user.click(screen.getByRole("button", { name: /review draft/i }));
+
+    await screen.findByRole("dialog", {
+      name: /confirm fictional submission/i,
+    });
+    const stateAtStaging = useAppStore.getState();
+    const stagedEvidence = {
+      portalMode: stateAtStaging.portalMode,
+      draft: structuredClone(stateAtStaging.serviceDrafts.parking_permit_renewal),
+      activityIds: stateAtStaging.activity.map((entry) => entry.id),
+      metrics: structuredClone(stateAtStaging.metrics),
+    };
+    await user.keyboard("{Escape}");
+
+    expect(await screen.findByText(/staged for human review/i)).toBeVisible();
+    expect(screen.getByText(/remains unsubmitted/i)).toBeVisible();
+    const returnToReview = screen.getByRole("button", { name: /return to review/i });
+    await waitFor(() => expect(returnToReview).toHaveFocus());
+    expect(within(screen.getByRole("main")).queryByRole("radio")).not.toBeInTheDocument();
+
+    await user.click(returnToReview);
+    const reopened = await screen.findByRole("dialog", { name: /confirm fictional submission/i });
+    expect(reopened).toBeVisible();
+    await user.click(within(reopened).getByRole("button", { name: /keep as draft/i }));
+    await waitFor(() => expect(returnToReview).toHaveFocus());
+    await user.click(returnToReview);
+    expect(
+      await screen.findByRole("dialog", { name: /confirm fictional submission/i }),
+    ).toBeVisible();
+    const stateAfterReopen = useAppStore.getState();
+    expect({
+      portalMode: stateAfterReopen.portalMode,
+      draft: stateAfterReopen.serviceDrafts.parking_permit_renewal,
+      activityIds: stateAfterReopen.activity.map((entry) => entry.id),
+      metrics: stateAfterReopen.metrics,
+    }).toEqual(stagedEvidence);
+  });
+
   it("keeps a one-field adaptive permit on its missing duration until the human fixes it", async () => {
     const user = userEvent.setup();
     render(<App />);

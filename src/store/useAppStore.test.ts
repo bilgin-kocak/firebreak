@@ -2,7 +2,15 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { canonicalPreferences } from "../domain/seed";
 import { DomainError, type WorkflowToolProposal } from "../domain/types";
-import { PERSISTENCE_KEYS, type PersistenceStorage } from "./persistence";
+import {
+  loadSession,
+  loadWorkflowTools,
+  PERSISTENCE_KEYS,
+  saveSession,
+  saveViews,
+  saveWorkflowTools,
+  type PersistenceStorage,
+} from "./persistence";
 import { selectOrderedActivity } from "./selectors";
 import {
   getAppState,
@@ -84,6 +92,22 @@ const validProposal: WorkflowToolProposal = {
   ],
 };
 
+const installViewWithPassingChecks = () => {
+  const store = useAppStore.getState();
+  store.startManualFlow("parking_permit_renewal");
+  store.addView(view);
+  expect(
+    store.setJourneyChecks(view.id, view.revision, [
+      {
+        id: "current_view_proof",
+        title: "Current view proof",
+        status: "pass",
+        detail: "The exact current view passed its recorded checks.",
+      },
+    ]),
+  ).toBe(true);
+};
+
 describe("CivicWeave app store", () => {
   beforeEach(() => {
     resetAppStoreForTests();
@@ -152,6 +176,7 @@ describe("CivicWeave app store", () => {
   });
 
   it("keeps proposal staging separate from human approval and registration", () => {
+    installViewWithPassingChecks();
     const store = useAppStore.getState();
     store.createProposal(validProposal);
     store.validateProposal(validProposal.id);
@@ -167,6 +192,7 @@ describe("CivicWeave app store", () => {
   });
 
   it("lets only a human return the current proposal to an editable draft", () => {
+    installViewWithPassingChecks();
     const store = useAppStore.getState();
     store.createProposal(validProposal);
     store.validateProposal(validProposal.id);
@@ -206,6 +232,90 @@ describe("CivicWeave app store", () => {
     store.hydrateFromPersistence();
 
     expect(getAppState().views).toEqual({});
+    expect(getAppState().activity[0]?.detail).toContain("PERSISTENCE_RECOVERY");
+  });
+
+  it("reconciles a dangling active view into a usable staged portal and discards dependent workflows", () => {
+    const storage = createStorage();
+    const seed = getAppState();
+    saveSession(storage, {
+      resident: seed.resident,
+      currentService: "parking_permit_renewal",
+      portalMode: "staged_for_review",
+      serviceDrafts: {
+        parking_permit_renewal: {
+          vehicleId: "vehicle_aurora",
+          durationMonths: 12,
+          contactEmail: "maya.chen@example.test",
+          fee: 60,
+          status: "staged_for_review",
+        },
+      },
+      activeViewId: "missing_view",
+      proposals: {
+        [validProposal.id]: {
+          ...validProposal,
+          viewId: "missing_view",
+          status: "awaiting_approval",
+        },
+      },
+      metrics: seed.metrics,
+    });
+    storage.setItem(PERSISTENCE_KEYS.views, "corrupt views envelope");
+    saveWorkflowTools(storage, [
+      {
+        ...validProposal,
+        viewId: "missing_view",
+        status: "registered",
+        approvedAt: "2026-08-29T00:00:00.000Z",
+        enabled: true,
+        registrationRevision: 1,
+      },
+    ]);
+    const store = useAppStore.getState();
+    store.setPersistenceStorage(storage);
+
+    store.hydrateFromPersistence();
+
+    expect(getAppState()).toMatchObject({
+      currentService: "parking_permit_renewal",
+      portalMode: "staged_for_review",
+      activeViewId: null,
+      proposals: {},
+      approvedWorkflowTools: {},
+    });
+    expect(getAppState().serviceDrafts.parking_permit_renewal).toMatchObject({
+      status: "staged_for_review",
+      durationMonths: 12,
+    });
+    expect(getAppState().activity[0]?.detail).toContain("PERSISTENCE_RECOVERY");
+    expect(loadSession(storage).data).toMatchObject({ activeViewId: null, proposals: {} });
+    expect(loadWorkflowTools(storage).data).toEqual([]);
+  });
+
+  it("discards an active view that has no matching selected service", () => {
+    const storage = createStorage();
+    const seed = getAppState();
+    saveSession(storage, {
+      resident: seed.resident,
+      currentService: null,
+      portalMode: "adaptive_view_active",
+      serviceDrafts: {},
+      activeViewId: view.id,
+      proposals: {},
+      metrics: seed.metrics,
+    });
+    saveViews(storage, [view]);
+    const store = useAppStore.getState();
+    store.setPersistenceStorage(storage);
+
+    store.hydrateFromPersistence();
+
+    expect(getAppState()).toMatchObject({
+      currentService: null,
+      portalMode: "idle",
+      activeViewId: null,
+    });
     expect(getAppState().activity[0]?.detail).toContain("PERSISTENCE_RECOVERY");
   });
 
@@ -288,6 +398,7 @@ describe("CivicWeave app store", () => {
   });
 
   it("enforces workflow proposal transitions through validation, review, registration, disable, and delete", () => {
+    installViewWithPassingChecks();
     const store = useAppStore.getState();
     const draft = { ...validProposal, status: "draft" as const };
     store.createProposal(draft);
@@ -306,6 +417,7 @@ describe("CivicWeave app store", () => {
     expect(getAppState().approvedWorkflowTools[draft.name]).toBeUndefined();
 
     resetAppStoreForTests();
+    installViewWithPassingChecks();
     const rejected = { ...validProposal, id: "proposal_rejected", status: "draft" as const };
     useAppStore.getState().createProposal(rejected);
     useAppStore.getState().validateProposal(rejected.id);
@@ -458,6 +570,7 @@ describe("CivicWeave app store", () => {
   });
 
   it("blocks invalid workflow proposals before validation, approval, or registration", () => {
+    installViewWithPassingChecks();
     const store = useAppStore.getState();
     const invalid: WorkflowToolProposal = {
       ...validProposal,
@@ -475,6 +588,7 @@ describe("CivicWeave app store", () => {
   });
 
   it("validates and revalidates canonical proposals before approval", () => {
+    installViewWithPassingChecks();
     const store = useAppStore.getState();
     store.createProposal(validProposal);
     store.validateProposal(validProposal.id);

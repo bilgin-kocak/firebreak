@@ -22,6 +22,7 @@ export interface WorkflowValidationOptions {
   staticToolNames?: readonly string[];
   enabledCompiledToolNames?: readonly string[];
   journeyChecks?: ReadonlyArray<{ id: string; status: "pass" | "fail" | "warning" }>;
+  requireJourneyCheckProof?: boolean;
 }
 
 export interface DynamicInputSchema {
@@ -316,11 +317,13 @@ export const validateWorkflowProposal = (
   if (proposal.stopAt !== "review") {
     add(errors, "REVIEW_STEP_REQUIRED", "stopAt must be exactly review.", "stopAt");
   }
-  if (options.journeyChecks?.some((check) => check.status === "fail")) {
+  if (options.requireJourneyCheckProof === true && !options.journeyChecks?.length) {
+    add(errors, "CHECKS_FAILED", "Run journey checks for the current view, then retry staging.");
+  } else if (options.journeyChecks?.some((check) => check.status === "fail")) {
     add(
       errors,
       "CHECKS_FAILED",
-      "Blocking journey checks must pass before a workflow can be approved.",
+      "Blocking journey checks must pass. Resolve them, run journey checks again, then retry.",
     );
   }
   const inputSchema = deriveDynamicInputSchema(proposal);

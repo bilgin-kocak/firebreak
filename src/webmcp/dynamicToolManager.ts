@@ -10,7 +10,7 @@ import {
 } from "../domain/workflowExecutor";
 import { DomainError, type WorkflowToolProposal } from "../domain/types";
 import { deriveDynamicInputSchema, validateWorkflowProposal } from "../domain/workflowValidator";
-import { useAppStore } from "../store/useAppStore";
+import { getCurrentJourneyChecks, useAppStore } from "../store/useAppStore";
 import type { ToolRegistry } from "./registry";
 import { successResult } from "./results";
 import { STATIC_TOOL_NAMES } from "./staticToolDefinitions";
@@ -51,9 +51,13 @@ export class DynamicToolManager {
     try {
       await this.assertCurrentlyValid(proposal, false);
     } catch (error) {
-      useAppStore
-        .getState()
-        .invalidateProposalForEdit(proposalId, this.validationErrorCodes(error));
+      const proofInvalidated =
+        error instanceof DomainError && error.details?.proofInvalidated === true;
+      if (!proofInvalidated) {
+        useAppStore
+          .getState()
+          .invalidateProposalForEdit(proposalId, this.validationErrorCodes(error));
+      }
       throw error;
     }
 
@@ -162,6 +166,15 @@ export class DynamicToolManager {
         "The persisted workflow no longer has a matching trusted task view.",
       );
     }
+    const recordedChecks = getCurrentJourneyChecks(state, proposal.viewId);
+    if (!restoringSameDefinition && !recordedChecks?.length) {
+      throw new DomainError(
+        "CHECKS_FAILED",
+        "Run journey checks for the current view, then retry approval.",
+        { validationErrors: ["CHECKS_FAILED"], proofInvalidated: true },
+      );
+    }
+    const checkedRevision = view.revision;
     const blueprint = getServiceBlueprint(proposal.serviceId);
     const currentChecks = await runJourneyChecks(view, {
       operationSafety: {
@@ -174,9 +187,18 @@ export class DynamicToolManager {
         operationCount: proposal.operations.length,
       },
     });
+    const liveState = useAppStore.getState();
+    const liveView = liveState.views[proposal.viewId];
+    if (!liveView || liveView.revision !== checkedRevision) {
+      throw new DomainError(
+        "CHECKS_FAILED",
+        "The task view changed during approval validation. Run journey checks again, then retry.",
+        { validationErrors: ["CHECKS_FAILED"], proofInvalidated: true },
+      );
+    }
     const validation = validateWorkflowProposal(proposal, {
       staticToolNames: STATIC_TOOL_NAMES,
-      enabledCompiledToolNames: Object.values(state.approvedWorkflowTools)
+      enabledCompiledToolNames: Object.values(liveState.approvedWorkflowTools)
         .filter((tool) => {
           if (!tool.enabled) return false;
           if (!restoringSameDefinition || !("registrationRevision" in proposal)) return true;
@@ -185,7 +207,10 @@ export class DynamicToolManager {
           );
         })
         .map((tool) => tool.name),
-      journeyChecks: [...(state.journeyChecks[proposal.viewId] ?? []), ...currentChecks],
+      journeyChecks: restoringSameDefinition
+        ? currentChecks
+        : [...(recordedChecks ?? []), ...currentChecks],
+      requireJourneyCheckProof: true,
     });
     if (!validation.valid) {
       const firstError = validation.errors[0];

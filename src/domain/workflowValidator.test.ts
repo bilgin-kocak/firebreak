@@ -111,6 +111,22 @@ describe("workflow proposal validator", () => {
     expect(validateWorkflowProposal(canonicalProposal()).valid).toBe(true);
   });
 
+  it("requires a non-empty recorded journey-check proof before staging", () => {
+    for (const journeyChecks of [undefined, []]) {
+      expect(
+        validateWorkflowProposal(canonicalProposal(), {
+          journeyChecks,
+          requireJourneyCheckProof: true,
+        }).errors,
+      ).toContainEqual(
+        expect.objectContaining({
+          code: "CHECKS_FAILED",
+          message: expect.stringMatching(/run journey checks.*retry/i),
+        }),
+      );
+    }
+  });
+
   it("accepts optional blank workflow titles and parameter descriptions", () => {
     const proposal = canonicalProposal();
     proposal.title = "";

@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 import { installModelContextMock } from "../src/test/modelContextMock";
@@ -70,6 +71,13 @@ const boot = async (page: Page) => {
   await expect(page.getByText("7 registered tools")).toBeVisible();
 };
 
+const seriousOrCritical = async (page: Page) => {
+  const result = await new AxeBuilder({ page }).analyze();
+  return result.violations.filter((violation) =>
+    ["serious", "critical"].includes(violation.impact ?? ""),
+  );
+};
+
 const approveCanonicalTool = async (page: Page) => {
   const compiled = await execute<{ ok: true; data: { viewId: string } }>(
     page,
@@ -97,6 +105,73 @@ test("reload revalidates and re-registers an enabled human-approved workflow", a
   await expect(page.getByText("8 registered tools")).toBeVisible();
   await page.getByRole("tab", { name: "Activity" }).click();
   await expect(page.getByText("Saved approval; registered for this tab.")).toBeVisible();
+});
+
+test("a staged adaptive draft reopens the same human review before and after reload", async ({
+  page,
+}, testInfo) => {
+  await boot(page);
+  const compiled = await execute<{ ok: true; data: { viewId: string } }>(
+    page,
+    "compile_task_view",
+    compileInput,
+  );
+  await execute(page, "run_journey_checks", {
+    viewId: compiled.data.viewId,
+    includeDomChecks: true,
+  });
+
+  await page.getByRole("button", { name: "Next question" }).click();
+  await page.getByLabel("12 months").click();
+  await page.getByRole("button", { name: "Next question" }).click();
+  await page.getByRole("button", { name: "Next question" }).click();
+  await page.getByRole("button", { name: "Review draft" }).click();
+  const confirmation = page.getByRole("dialog", { name: "Confirm fictional submission" });
+  await confirmation.getByRole("button", { name: "Keep as draft" }).click();
+
+  const returnToReview = page.getByRole("button", { name: "Return to review" });
+  await expect(page.getByRole("heading", { name: "Staged for human review" })).toBeVisible();
+  await expect(page.getByText(/remains unsubmitted/i)).toBeVisible();
+  await expect(returnToReview).toBeFocused();
+  expect(await seriousOrCritical(page)).toEqual([]);
+  const persistedBeforeReopen = await page.evaluate(() => ({
+    session: localStorage.getItem("civicweave:v1:session"),
+    activity: localStorage.getItem("civicweave:v1:activity"),
+    views: localStorage.getItem("civicweave:v1:views"),
+  }));
+
+  await returnToReview.click();
+  await expect(confirmation).toBeVisible();
+  expect(
+    await page.evaluate(() => ({
+      session: localStorage.getItem("civicweave:v1:session"),
+      activity: localStorage.getItem("civicweave:v1:activity"),
+      views: localStorage.getItem("civicweave:v1:views"),
+    })),
+  ).toEqual(persistedBeforeReopen);
+  await confirmation.getByRole("button", { name: "Keep as draft" }).click();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await page.screenshot({
+    path: testInfo.outputPath("adaptive-staged-desktop.png"),
+    fullPage: true,
+  });
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Staged for human review" })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(await seriousOrCritical(page)).toEqual([]);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await page.screenshot({
+    path: testInfo.outputPath("adaptive-staged-reload-mobile.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Return to review" }).click();
+  await confirmation.getByRole("button", { name: "Confirm & Submit" }).click();
+  await expect(page.getByRole("heading", { name: "Submission confirmed" })).toBeVisible();
 });
 
 test("Disable unregisters through the registration AbortSignal and keeps saved metadata", async ({

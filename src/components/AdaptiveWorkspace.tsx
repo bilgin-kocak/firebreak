@@ -39,6 +39,8 @@ export const AdaptiveWorkspace = () => {
   const draft = storedDraft ?? {};
   const human = useAppStore((state) => state.human);
   const stage = useAppStore((state) => state.stageDraftForReview);
+  const portalMode = useAppStore((state) => state.portalMode);
+  const setDialog = useAppStore((state) => state.setDialog);
   const [stepIndex, setStepIndex] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState("");
@@ -49,6 +51,83 @@ export const AdaptiveWorkspace = () => {
   }, [view?.id]);
   const blueprint = useMemo(() => (view ? getServiceBlueprint(view.serviceId) : undefined), [view]);
   if (!view || !blueprint) return null;
+  if (portalMode === "staged_for_review") {
+    const permit = view.serviceId === "parking_permit_renewal";
+    return (
+      <section
+        id="adaptive-workspace"
+        className="adaptive-workspace adaptive-staged-review"
+        aria-labelledby="adaptive-title"
+      >
+        <div className="adaptive-hero adaptive-staged-hero">
+          <p className="eyebrow">Adaptive draft status</p>
+          <h1 id="adaptive-title" tabIndex={-1}>
+            Staged for human review
+          </h1>
+          <p>{view.title} is ready for your final decision.</p>
+        </div>
+        <div className="trusted-notice" role="status">
+          <ShieldCheck size={19} />
+          <p>
+            <strong>This draft remains unsubmitted.</strong>
+            <span>Only you can reopen the review and use the final confirmation action.</span>
+          </p>
+        </div>
+        <div className="adaptive-staged-summary">
+          <h2>Draft summary</h2>
+          <dl className="review-list">
+            {permit ? (
+              <>
+                <div>
+                  <dt>Vehicle</dt>
+                  <dd>NST-4821</dd>
+                </div>
+                <div>
+                  <dt>Duration</dt>
+                  <dd>{String(draft.durationMonths)} months</dd>
+                </div>
+                <div>
+                  <dt>Fictional fee</dt>
+                  <dd>${String(draft.fee)}</dd>
+                </div>
+                <div>
+                  <dt>Contact</dt>
+                  <dd>{String(draft.contactEmail)}</dd>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <dt>New address</dt>
+                  <dd>
+                    {String(draft.newStreet)}, {String(draft.newCity)} {String(draft.newPostalCode)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Effective date</dt>
+                  <dd>{String(draft.effectiveDate)}</dd>
+                </div>
+                <div>
+                  <dt>Voter record</dt>
+                  <dd>
+                    {draft.updateVoterRecord ? "Include update request" : "No update request"}
+                  </dd>
+                </div>
+              </>
+            )}
+          </dl>
+          <button
+            id="adaptive-return-to-review"
+            className="button button-primary"
+            type="button"
+            onClick={() => setDialog("finalConfirmationOpen", true)}
+          >
+            <BadgeCheck size={18} /> Return to review
+          </button>
+        </div>
+      </section>
+    );
+  }
   const visibleFields = view.fieldOrder
     .filter((id) => !view.hiddenOptionalFields.includes(id))
     .map((id) => blueprint.fields.find((field) => field.id === id))

@@ -6,7 +6,7 @@ import { getServiceBlueprint, serviceBlueprints } from "../domain/serviceBluepri
 import { compileTaskView, patchTaskView } from "../domain/viewCompiler";
 import { compileWorkflowProposal } from "../domain/workflowCompiler";
 import { DomainError, type ServiceId } from "../domain/types";
-import { getAppState, type ToolAppState } from "../store/useAppStore";
+import { getAppState, getCurrentJourneyChecks, type ToolAppState } from "../store/useAppStore";
 import { successResult } from "./results";
 import type { RegistryToolDefinition } from "./types";
 
@@ -417,7 +417,7 @@ export const createStaticToolDefinitions = (
           },
           lockedElementIds: [...view.lockedElementIds],
           currentValues: structuredClone(state.serviceDrafts[view.serviceId] ?? {}),
-          checkStatus: (state.journeyChecks[view.id] ?? []).map((check) => ({
+          checkStatus: (getCurrentJourneyChecks(state, view.id) ?? []).map((check) => ({
             id: check.id,
             status: check.status,
           })),
@@ -488,7 +488,12 @@ export const createStaticToolDefinitions = (
               operationRegistry[blueprint.finalHumanOperationId]?.compilable,
           },
         });
-        getState().setJourneyChecks(view.id, checks);
+        if (!getState().setJourneyChecks(view.id, view.revision, checks)) {
+          throw new DomainError(
+            "CHECKS_FAILED",
+            "The task view changed while checks were running. Run journey checks again, then retry.",
+          );
+        }
         const failures = checks.filter((check) => check.status === "fail");
         const warnings = checks.filter((check) => check.status === "warning");
         return successResult("CHECKS_COMPLETED", "Completed deterministic journey checks.", {
@@ -522,6 +527,13 @@ export const createStaticToolDefinitions = (
         const view = state.views[input.viewId];
         if (!view)
           throw new DomainError("VIEW_NOT_FOUND", "The requested task view was not found.");
+        const currentChecks = getCurrentJourneyChecks(state, view.id);
+        if (!currentChecks?.length) {
+          throw new DomainError(
+            "CHECKS_FAILED",
+            "Run journey checks for the current view, then retry staging.",
+          );
+        }
         const proposal = compileWorkflowProposal(
           { ...input, serviceId: view.serviceId },
           {
@@ -530,7 +542,8 @@ export const createStaticToolDefinitions = (
             enabledCompiledToolNames: Object.values(state.approvedWorkflowTools)
               .filter((tool) => tool.enabled)
               .map((tool) => tool.name),
-            journeyChecks: state.journeyChecks[view.id],
+            journeyChecks: currentChecks,
+            requireJourneyCheckProof: true,
           },
         );
         if (proposal.status !== "awaiting_approval") {

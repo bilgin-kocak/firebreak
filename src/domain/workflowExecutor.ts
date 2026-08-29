@@ -142,7 +142,9 @@ export const executeWorkflow = async (
   };
 
   if (isCancelled(signal)) return fail("EXECUTION_CANCELLED");
-  const validation = validateWorkflowProposal(proposal);
+  // Runtime execution rechecks the immutable, already-human-approved definition.
+  // Revision-bound journey proof is required at staging and approval, not replayed here.
+  const validation = validateWorkflowProposal(proposal, { requireJourneyCheckProof: false });
   if (!validation.valid) return fail("OPERATION_FAILED", validation.errors[0]?.message);
   const inputSchema = deriveDynamicInputSchema(proposal);
   if (!validateJsonSchema(inputSchema, input))
