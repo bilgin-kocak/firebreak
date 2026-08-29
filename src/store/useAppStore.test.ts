@@ -47,6 +47,38 @@ const proposal: WorkflowToolProposal = {
   createdAt: "2026-08-29T00:00:00.000Z",
 };
 
+const validProposal: WorkflowToolProposal = {
+  ...proposal,
+  id: "proposal_valid",
+  status: "draft",
+  parameters: [
+    {
+      name: "durationMonths",
+      fieldId: "permitDurationMonths",
+      description: "Choose a 6- or 12-month parking permit.",
+      required: true,
+    },
+  ],
+  operations: [
+    { operationId: "permit.load_current", bindings: [] },
+    {
+      operationId: "permit.set_vehicle",
+      bindings: [{ argument: "vehicleId", source: "portal_state", key: "currentVehicleId" }],
+    },
+    {
+      operationId: "permit.set_duration",
+      bindings: [{ argument: "months", source: "tool_input", key: "durationMonths" }],
+    },
+    {
+      operationId: "permit.set_contact",
+      bindings: [{ argument: "email", source: "portal_state", key: "contactEmail" }],
+    },
+    { operationId: "permit.calculate_fee", bindings: [] },
+    { operationId: "permit.save_draft", bindings: [] },
+    { operationId: "permit.stage_review", bindings: [] },
+  ],
+};
+
 describe("CivicWeave app store", () => {
   beforeEach(() => {
     resetAppStoreForTests();
@@ -59,6 +91,7 @@ describe("CivicWeave app store", () => {
 
   it("moves the portal through adaptive, draft, review, and submitted states", () => {
     const store = useAppStore.getState();
+    store.startManualFlow("parking_permit_renewal");
     store.addView(view);
     store.human.editDraft("parking_permit_renewal", {
       vehicleId: "vehicle_aurora",
@@ -83,6 +116,7 @@ describe("CivicWeave app store", () => {
 
   it("allows only a human action to make the fictional address submission transition", () => {
     const store = useAppStore.getState();
+    store.startManualFlow("address_change");
     store.human.editDraft("address_change", {
       newStreet: "8 Cove Road",
       newCity: "Northstar",
@@ -100,6 +134,7 @@ describe("CivicWeave app store", () => {
 
   it("preserves a human lock and edit in the view state", () => {
     const store = useAppStore.getState();
+    store.startManualFlow("parking_permit_renewal");
     store.addView(view);
     store.human.setDraftField("parking_permit_renewal", "contactEmail", "maya@example.test");
     store.human.lockElement(view.id, "field:vehicleId");
@@ -112,14 +147,14 @@ describe("CivicWeave app store", () => {
 
   it("keeps proposal staging separate from human approval and registration", () => {
     const store = useAppStore.getState();
-    store.createProposal({ ...proposal, status: "draft" });
-    store.validateProposal(proposal.id);
-    store.requestProposalApproval(proposal.id);
+    store.createProposal(validProposal);
+    store.validateProposal(validProposal.id);
+    store.requestProposalApproval(validProposal.id);
 
-    expect(getAppState().proposals[proposal.id]?.status).toBe("awaiting_approval");
+    expect(getAppState().proposals[validProposal.id]?.status).toBe("awaiting_approval");
     expect(getAppState().approvedWorkflowTools).toEqual({});
-    store.human.approveProposal(proposal.id);
-    expect(getAppState().approvedWorkflowTools[proposal.name]).toMatchObject({
+    store.human.approveProposal(validProposal.id);
+    expect(getAppState().approvedWorkflowTools[validProposal.name]).toMatchObject({
       status: "registered",
       enabled: true,
     });
@@ -161,6 +196,7 @@ describe("CivicWeave app store", () => {
     store.registerDynamicToolUnregister(async () => {
       unregistered += 1;
     });
+    store.startManualFlow("parking_permit_renewal");
     store.addView(view);
 
     await store.reset();
@@ -180,6 +216,7 @@ describe("CivicWeave app store", () => {
       "DRAFT_VALIDATION_FAILED",
     );
 
+    store.startManualFlow("parking_permit_renewal");
     store.human.editDraft("parking_permit_renewal", {
       vehicleId: "vehicle_aurora",
       durationMonths: 12,
@@ -194,6 +231,7 @@ describe("CivicWeave app store", () => {
 
     resetAppStoreForTests();
     const next = useAppStore.getState();
+    next.startManualFlow("address_change");
     expect(() => next.human.confirmAddressSubmission()).toThrow("DRAFT_VALIDATION_FAILED");
     next.human.editDraft("address_change", {
       newStreet: "8 Cove Road",
@@ -219,7 +257,7 @@ describe("CivicWeave app store", () => {
 
   it("enforces workflow proposal transitions through validation, review, registration, disable, and delete", () => {
     const store = useAppStore.getState();
-    const draft = { ...proposal, status: "draft" as const };
+    const draft = { ...validProposal, status: "draft" as const };
     store.createProposal(draft);
     expect(() => store.requestProposalApproval(draft.id)).toThrow("HUMAN_APPROVAL_REQUIRED");
     expect(() => store.human.approveProposal(draft.id)).toThrow("HUMAN_APPROVAL_REQUIRED");
@@ -236,7 +274,7 @@ describe("CivicWeave app store", () => {
     expect(getAppState().approvedWorkflowTools[draft.name]).toBeUndefined();
 
     resetAppStoreForTests();
-    const rejected = { ...proposal, id: "proposal_rejected", status: "draft" as const };
+    const rejected = { ...validProposal, id: "proposal_rejected", status: "draft" as const };
     useAppStore.getState().createProposal(rejected);
     useAppStore.getState().validateProposal(rejected.id);
     useAppStore.getState().requestProposalApproval(rejected.id);
@@ -264,6 +302,22 @@ describe("CivicWeave app store", () => {
     expect(saved).not.toContain("other@example.test");
     expect(saved).not.toContain("form-data");
     expect(saved).not.toContain("secret");
+  });
+
+  it("sanitizes tool names before they reach memory or persisted activity", () => {
+    const storage = createStorage();
+    const store = useAppStore.getState();
+    store.setPersistenceStorage(storage);
+    store.logActivity({
+      actor: "agent",
+      kind: "tool_completed",
+      title: "Completed",
+      toolName: "tool_maya.chen@example.test_payload={secret}",
+      status: "success",
+    });
+
+    expect(getAppState().activity[0]?.toolName).not.toContain("maya.chen@example.test");
+    expect(storage.getItem(PERSISTENCE_KEYS.activity)).not.toContain("secret");
   });
 
   it("offers newest and chronological activity ordering without mutating the ledger", () => {
@@ -323,5 +377,59 @@ describe("CivicWeave app store", () => {
     expect(storage.getItem(PERSISTENCE_KEYS.session)).toBeNull();
     expect(getAppState().resident.name).toBe("Maya Chen");
     expect(getAppState().activity[0]).toMatchObject({ kind: "reset" });
+  });
+
+  it("requires legal portal edges for human drafts and tool-compiled adaptive views", () => {
+    const store = useAppStore.getState();
+    expect(() => store.human.editDraft("parking_permit_renewal", {})).toThrow(
+      "DRAFT_VALIDATION_FAILED",
+    );
+    expect(() => store.addView(view)).toThrow("DRAFT_VALIDATION_FAILED");
+
+    store.startManualFlow("parking_permit_renewal");
+    store.addView(view);
+    expect(getAppState().portalMode).toBe("adaptive_view_active");
+    store.human.editDraft("parking_permit_renewal", { contactEmail: "maya.chen@example.test" });
+    expect(getAppState().portalMode).toBe("draft_in_progress");
+  });
+
+  it("delegates review readiness to the domain validator", () => {
+    const store = useAppStore.getState();
+    store.startManualFlow("parking_permit_renewal");
+    store.human.editDraft("parking_permit_renewal", {
+      vehicleId: "vehicle_aurora",
+      durationMonths: 12,
+      contactEmail: "maya.chen@example.test",
+      fee: 35,
+    });
+
+    expect(() => store.stageDraftForReview("parking_permit_renewal")).toThrow("matching fee");
+  });
+
+  it("blocks invalid workflow proposals before validation, approval, or registration", () => {
+    const store = useAppStore.getState();
+    const invalid: WorkflowToolProposal = {
+      ...validProposal,
+      id: "proposal_human_only",
+      name: "bad_human_only",
+      operations: [{ operationId: "permit.submit", bindings: [] }],
+    };
+    store.createProposal(invalid);
+
+    expect(() => store.validateProposal(invalid.id)).toThrow("VIEW_VALIDATION_FAILED");
+    expect(getAppState().proposals[invalid.id]?.status).toBe("draft");
+    expect(getAppState().proposals[invalid.id]?.validationErrors).toContain("HUMAN_ONLY_OPERATION");
+    expect(() => store.requestProposalApproval(invalid.id)).toThrow("HUMAN_APPROVAL_REQUIRED");
+    expect(() => store.human.approveProposal(invalid.id)).toThrow("HUMAN_APPROVAL_REQUIRED");
+  });
+
+  it("validates and revalidates canonical proposals before approval", () => {
+    const store = useAppStore.getState();
+    store.createProposal(validProposal);
+    store.validateProposal(validProposal.id);
+    store.requestProposalApproval(validProposal.id);
+
+    expect(getAppState().proposals[validProposal.id]?.status).toBe("awaiting_approval");
+    expect(store.human.approveProposal(validProposal.id).status).toBe("registered");
   });
 });

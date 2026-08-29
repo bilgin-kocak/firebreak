@@ -87,3 +87,40 @@
 ### Remaining Concern
 
 - Dynamic registration/disable/delete implementation must invoke the relevant browser adapter unregister lifecycle around the human-only store methods; this store supplies the capability boundary and reset hook, while the WebMCP task owns adapter lifecycle wiring.
+
+## Fix Round 2
+
+### Root Causes
+
+- The store treated portal modes as labels rather than legal graph edges, allowing idle edits and direct compilation from arbitrary modes.
+- Activity sanitization omitted `toolName`, letting free text bypass the privacy boundary.
+- Proposal transition code marked a caller-supplied draft as validated without invoking `validateWorkflowProposal` or retaining its errors.
+- Review-readiness logic was duplicated in the store instead of sharing trusted domain semantics.
+
+### Changes
+
+- Enforced `idle → manual_flow_active → adaptive_view_active/draft_in_progress → staged_for_review → submitted`; human edits require an active matching service, while `addView` requires the canonical `startManualFlow(serviceId)` followed by compilation for that same service. The caller sequence is documented next to `addView`.
+- Sanitized `toolName` with the same conservative free-text sanitizer used for title/detail before an activity entry is stored or persisted.
+- `validateProposal`, approval staging, and human approval now call `validateWorkflowProposal` with current view checks, static names, and enabled dynamic names. Failed validation stores stable error codes and blocks all later transitions.
+- Added `src/domain/draftValidator.ts`, using service blueprints and the trusted operation schemas; the store delegates review-readiness checks to it.
+
+### Red / Green Evidence
+
+1. Red — `npm test -- src/domain/draftValidator.test.ts src/store/useAppStore.test.ts`
+   - Missing domain validator import, unsanitized `toolName`, idle editing, and invalid human-only proposal validation all failed as expected.
+2. Green focused — `npm test -- src/domain/draftValidator.test.ts src/store/useAppStore.test.ts src/store/persistence.test.ts`
+   - 3 files passed, 28 tests passed.
+3. Full verification — `npm run typecheck && npm run lint && npm run format:check && npm test`
+   - Typecheck exit 0; lint exit 0; Prettier clean; 8 files passed, 87 tests passed.
+
+### Exact Commands and Output
+
+- `npm test -- src/domain/draftValidator.test.ts src/store/useAppStore.test.ts src/store/persistence.test.ts` — 3 files passed, 28 tests passed.
+- `npm run typecheck` — exit 0.
+- `npm run lint` — exit 0, zero warnings.
+- `npm run format:check` — `All matched files use Prettier code style!`
+- `npm test` — 8 test files passed, 87 tests passed.
+
+### Remaining Concern
+
+- The production build remains blocked by the separate missing `src/main.tsx` entry. Dynamic browser registration remains responsible for connecting its adapter-specific disable/delete unregister lifecycle to these human-only store operations.

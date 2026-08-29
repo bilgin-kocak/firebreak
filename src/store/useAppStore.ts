@@ -1,7 +1,9 @@
 import { create } from "zustand";
 
+import { validateDraftForReview } from "../domain/draftValidator";
 import type { JourneyCheckResult } from "../domain/journeyChecks";
 import { cloneSeedResident, createId, systemClock } from "../domain/seed";
+import { validateWorkflowProposal } from "../domain/workflowValidator";
 import {
   DomainError,
   type ActivityEntry,
@@ -187,43 +189,21 @@ const transitionError = (
   code: "DRAFT_VALIDATION_FAILED" | "HUMAN_APPROVAL_REQUIRED",
   message: string,
 ) => new DomainError(code, `${code}: ${message}`);
-const email = (value: unknown): value is string =>
-  typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-const minString = (value: unknown, length: number): value is string =>
-  typeof value === "string" && value.trim().length >= length;
-
 const assertReviewableDraft = (state: AppState, serviceId: ServiceId): Draft => {
-  if (state.portalMode !== "draft_in_progress" || state.currentService !== serviceId)
+  if (state.portalMode !== "draft_in_progress" || state.currentService !== serviceId) {
     throw transitionError(
       "DRAFT_VALIDATION_FAILED",
       "A draft must be in progress before it can be staged.",
     );
+  }
   const draft = state.serviceDrafts[serviceId];
   if (!draft) throw transitionError("DRAFT_VALIDATION_FAILED", "The draft is missing.");
-  if (serviceId === "parking_permit_renewal") {
-    const duration = draft.durationMonths;
-    const valid =
-      typeof draft.vehicleId === "string" &&
-      state.resident.vehicles.some((vehicle) => vehicle.id === draft.vehicleId) &&
-      (duration === 6 || duration === 12) &&
-      email(draft.contactEmail) &&
-      draft.fee === (duration === 6 ? 35 : 60);
-    if (!valid)
-      throw transitionError(
-        "DRAFT_VALIDATION_FAILED",
-        "A permit draft needs a resident vehicle, duration, contact email, and matching fee.",
-      );
-  } else if (
-    !minString(draft.newStreet, 3) ||
-    !minString(draft.newCity, 2) ||
-    !minString(draft.newPostalCode, 3) ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(String(draft.effectiveDate ?? ""))
-  ) {
+  const readiness = validateDraftForReview(serviceId, draft, state.resident);
+  if (!readiness.valid)
     throw transitionError(
       "DRAFT_VALIDATION_FAILED",
-      "An address draft needs street, city, postal code, and ISO effective date.",
+      readiness.errors[0] ?? "Draft is not ready for review.",
     );
-  }
   return draft;
 };
 
@@ -273,14 +253,45 @@ const persist = (state: AppState) => {
   saveActivity(persistenceStorage, state.activity);
 };
 
+const staticToolNames = [
+  "inspect_portal",
+  "compile_task_view",
+  "inspect_task_view",
+  "patch_task_view",
+  "run_journey_checks",
+  "stage_workflow_tool",
+  "list_workflow_tools",
+];
+
+const validateProposalInState = (state: AppState, proposal: WorkflowToolProposal) =>
+  validateWorkflowProposal(proposal, {
+    staticToolNames,
+    enabledCompiledToolNames: Object.values(state.approvedWorkflowTools)
+      .filter((tool) => tool.enabled && tool.name !== proposal.name)
+      .map((tool) => tool.name),
+    journeyChecks: state.journeyChecks[proposal.viewId],
+  });
+
 export const useAppStore = create<AppState>((set, get) => {
   const human: HumanEventActions = {
     editDraft(serviceId, patch) {
-      if (get().portalMode === "submitted")
+      const current = get();
+      if (current.portalMode === "submitted")
         throw transitionError(
           "DRAFT_VALIDATION_FAILED",
           "A submitted draft cannot be edited. Reset to begin again.",
         );
+      if (
+        !["manual_flow_active", "adaptive_view_active", "draft_in_progress"].includes(
+          current.portalMode,
+        ) ||
+        current.currentService !== serviceId
+      ) {
+        throw transitionError(
+          "DRAFT_VALIDATION_FAILED",
+          "Start the selected service before editing its draft.",
+        );
+      }
       set((state) => ({
         currentService: serviceId,
         portalMode: "draft_in_progress",
@@ -337,6 +348,24 @@ export const useAppStore = create<AppState>((set, get) => {
       const proposal = get().proposals[proposalId];
       if (!proposal || proposal.status !== "awaiting_approval")
         throw transitionError("HUMAN_APPROVAL_REQUIRED", "Only a staged proposal can be approved.");
+      const validation = validateProposalInState(get(), proposal);
+      if (!validation.valid) {
+        set((state) => ({
+          proposals: {
+            ...state.proposals,
+            [proposalId]: {
+              ...proposal,
+              status: "draft",
+              validationErrors: validation.errors.map((error) => error.code),
+            },
+          },
+        }));
+        persist(get());
+        throw new DomainError(
+          "VIEW_VALIDATION_FAILED",
+          "VIEW_VALIDATION_FAILED: The proposal must pass current validation before approval.",
+        );
+      }
       const approved: ApprovedWorkflowTool = {
         ...proposal,
         status: "registered",
@@ -473,10 +502,27 @@ export const useAppStore = create<AppState>((set, get) => {
       }));
     },
     startManualFlow(serviceId) {
+      if (get().portalMode !== "idle") {
+        throw transitionError(
+          "DRAFT_VALIDATION_FAILED",
+          "A service can only start from the idle portal.",
+        );
+      }
       set({ currentService: serviceId, portalMode: "manual_flow_active" });
       persist(get());
     },
+    /** Canonical tool flow: startManualFlow(serviceId), then addView(compiledView). */
     addView(view) {
+      const current = get();
+      if (
+        current.portalMode !== "manual_flow_active" ||
+        current.currentService !== view.serviceId
+      ) {
+        throw transitionError(
+          "DRAFT_VALIDATION_FAILED",
+          "Compile an adaptive view only for the active manual service flow.",
+        );
+      }
       set((state) => ({
         views: { ...state.views, [view.id]: view },
         activeViewId: view.id,
@@ -538,8 +584,28 @@ export const useAppStore = create<AppState>((set, get) => {
       const proposal = get().proposals[proposalId];
       if (!proposal || proposal.status !== "draft")
         throw transitionError("HUMAN_APPROVAL_REQUIRED", "Only a draft proposal can be validated.");
+      const validation = validateProposalInState(get(), proposal);
+      if (!validation.valid) {
+        set((state) => ({
+          proposals: {
+            ...state.proposals,
+            [proposalId]: {
+              ...proposal,
+              validationErrors: validation.errors.map((error) => error.code),
+            },
+          },
+        }));
+        persist(get());
+        throw new DomainError(
+          "VIEW_VALIDATION_FAILED",
+          "VIEW_VALIDATION_FAILED: The workflow proposal is not safe to validate.",
+        );
+      }
       set((state) => ({
-        proposals: { ...state.proposals, [proposalId]: { ...proposal, status: "validated" } },
+        proposals: {
+          ...state.proposals,
+          [proposalId]: { ...proposal, status: "validated", validationErrors: [] },
+        },
       }));
       persist(get());
     },
@@ -550,6 +616,24 @@ export const useAppStore = create<AppState>((set, get) => {
           "HUMAN_APPROVAL_REQUIRED",
           "Only a validated proposal can request human approval.",
         );
+      const validation = validateProposalInState(get(), proposal);
+      if (!validation.valid) {
+        set((state) => ({
+          proposals: {
+            ...state.proposals,
+            [proposalId]: {
+              ...proposal,
+              status: "draft",
+              validationErrors: validation.errors.map((error) => error.code),
+            },
+          },
+        }));
+        persist(get());
+        throw new DomainError(
+          "VIEW_VALIDATION_FAILED",
+          "VIEW_VALIDATION_FAILED: The workflow proposal changed and must be validated again.",
+        );
+      }
       set((state) => ({
         proposals: {
           ...state.proposals,
@@ -585,6 +669,7 @@ export const useAppStore = create<AppState>((set, get) => {
         ...entry,
         title: privateActivityDetail(entry.title) ?? "Activity",
         detail: privateActivityDetail(entry.detail),
+        toolName: privateActivityDetail(entry.toolName),
       };
       set((state) => ({ activity: [record, ...state.activity].slice(0, 200) }));
       saveActivity(persistenceStorage, get().activity);
