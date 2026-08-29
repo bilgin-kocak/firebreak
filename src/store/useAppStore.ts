@@ -467,15 +467,18 @@ export const useAppStore = create<AppState>((set, get) => {
       persist(get());
     },
     deleteWorkflowTool(name) {
-      if (!get().approvedWorkflowTools[name])
+      const tool = get().approvedWorkflowTools[name];
+      if (!tool)
         throw new DomainError(
           "WORKFLOW_NOT_APPROVED",
           "WORKFLOW_NOT_APPROVED: Tool is not registered.",
         );
       set((state) => {
         const approvedWorkflowTools = { ...state.approvedWorkflowTools };
+        const proposals = { ...state.proposals };
         delete approvedWorkflowTools[name];
-        return { approvedWorkflowTools };
+        delete proposals[tool.id];
+        return { approvedWorkflowTools, proposals };
       });
       get().logActivity({
         actor: "human",
