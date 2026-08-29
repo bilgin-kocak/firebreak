@@ -100,3 +100,43 @@ Tests       5 passed (5)
 ## Concerns
 
 - `npm run build` and `npm run test:e2e` are intentionally not yet runnable: `src/main.tsx` and the application/E2E suites are owned by later planned tasks. This task verified its specified focused unit suite and strict typecheck.
+
+## Fix Round 1
+
+### Changed files
+
+- `playwright.config.ts`
+- `.superpowers/sdd/2026-08-29-civicweave-implementation/task-1-report.md`
+
+### Root cause
+
+`use.baseURL` targeted port `4173`, while the managed Vite `webServer` advertises port `5173`. Consequently, a future `page.goto("/")` would resolve to a server that Playwright had not started.
+
+### Fix and validation
+
+Updated `baseURL` to `http://127.0.0.1:5173`, matching the managed server URL. A separate configuration test would only mirror two literal values, so validation directly loaded the Playwright configuration instead.
+
+Covering command:
+
+```text
+npx playwright test --list --pass-with-no-tests && npm run lint && npm run format:check && npm run typecheck
+```
+
+Exact output:
+
+```text
+Listing tests:
+Total: 0 tests in 0 files
+
+> civicweave@0.0.0 lint
+> eslint . --max-warnings=0
+
+> civicweave@0.0.0 format:check
+> prettier --check .
+
+Checking formatting...
+All matched files use Prettier code style!
+
+> civicweave@0.0.0 typecheck
+> tsc --noEmit
+```
