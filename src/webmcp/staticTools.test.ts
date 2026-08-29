@@ -159,6 +159,7 @@ describe("seven static WebMCP tools", () => {
     const { adapter } = await setup();
     const viewId = await compileView(adapter);
     useAppStore.getState().human.lockElement(viewId, "field:vehicleId");
+    expect(getAppState().metrics.humanLocksPreserved).toBe(0);
 
     const result = await adapter.executeTool("patch_task_view", {
       viewId,
@@ -178,6 +179,7 @@ describe("seven static WebMCP tools", () => {
       details: { lockedElementIds: ["field:vehicleId"] },
     });
     expect(getAppState().views[viewId]).toMatchObject({ title: "Renew my permit", revision: 1 });
+    expect(getAppState().metrics.humanLocksPreserved).toBe(1);
   });
 
   it("updates journey-check state and stages human review without registering a tool", async () => {

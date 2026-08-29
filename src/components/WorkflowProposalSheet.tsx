@@ -1,9 +1,11 @@
-import { ArrowLeft, CheckCircle2, Database, ShieldCheck, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Database, ShieldCheck, X } from "lucide-react";
 import { useCallback } from "react";
 
 import { operationRegistry } from "../domain/operationRegistry";
 import { getServiceBlueprint } from "../domain/serviceBlueprints";
+import { validateWorkflowProposal } from "../domain/workflowValidator";
 import { useAppStore } from "../store/useAppStore";
+import { STATIC_TOOL_NAMES } from "../webmcp/staticToolDefinitions";
 import { useDialogFocus } from "./useDialogFocus";
 
 interface WorkflowProposalSheetProps {
@@ -13,15 +15,33 @@ interface WorkflowProposalSheetProps {
 
 export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposalSheetProps) => {
   const open = useAppStore((state) => state.dialogs.proposalSheetOpen);
-  const proposal = useAppStore((state) =>
-    Object.values(state.proposals).find((item) => item.status === "awaiting_approval"),
-  );
+  const proposals = useAppStore((state) => state.proposals);
+  const approved = useAppStore((state) => state.approvedWorkflowTools);
+  const journeyChecks = useAppStore((state) => state.journeyChecks);
+  const proposal = Object.values(proposals)
+    .filter((item) => item.status === "awaiting_approval")
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+    .at(-1);
   const setDialog = useAppStore((state) => state.setDialog);
+  const returnToEdit = useAppStore((state) => state.human.returnProposalToEdit);
   const reject = useAppStore((state) => state.human.rejectProposal);
   const close = useCallback(() => setDialog("proposalSheetOpen", false), [setDialog]);
   const dialogRef = useDialogFocus(open, close);
   if (!open || !proposal) return null;
   const blueprint = getServiceBlueprint(proposal.serviceId);
+  const currentChecks = journeyChecks[proposal.viewId] ?? [];
+  const blockingChecks = currentChecks.filter((check) => check.status === "fail");
+  const validation = validateWorkflowProposal(proposal, {
+    staticToolNames: STATIC_TOOL_NAMES,
+    enabledCompiledToolNames: Object.values(approved)
+      .filter((tool) => tool.enabled)
+      .map((tool) => tool.name),
+    journeyChecks: currentChecks,
+  });
+  const literalValue = (value: unknown): string => {
+    const serialized = JSON.stringify(value);
+    return (serialized ?? "undefined").slice(0, 160);
+  };
   const approve = async () => {
     try {
       await onApprove(proposal.id);
@@ -38,6 +58,7 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
         role="dialog"
         aria-modal="true"
         aria-labelledby="proposal-title"
+        data-proposal-id={proposal.id}
       >
         <header className="dialog-header">
           <div>
@@ -73,7 +94,10 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
               const field = blueprint.fields.find((item) => item.id === parameter.fieldId);
               return (
                 <article className="parameter-row" key={parameter.name}>
-                  <code>{parameter.name}</code>
+                  <div className="parameter-name">
+                    <code>{parameter.name}</code>
+                    <span>{parameter.required ? "Required" : "Optional"}</span>
+                  </div>
                   <p>{parameter.description}</p>
                   <small>
                     Type:{" "}
@@ -111,10 +135,19 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
                           {operation?.sideEffect.replace("_", " ")}
                         </span>
                         {step.bindings.map((binding) => (
-                          <span key={`${binding.argument}-${binding.source}`}>
-                            <Database size={12} /> {binding.argument} ← {binding.source}
-                            {binding.key ? `:${binding.key}` : ""}
-                          </span>
+                          <div
+                            className="binding-detail"
+                            key={`${binding.argument}-${binding.source}-${binding.key ?? literalValue(binding.value)}`}
+                          >
+                            <Database size={12} />
+                            <span>Argument: {binding.argument}</span>
+                            <span>Source: {binding.source}</span>
+                            <span>Key: {binding.key ?? "—"}</span>
+                            <span>
+                              Value:{" "}
+                              {binding.source === "literal" ? literalValue(binding.value) : "—"}
+                            </span>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -133,12 +166,44 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
               </p>
             </div>
           </section>
-          <p className="validation-pass">
-            <CheckCircle2 size={17} /> Validation passed · 0 blocking journey checks
-          </p>
+          <section
+            className={`validation-summary ${validation.valid ? "validation-pass" : "validation-fail"}`}
+            aria-label="Current proposal validation"
+          >
+            {validation.valid ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
+            <div>
+              <p>
+                <strong>{validation.errors.length} current validation errors</strong>
+                <strong>{blockingChecks.length} blocking journey checks</strong>
+              </p>
+              {validation.errors.length ? (
+                <ul>
+                  {validation.errors.map((error, index) => (
+                    <li key={`${error.code}-${error.path ?? index}`}>{error.message}</li>
+                  ))}
+                </ul>
+              ) : (
+                <span>Validation passed against the current definition and checks.</span>
+              )}
+              {proposal.validationErrors.length ? (
+                <div className="recorded-validation">
+                  <span>Recorded validation details</span>
+                  <ul>
+                    {proposal.validationErrors.map((error) => (
+                      <li key={error}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          </section>
         </div>
         <footer className="dialog-actions">
-          <button className="button button-secondary" type="button" onClick={close}>
+          <button
+            className="button button-secondary"
+            type="button"
+            onClick={() => returnToEdit(proposal.id)}
+          >
             <ArrowLeft size={17} /> Back to edit
           </button>
           <button

@@ -43,9 +43,7 @@ const canonicalProposalInput = {
   stopAt: "review",
 } as const;
 
-const stageCanonicalProposal = async (adapter: WebMCPAdapter = createMemoryAdapter()) => {
-  const registry = new ToolRegistry(adapter);
-  await registerStaticTools(registry);
+const stageCanonicalOnAdapter = async (adapter: WebMCPAdapter) => {
   await adapter.executeTool("compile_task_view", {
     serviceId: "parking_permit_renewal",
     title: "Renew your parking permit",
@@ -60,8 +58,17 @@ const stageCanonicalProposal = async (adapter: WebMCPAdapter = createMemoryAdapt
   if (!viewId) throw new Error("Canonical view was not created");
   await adapter.executeTool("run_journey_checks", { viewId });
   await adapter.executeTool("stage_workflow_tool", { viewId, ...canonicalProposalInput });
-  const proposalId = Object.keys(getAppState().proposals)[0];
+  const proposalId = Object.values(getAppState().proposals).find(
+    (proposal) => proposal.status === "awaiting_approval",
+  )?.id;
   if (!proposalId) throw new Error("Canonical proposal was not staged");
+  return proposalId;
+};
+
+const stageCanonicalProposal = async (adapter: WebMCPAdapter = createMemoryAdapter()) => {
+  const registry = new ToolRegistry(adapter);
+  await registerStaticTools(registry);
+  const proposalId = await stageCanonicalOnAdapter(adapter);
   return { adapter, registry, proposalId };
 };
 
@@ -402,6 +409,30 @@ describe("DynamicToolManager", () => {
     const { adapter, registry, proposalId } = await stageCanonicalProposal();
     const manager = new DynamicToolManager(registry);
     await manager.approveAndRegister(proposalId);
+
+    await useAppStore.getState().reset();
+
+    expect((await adapter.getTools()).map((tool) => tool.name)).not.toContain(
+      "renew_permit_guided",
+    );
+    expect(getAppState().approvedWorkflowTools).toEqual({});
+  });
+
+  it("keeps the reset unregister lifecycle active across repeated approvals", async () => {
+    const { adapter, registry, proposalId } = await stageCanonicalProposal();
+    const manager = new DynamicToolManager(registry);
+    await manager.approveAndRegister(proposalId);
+
+    await useAppStore.getState().reset();
+
+    expect((await adapter.getTools()).map((tool) => tool.name)).not.toContain(
+      "renew_permit_guided",
+    );
+    expect(getAppState().approvedWorkflowTools).toEqual({});
+
+    const secondProposalId = await stageCanonicalOnAdapter(adapter);
+    await manager.approveAndRegister(secondProposalId);
+    expect((await adapter.getTools()).map((tool) => tool.name)).toContain("renew_permit_guided");
 
     await useAppStore.getState().reset();
 

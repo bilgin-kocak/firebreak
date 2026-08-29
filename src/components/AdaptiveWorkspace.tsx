@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, BadgeCheck, ShieldCheck, WandSparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { validateDraftForReview } from "../domain/draftValidator";
 import { parkingPermitFees } from "../domain/seed";
 import { getServiceBlueprint } from "../domain/serviceBlueprints";
 import type { FieldDefinition } from "../domain/types";
@@ -39,7 +40,13 @@ export const AdaptiveWorkspace = () => {
   const human = useAppStore((state) => state.human);
   const stage = useAppStore((state) => state.stageDraftForReview);
   const [stepIndex, setStepIndex] = useState(0);
-  useEffect(() => setStepIndex(0), [view?.id]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState("");
+  useEffect(() => {
+    setStepIndex(0);
+    setErrors({});
+    setFormError("");
+  }, [view?.id]);
   const blueprint = useMemo(() => (view ? getServiceBlueprint(view.serviceId) : undefined), [view]);
   if (!view || !blueprint) return null;
   const visibleFields = view.fieldOrder
@@ -53,6 +60,8 @@ export const AdaptiveWorkspace = () => {
         (field): field is FieldDefinition => Boolean(field),
       );
   const setValue = (fieldId: string, value: unknown) => {
+    setErrors((current) => ({ ...current, [fieldId]: "" }));
+    setFormError("");
     if (fieldId === "permitDurationMonths") {
       const months = value === 6 || value === 12 ? value : Number(value);
       human.editDraft(view.serviceId, {
@@ -66,19 +75,55 @@ export const AdaptiveWorkspace = () => {
     view.lockedElementIds.includes(elementId)
       ? human.unlockElement(view.id, elementId)
       : human.lockElement(view.id, elementId);
-  const prepareReview = () => {
+  const reviewDraft = () => {
     if (view.serviceId === "parking_permit_renewal") {
       const duration =
-        draft.durationMonths === 6 || draft.durationMonths === 12 ? draft.durationMonths : 12;
-      human.editDraft(view.serviceId, {
+        draft.durationMonths === 6 || draft.durationMonths === 12
+          ? draft.durationMonths
+          : undefined;
+      return {
+        ...draft,
         vehicleId: draft.vehicleId ?? resident.activeParkingPermit.vehicleId,
         durationMonths: duration,
         permitDurationMonths: duration,
         contactEmail: draft.contactEmail ?? resident.email,
-        fee: parkingPermitFees[duration],
-      });
+        fee: duration ? parkingPermitFees[duration] : undefined,
+      };
     }
-    stage(view.serviceId);
+    return { ...draft, updateVoterRecord: Boolean(draft.updateVoterRecord) };
+  };
+  const validateAndFocus = (fieldIds: string[]): boolean => {
+    const readiness = validateDraftForReview(view.serviceId, reviewDraft(), resident);
+    const relevant = Object.fromEntries(
+      Object.entries(readiness.fieldErrors ?? {}).filter(([id]) => fieldIds.includes(id)),
+    );
+    if (Object.keys(relevant).length === 0) return true;
+    setErrors((current) => ({ ...current, ...relevant }));
+    const first = fieldIds.find((id) => relevant[id]);
+    if (first) {
+      const fieldRoot = document.querySelector<HTMLElement>(`[data-field-id="${first}"]`);
+      fieldRoot?.querySelector<HTMLElement>("input, select, textarea")?.focus();
+    }
+    return false;
+  };
+  const nextStep = () => {
+    const current = visibleFields[stepIndex];
+    if (current && !validateAndFocus([current.id])) return;
+    setStepIndex((index) => Math.min(visibleFields.length - 1, index + 1));
+  };
+  const prepareReview = () => {
+    const editableFieldIds = visibleFields
+      .filter((field) => field.kind !== "readonly_summary")
+      .map((field) => field.id);
+    if (!validateAndFocus(editableFieldIds)) return;
+    try {
+      setErrors({});
+      setFormError("");
+      human.editDraft(view.serviceId, reviewDraft());
+      stage(view.serviceId);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Review this draft and try again.");
+    }
   };
   return (
     <section
@@ -92,7 +137,9 @@ export const AdaptiveWorkspace = () => {
         </div>
         <div className="adaptive-title-row">
           <div>
-            <h1 id="adaptive-title">{view.title}</h1>
+            <h1 id="adaptive-title" tabIndex={-1}>
+              {view.title}
+            </h1>
             <p>{view.goal}</p>
           </div>
           <LockButton
@@ -147,12 +194,18 @@ export const AdaptiveWorkspace = () => {
                 helpText={copy.helpText}
                 value={draftValue(field, draft, resident)}
                 large={view.preferences.controlStyle === "large_cards"}
+                error={errors[field.id]}
                 onChange={(value) => setValue(field.id, value)}
               />
             </AdaptiveStep>
           );
         })}
       </div>
+      {formError ? (
+        <p className="form-error adaptive-form-error" role="alert">
+          {formError}
+        </p>
+      ) : null}
       <div className="adaptive-navigation">
         {!grouped ? (
           <button
@@ -167,11 +220,7 @@ export const AdaptiveWorkspace = () => {
           <span />
         )}
         {!grouped && stepIndex < visibleFields.length - 1 ? (
-          <button
-            className="button button-primary"
-            type="button"
-            onClick={() => setStepIndex((index) => Math.min(visibleFields.length - 1, index + 1))}
-          >
+          <button className="button button-primary" type="button" onClick={nextStep}>
             Next question <ArrowRight size={18} />
           </button>
         ) : (

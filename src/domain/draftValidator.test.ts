@@ -59,4 +59,26 @@ describe("draft review readiness", () => {
       ),
     ).toEqual({ valid: true, errors: [] });
   });
+
+  it("treats whitespace-padded address fragments as invalid actionable fields", () => {
+    expect(
+      validateDraftForReview(
+        "address_change",
+        {
+          newStreet: "  a ",
+          newCity: " n ",
+          newPostalCode: " x ",
+          effectiveDate: "2026-09-01",
+        },
+        cloneSeedResident(),
+      ),
+    ).toMatchObject({
+      valid: false,
+      fieldErrors: {
+        newStreet: expect.any(String),
+        newCity: expect.any(String),
+        newPostalCode: expect.any(String),
+      },
+    });
+  });
 });

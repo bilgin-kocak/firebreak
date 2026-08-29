@@ -438,7 +438,15 @@ export const createStaticToolDefinitions = (
         const view = getState().views[input.viewId];
         if (!view)
           throw new DomainError("VIEW_NOT_FOUND", "The requested task view was not found.");
-        const patched = patchTaskView(view, input.patches);
+        let patched: ReturnType<typeof patchTaskView>;
+        try {
+          patched = patchTaskView(view, input.patches);
+        } catch (error) {
+          if (error instanceof DomainError && error.code === "LOCKED_BY_USER") {
+            getState().recordLockPreserved();
+          }
+          throw error;
+        }
         getState().updateView(patched);
         return successResult("VIEW_PATCHED", "Applied the safe view patch.", {
           viewId: patched.id,

@@ -40,10 +40,23 @@ export const MetricsStrip = () => {
           <small>Agent call + human confirmation</small>
         </p>
       </article>
-      <article className="actual-metrics">
-        <span>{metrics.webmcpToolCalls} tool calls</span>
-        <span>{metrics.humanEdits} human edits</span>
-        <span>{metrics.humanLocksPreserved} locks preserved</span>
+      <article className="actual-metrics" aria-label="Actual session metrics">
+        {[
+          ["WebMCP calls", String(metrics.webmcpToolCalls)],
+          ["Human edits", String(metrics.humanEdits)],
+          ["Locks preserved", String(metrics.humanLocksPreserved)],
+          ["Workflow operations", String(metrics.workflowOperationsExecuted)],
+          [
+            "Last tool duration",
+            metrics.lastToolDurationMs === null ? "—" : `${metrics.lastToolDurationMs} ms`,
+          ],
+          ["Blocking checks", String(metrics.blockingChecks)],
+        ].map(([label, value]) => (
+          <span key={label}>
+            <small>{label}</small>
+            <strong>{value}</strong>
+          </span>
+        ))}
       </article>
     </section>
   );

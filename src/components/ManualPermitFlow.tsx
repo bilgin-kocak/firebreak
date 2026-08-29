@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, CarFront, ShieldCheck } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
+import { validateDraftForReview } from "../domain/draftValidator";
 import { parkingPermitFees } from "../domain/seed";
 import { useAppStore } from "../store/useAppStore";
 
@@ -18,17 +19,41 @@ export const ManualPermitFlow = ({ onBack }: { onBack(): void }) => {
     draft.durationMonths === 6 || draft.durationMonths === 12 ? draft.durationMonths : undefined;
   const email = String(draft.contactEmail ?? resident.email);
   const fee = useMemo(() => (duration ? parkingPermitFees[duration] : null), [duration]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState("");
 
   const review = () => {
-    if (!duration) return;
-    editDraft("parking_permit_renewal", {
+    const candidate = {
       vehicleId,
       durationMonths: duration,
       contactEmail: email,
       communicationPreference: draft.communicationPreference ?? "email",
-      fee: parkingPermitFees[duration],
-    });
-    stage("parking_permit_renewal");
+      fee: duration ? parkingPermitFees[duration] : undefined,
+    };
+    const readiness = validateDraftForReview("parking_permit_renewal", candidate, resident);
+    if (!readiness.valid) {
+      const nextErrors = readiness.fieldErrors ?? {};
+      setErrors(nextErrors);
+      const first = ["vehicleId", "permitDurationMonths", "contactEmail"].find(
+        (id) => nextErrors[id],
+      );
+      const target =
+        first === "permitDurationMonths"
+          ? document.querySelector<HTMLElement>('input[name="manualDuration"]')
+          : first
+            ? document.getElementById(`manual-${first}`)
+            : null;
+      target?.focus();
+      return;
+    }
+    try {
+      setErrors({});
+      setFormError("");
+      editDraft("parking_permit_renewal", candidate);
+      stage("parking_permit_renewal");
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Review this draft and try again.");
+    }
   };
 
   return (
@@ -39,7 +64,9 @@ export const ManualPermitFlow = ({ onBack }: { onBack(): void }) => {
       <div className="flow-heading">
         <div>
           <p className="eyebrow">Permits · Resident parking</p>
-          <h1 id="permit-flow-title">Parking Permit Renewal</h1>
+          <h1 id="permit-flow-title" tabIndex={-1}>
+            Parking Permit Renewal
+          </h1>
           <p>Review your current permit and prepare a fictional renewal.</p>
         </div>
         <span className="flow-step">Step 1 of 3</span>
@@ -47,18 +74,24 @@ export const ManualPermitFlow = ({ onBack }: { onBack(): void }) => {
       <div className="manual-layout">
         <form
           className="manual-form"
+          noValidate
           onSubmit={(event) => {
             event.preventDefault();
             review();
           }}
         >
-          <fieldset>
+          <fieldset
+            aria-invalid={Boolean(errors.vehicleId)}
+            aria-describedby={errors.vehicleId ? "manual-vehicle-error" : undefined}
+          >
             <legend>1. Select your vehicle</legend>
             {resident.vehicles.map((vehicle) => (
               <label className="choice-row" key={vehicle.id}>
                 <input
                   type="radio"
                   name="manualVehicle"
+                  aria-invalid={Boolean(errors.vehicleId)}
+                  aria-describedby={errors.vehicleId ? "manual-vehicle-error" : undefined}
                   checked={vehicleId === vehicle.id}
                   onChange={() => setField("parking_permit_renewal", "vehicleId", vehicle.id)}
                 />
@@ -69,8 +102,16 @@ export const ManualPermitFlow = ({ onBack }: { onBack(): void }) => {
                 </span>
               </label>
             ))}
+            {errors.vehicleId ? (
+              <p className="field-error" id="manual-vehicle-error">
+                {errors.vehicleId}
+              </p>
+            ) : null}
           </fieldset>
-          <fieldset>
+          <fieldset
+            aria-invalid={Boolean(errors.permitDurationMonths)}
+            aria-describedby={errors.permitDurationMonths ? "manual-duration-error" : undefined}
+          >
             <legend>2. Choose permit duration</legend>
             <div className="choice-grid">
               {[6, 12].map((months) => (
@@ -79,6 +120,10 @@ export const ManualPermitFlow = ({ onBack }: { onBack(): void }) => {
                     type="radio"
                     name="manualDuration"
                     aria-label={`${months} months`}
+                    aria-invalid={Boolean(errors.permitDurationMonths)}
+                    aria-describedby={
+                      errors.permitDurationMonths ? "manual-duration-error" : undefined
+                    }
                     checked={duration === months}
                     onChange={() => setField("parking_permit_renewal", "durationMonths", months)}
                   />
@@ -89,13 +134,19 @@ export const ManualPermitFlow = ({ onBack }: { onBack(): void }) => {
                 </label>
               ))}
             </div>
+            {errors.permitDurationMonths ? (
+              <p className="field-error" id="manual-duration-error">
+                {errors.permitDurationMonths}
+              </p>
+            ) : null}
           </fieldset>
           <div className="field-stack">
             <label htmlFor="manual-contact-email">3. Contact email</label>
             <p id="manual-contact-help">Permit updates will be sent to this address.</p>
             <input
               id="manual-contact-email"
-              aria-describedby="manual-contact-help"
+              aria-describedby={`manual-contact-help${errors.contactEmail ? " manual-contact-error" : ""}`}
+              aria-invalid={Boolean(errors.contactEmail)}
               type="email"
               value={email}
               onChange={(event) =>
@@ -103,7 +154,17 @@ export const ManualPermitFlow = ({ onBack }: { onBack(): void }) => {
               }
               required
             />
+            {errors.contactEmail ? (
+              <p className="field-error" id="manual-contact-error">
+                {errors.contactEmail}
+              </p>
+            ) : null}
           </div>
+          {formError ? (
+            <p className="form-error" role="alert">
+              {formError}
+            </p>
+          ) : null}
           {mode === "staged_for_review" ? (
             <button
               className="button button-primary"
@@ -113,7 +174,7 @@ export const ManualPermitFlow = ({ onBack }: { onBack(): void }) => {
               Return to review <ArrowRight size={17} />
             </button>
           ) : (
-            <button className="button button-primary" type="submit" disabled={!duration || !email}>
+            <button className="button button-primary" type="submit">
               Review permit renewal <ArrowRight size={17} />
             </button>
           )}

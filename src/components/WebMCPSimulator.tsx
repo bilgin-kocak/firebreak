@@ -33,6 +33,92 @@ const canonicalOperations = [
   { operationId: "permit.stage_review", bindings: [] },
 ];
 
+const canonicalCompileInput = {
+  serviceId: "parking_permit_renewal",
+  title: "Renew your parking permit",
+  goal: "Prepare a plain-language parking permit renewal and stop for your approval.",
+  preferences: canonicalPreferences,
+  fieldOrder: [
+    "vehicleId",
+    "permitDurationMonths",
+    "contactEmail",
+    "communicationPreference",
+    "currentPermitSummary",
+  ],
+  hiddenOptionalFields: [],
+  copyOverrides: [],
+  requireHumanConfirmation: true,
+};
+
+const canonicalStageInput = (viewId: string) => ({
+  viewId,
+  name: "renew_permit_guided",
+  title: "Guided parking permit renewal",
+  description:
+    "Prepare a Northstar City parking permit renewal using the resident's current vehicle and contact details. Calculates the fee, saves a draft, and stops for human review without submitting.",
+  parameters: [
+    {
+      name: "durationMonths",
+      fieldId: "permitDurationMonths",
+      description: "Choose a 6- or 12-month parking permit.",
+      required: true,
+    },
+  ],
+  operations: canonicalOperations,
+  stopAt: "review",
+});
+
+const schemaSample = (schema: Record<string, unknown>): unknown => {
+  if ("const" in schema) return schema.const;
+  const choices = Array.isArray(schema.enum) ? schema.enum : [];
+  if (choices.length) return choices.at(-1);
+  if (schema.type === "boolean") return true;
+  if (schema.type === "number" || schema.type === "integer") return 1;
+  if (schema.type === "array") {
+    const item = schema.items;
+    return schema.minItems && item && typeof item === "object"
+      ? [schemaSample(item as Record<string, unknown>)]
+      : [];
+  }
+  if (schema.type === "object") {
+    const properties =
+      schema.properties && typeof schema.properties === "object"
+        ? (schema.properties as Record<string, Record<string, unknown>>)
+        : {};
+    const required = Array.isArray(schema.required) ? (schema.required as string[]) : [];
+    return Object.fromEntries(required.map((key) => [key, schemaSample(properties[key] ?? {})]));
+  }
+  return "sample";
+};
+
+const sampleInputForTool = (
+  tool: WebMCPToolMetadata,
+  activeViewId: string | null,
+): Record<string, unknown> => {
+  const viewId = activeViewId ?? "view_id_from_compile_task_view";
+  switch (tool.name) {
+    case "inspect_portal":
+      return { serviceId: "all" };
+    case "compile_task_view":
+      return canonicalCompileInput;
+    case "inspect_task_view":
+      return activeViewId ? { viewId: activeViewId } : {};
+    case "patch_task_view":
+      return {
+        viewId,
+        patches: [{ type: "set_title", title: "Renew your parking permit" }],
+      };
+    case "run_journey_checks":
+      return { viewId, includeDomChecks: true };
+    case "stage_workflow_tool":
+      return canonicalStageInput(viewId);
+    case "list_workflow_tools":
+      return { includeDisabled: true };
+    default:
+      return schemaSample(tool.inputSchema) as Record<string, unknown>;
+  }
+};
+
 export const WebMCPSimulator = ({ open, runtime, onClose, onMessage }: WebMCPSimulatorProps) => {
   const [tools, setTools] = useState<WebMCPToolMetadata[]>([]);
   const [selected, setSelected] = useState("inspect_portal");
@@ -43,8 +129,16 @@ export const WebMCPSimulator = ({ open, runtime, onClose, onMessage }: WebMCPSim
   const close = useCallback(() => onClose(), [onClose]);
   const dialogRef = useDialogFocus(open, close);
   useEffect(() => {
-    if (open && runtime) void runtime.adapter.getTools().then(setTools);
-  }, [open, runtime, registeredNames]);
+    if (open && runtime)
+      void runtime.adapter.getTools().then((nextTools) => {
+        setTools(nextTools);
+        const chosenTool = nextTools.find((tool) => tool.name === selected) ?? nextTools[0];
+        if (chosenTool) {
+          setSelected(chosenTool.name);
+          setInput(JSON.stringify(sampleInputForTool(chosenTool, activeViewId), null, 2));
+        }
+      });
+  }, [activeViewId, open, registeredNames, runtime, selected]);
   if (!open) return null;
   const execute = async (name: string, value: unknown) => {
     if (!runtime) return;
@@ -80,47 +174,14 @@ export const WebMCPSimulator = ({ open, runtime, onClose, onMessage }: WebMCPSim
         serviceId: "parking_permit_renewal",
         includeCurrentState: true,
       });
-    if (kind === "compile")
-      return execute("compile_task_view", {
-        serviceId: "parking_permit_renewal",
-        title: "Renew your parking permit",
-        goal: "Prepare a plain-language parking permit renewal and stop for your approval.",
-        preferences: canonicalPreferences,
-        fieldOrder: [
-          "vehicleId",
-          "permitDurationMonths",
-          "contactEmail",
-          "communicationPreference",
-          "currentPermitSummary",
-        ],
-        hiddenOptionalFields: [],
-        copyOverrides: [],
-        requireHumanConfirmation: true,
-      });
+    if (kind === "compile") return execute("compile_task_view", canonicalCompileInput);
     const viewId = useAppStore.getState().activeViewId;
     if (!viewId) {
       onMessage("Compile the guided view first.");
       return;
     }
     if (kind === "checks") return execute("run_journey_checks", { viewId, includeDomChecks: true });
-    if (kind === "stage")
-      return execute("stage_workflow_tool", {
-        viewId,
-        name: "renew_permit_guided",
-        title: "Guided parking permit renewal",
-        description:
-          "Prepare a Northstar City parking permit renewal using the resident's current vehicle and contact details. Calculates the fee, saves a draft, and stops for human review without submitting.",
-        parameters: [
-          {
-            name: "durationMonths",
-            fieldId: "permitDurationMonths",
-            description: "Choose a 6- or 12-month parking permit.",
-            required: true,
-          },
-        ],
-        operations: canonicalOperations,
-        stopAt: "review",
-      });
+    if (kind === "stage") return execute("stage_workflow_tool", canonicalStageInput(viewId));
     return execute("renew_permit_guided", { durationMonths: 12 });
   };
   const chosen = tools.find((tool) => tool.name === selected);
@@ -182,7 +243,8 @@ export const WebMCPSimulator = ({ open, runtime, onClose, onMessage }: WebMCPSim
                 onChange={(event) => {
                   setSelected(event.target.value);
                   const tool = tools.find((item) => item.name === event.target.value);
-                  setInput(JSON.stringify(tool?.inputSchema.properties ? {} : {}, null, 2));
+                  if (tool)
+                    setInput(JSON.stringify(sampleInputForTool(tool, activeViewId), null, 2));
                 }}
               >
                 {tools.map((tool) => (
@@ -194,9 +256,13 @@ export const WebMCPSimulator = ({ open, runtime, onClose, onMessage }: WebMCPSim
               {chosen ? (
                 <div className="schema-summary">
                   <p>{chosen.description}</p>
-                  <span>
-                    {chosen.annotations.readOnlyHint ? "Read-only" : "Writes reversible state"}
-                  </span>
+                  <div className="annotation-list" aria-label="Tool annotations">
+                    {Object.entries(chosen.annotations).map(([name, value]) => (
+                      <span key={name}>
+                        {name}: {String(value)}
+                      </span>
+                    ))}
+                  </div>
                   <details>
                     <summary>Input schema</summary>
                     <pre>{JSON.stringify(chosen.inputSchema, null, 2)}</pre>

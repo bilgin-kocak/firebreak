@@ -148,6 +148,7 @@ describe("CivicWeave app store", () => {
     expect(getAppState().serviceDrafts.parking_permit_renewal?.contactEmail).toBe(
       "maya@example.test",
     );
+    expect(getAppState().metrics.humanLocksPreserved).toBe(0);
   });
 
   it("keeps proposal staging separate from human approval and registration", () => {
@@ -163,6 +164,22 @@ describe("CivicWeave app store", () => {
       status: "registered",
       enabled: true,
     });
+  });
+
+  it("lets only a human return the current proposal to an editable draft", () => {
+    const store = useAppStore.getState();
+    store.createProposal(validProposal);
+    store.validateProposal(validProposal.id);
+    store.requestProposalApproval(validProposal.id);
+
+    store.human.returnProposalToEdit(validProposal.id);
+
+    expect(getAppState().proposals[validProposal.id]).toMatchObject({
+      status: "draft",
+      validationErrors: [],
+    });
+    expect(useAppStore.getState().dialogs.proposalSheetOpen).toBe(false);
+    expect(getAppState()).not.toHaveProperty("returnProposalToEdit");
   });
 
   it("redacts full emails and form payloads from the activity ledger", () => {
@@ -388,7 +405,7 @@ describe("CivicWeave app store", () => {
     store.recordWorkflowOperations(3);
     store.recordBlockingChecks(2);
     store.human.recordEdit();
-    store.human.recordLockPreserved();
+    store.recordLockPreserved();
 
     expect(getAppState().metrics).toEqual({
       webmcpToolCalls: 1,

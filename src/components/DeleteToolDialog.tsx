@@ -5,13 +5,23 @@ import { useDialogFocus } from "./useDialogFocus";
 
 interface DeleteToolDialogProps {
   name: string | null;
+  returnFocusTarget: HTMLElement | null;
   onClose(): void;
   onDelete(name: string): void;
 }
 
-export const DeleteToolDialog = ({ name, onClose, onDelete }: DeleteToolDialogProps) => {
+export const DeleteToolDialog = ({
+  name,
+  returnFocusTarget,
+  onClose,
+  onDelete,
+}: DeleteToolDialogProps) => {
   const close = useCallback(() => onClose(), [onClose]);
-  const dialogRef = useDialogFocus(Boolean(name), close);
+  const findFallback = useCallback(
+    () => document.querySelector<HTMLElement>("#tool-surface-heading"),
+    [],
+  );
+  const dialogRef = useDialogFocus(Boolean(name), close, returnFocusTarget, findFallback);
   if (!name) return null;
   return (
     <div className="dialog-backdrop">

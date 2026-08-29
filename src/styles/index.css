@@ -715,6 +715,26 @@ legend,
   font-size: 0.78rem;
   line-height: 1.45;
 }
+.field-stack > .field-error,
+.adaptive-fieldset > .field-error,
+.field-error,
+.form-error {
+  margin: 0;
+  color: #a12636;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+.form-error {
+  padding: 11px 13px;
+  border: 1px solid #e8bac1;
+  border-radius: 8px;
+  background: #fff7f8;
+}
+[aria-invalid="true"]:is(input, select, textarea),
+fieldset[aria-invalid="true"] {
+  border-color: #b73548;
+}
 input[type="text"],
 input[type="email"],
 input[type="date"],
@@ -978,6 +998,10 @@ dd {
 .controls-large_cards .button {
   min-height: 48px;
 }
+.controls-large_cards .lock-button {
+  min-width: 44px;
+  min-height: 44px;
+}
 
 .metrics-strip {
   margin-top: 20px;
@@ -1026,11 +1050,37 @@ dd {
   gap: 7px;
 }
 .actual-metrics span {
-  padding: 4px 7px;
+  min-width: 112px;
+  display: grid;
+  gap: 2px;
+  padding: 7px 9px;
   border-radius: 6px;
   background: var(--surface-muted);
   color: var(--ink-muted);
   font-size: 0.65rem;
+}
+.actual-metrics small {
+  font: inherit;
+  font-weight: 720;
+}
+.actual-metrics strong {
+  color: var(--navy);
+  font-size: 0.78rem;
+}
+.compiled-prompt {
+  margin: 16px;
+}
+.compiled-prompt .prompt-card {
+  min-height: 0;
+}
+.annotation-list {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+}
+.annotation-list span {
+  color: var(--ink-muted);
+  font-size: 0.72rem;
 }
 
 .right-rail {
@@ -1486,6 +1536,20 @@ code {
   padding: 10px 0;
   border-top: 1px solid var(--border);
 }
+.parameter-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.parameter-name span {
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.61rem;
+  font-weight: 800;
+}
 .parameter-row p {
   margin: 6px 0 3px;
   color: var(--ink-muted);
@@ -1555,6 +1619,23 @@ code {
   color: var(--accent-strong);
   background: var(--accent-soft);
 }
+.operation-meta .binding-detail {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 5px 10px;
+  padding: 6px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-muted);
+  color: var(--ink-muted);
+  font-size: 0.58rem;
+  overflow-wrap: anywhere;
+}
+.binding-detail > span {
+  padding: 0;
+}
 .safety-summary {
   display: flex;
   gap: 11px;
@@ -1570,13 +1651,43 @@ code {
   font-size: 0.7rem;
   line-height: 1.45;
 }
-.validation-pass {
+.validation-summary {
   margin: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 7px;
-  color: var(--success);
   font-size: 0.72rem;
+}
+.validation-summary > div {
+  flex: 1;
+}
+.validation-summary p {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.validation-summary ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  line-height: 1.45;
+}
+.validation-pass {
+  color: var(--success);
+}
+.validation-fail {
+  padding: 11px;
+  border: 1px solid #e8bac1;
+  border-radius: 8px;
+  background: #fff7f8;
+  color: #8d2030;
+}
+.recorded-validation {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid currentColor;
+}
+.recorded-validation > span {
   font-weight: 800;
 }
 .simulator-dialog {

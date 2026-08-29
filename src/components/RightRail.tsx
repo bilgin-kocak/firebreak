@@ -7,7 +7,8 @@ import { ToolSurface } from "./ToolSurface";
 
 interface RightRailProps {
   onDisable(name: string): void;
-  onDelete(name: string): void;
+  onDelete(name: string, opener: HTMLElement): void;
+  onCopied(message: string): void;
 }
 const tabs: Array<[RightRailTab, string, typeof Activity]> = [
   ["activity", "Activity", Activity],
@@ -15,7 +16,7 @@ const tabs: Array<[RightRailTab, string, typeof Activity]> = [
   ["checks", "Checks", ListChecks],
 ];
 
-export const RightRail = ({ onDisable, onDelete }: RightRailProps) => {
+export const RightRail = ({ onDisable, onDelete, onCopied }: RightRailProps) => {
   const active = useAppStore((state) => state.rightRail.activeTab);
   const setTab = useAppStore((state) => state.setRightRail);
   const registeredCount = useAppStore((state) => state.webmcp.registeredToolNames.length);
@@ -41,7 +42,7 @@ export const RightRail = ({ onDisable, onDelete }: RightRailProps) => {
         {active === "activity" ? (
           <ActivityLedger />
         ) : active === "tool_surface" ? (
-          <ToolSurface onDisable={onDisable} onDelete={onDelete} />
+          <ToolSurface onDisable={onDisable} onDelete={onDelete} onCopied={onCopied} />
         ) : (
           <JourneyChecks />
         )}

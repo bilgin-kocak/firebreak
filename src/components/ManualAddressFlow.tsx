@@ -1,5 +1,7 @@
 import { ArrowLeft, ArrowRight, MapPin } from "lucide-react";
+import { useState } from "react";
 
+import { validateDraftForReview } from "../domain/draftValidator";
 import { useAppStore } from "../store/useAppStore";
 
 export const ManualAddressFlow = ({ onBack }: { onBack(): void }) => {
@@ -12,17 +14,34 @@ export const ManualAddressFlow = ({ onBack }: { onBack(): void }) => {
   const stage = useAppStore((state) => state.stageDraftForReview);
   const reopen = useAppStore((state) => state.setDialog);
   const field = (name: string) => String(draft[name] ?? "");
-  const valid =
-    field("newStreet") && field("newCity") && field("newPostalCode") && field("effectiveDate");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState("");
   const review = () => {
-    editDraft("address_change", {
+    const candidate = {
       newStreet: field("newStreet"),
       newCity: field("newCity"),
       newPostalCode: field("newPostalCode"),
       effectiveDate: field("effectiveDate"),
       updateVoterRecord: Boolean(draft.updateVoterRecord),
-    });
-    stage("address_change");
+    };
+    const readiness = validateDraftForReview("address_change", candidate, resident);
+    if (!readiness.valid) {
+      const nextErrors = readiness.fieldErrors ?? {};
+      setErrors(nextErrors);
+      const first = ["newStreet", "newCity", "newPostalCode", "effectiveDate"].find(
+        (id) => nextErrors[id],
+      );
+      if (first) document.getElementById(`manual-${first}`)?.focus();
+      return;
+    }
+    try {
+      setErrors({});
+      setFormError("");
+      editDraft("address_change", candidate);
+      stage("address_change");
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Review this address and try again.");
+    }
   };
   return (
     <section className="flow-view" aria-labelledby="address-flow-title">
@@ -32,7 +51,9 @@ export const ManualAddressFlow = ({ onBack }: { onBack(): void }) => {
       <div className="flow-heading">
         <div>
           <p className="eyebrow">Records · Resident profile</p>
-          <h1 id="address-flow-title">Address Change</h1>
+          <h1 id="address-flow-title" tabIndex={-1}>
+            Address Change
+          </h1>
           <p>Update the fictional address used across Northstar City records.</p>
         </div>
         <span className="flow-step">Step 1 of 2</span>
@@ -40,6 +61,7 @@ export const ManualAddressFlow = ({ onBack }: { onBack(): void }) => {
       <div className="manual-layout">
         <form
           className="manual-form"
+          noValidate
           onSubmit={(event) => {
             event.preventDefault();
             review();
@@ -60,9 +82,19 @@ export const ManualAddressFlow = ({ onBack }: { onBack(): void }) => {
                   id={`manual-${id}`}
                   type={type}
                   value={field(id)}
-                  onChange={(event) => setField("address_change", id, event.target.value)}
+                  aria-invalid={Boolean(errors[id])}
+                  aria-describedby={errors[id] ? `manual-${id}-error` : undefined}
+                  onChange={(event) => {
+                    setErrors((current) => ({ ...current, [id]: "" }));
+                    setField("address_change", id, event.target.value);
+                  }}
                   required
                 />
+                {errors[id] ? (
+                  <p className="field-error" id={`manual-${id}-error`}>
+                    {errors[id]}
+                  </p>
+                ) : null}
               </div>
             ))}
           </div>
@@ -79,6 +111,11 @@ export const ManualAddressFlow = ({ onBack }: { onBack(): void }) => {
               <small>Fictional demonstration only.</small>
             </span>
           </label>
+          {formError ? (
+            <p className="form-error" role="alert">
+              {formError}
+            </p>
+          ) : null}
           {mode === "staged_for_review" ? (
             <button
               className="button button-primary"
@@ -88,7 +125,7 @@ export const ManualAddressFlow = ({ onBack }: { onBack(): void }) => {
               Return to review <ArrowRight size={17} />
             </button>
           ) : (
-            <button className="button button-primary" type="submit" disabled={!valid}>
+            <button className="button button-primary" type="submit">
               Review address change <ArrowRight size={17} />
             </button>
           )}

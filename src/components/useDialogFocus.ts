@@ -4,13 +4,19 @@ const focusableSelector =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 const dialogStack: HTMLElement[] = [];
 
-export const useDialogFocus = (open: boolean, onClose: () => void) => {
+export const useDialogFocus = (
+  open: boolean,
+  onClose: () => void,
+  returnTarget?: HTMLElement | null,
+  getFallbackTarget?: () => HTMLElement | null,
+) => {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    const returnTarget =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const capturedTarget =
+      returnTarget ??
+      (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     const dialog = dialogRef.current;
     if (dialog) dialogStack.push(dialog);
     const controls = () =>
@@ -46,9 +52,10 @@ export const useDialogFocus = (open: boolean, onClose: () => void) => {
         const index = dialogStack.lastIndexOf(dialog);
         if (index >= 0) dialogStack.splice(index, 1);
       }
-      returnTarget?.focus();
+      if (capturedTarget?.isConnected) capturedTarget.focus();
+      else getFallbackTarget?.()?.focus();
     };
-  }, [onClose, open]);
+  }, [getFallbackTarget, onClose, open, returnTarget]);
 
   return dialogRef;
 };

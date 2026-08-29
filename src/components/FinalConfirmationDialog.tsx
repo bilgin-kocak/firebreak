@@ -20,7 +20,14 @@ export const FinalConfirmationDialog = ({
   const confirmPermit = useAppStore((state) => state.human.confirmPermitSubmission);
   const confirmAddress = useAppStore((state) => state.human.confirmAddressSubmission);
   const close = useCallback(() => setDialog("finalConfirmationOpen", false), [setDialog]);
-  const dialogRef = useDialogFocus(open, close);
+  const findFallback = useCallback(
+    () =>
+      document.querySelector<HTMLElement>(
+        "#adaptive-title, #permit-flow-title, #address-flow-title, #main-content",
+      ),
+    [],
+  );
+  const dialogRef = useDialogFocus(open, close, undefined, findFallback);
   if (!open || !serviceId) return null;
   const confirm = () =>
     onConfirmed(serviceId === "parking_permit_renewal" ? confirmPermit() : confirmAddress());

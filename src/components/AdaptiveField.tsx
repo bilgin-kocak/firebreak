@@ -8,21 +8,34 @@ interface FieldControlProps {
   helpText: string;
   value: unknown;
   large: boolean;
+  error?: string;
   onChange(value: unknown): void;
 }
 
-const InputField = ({ field, label, helpText, value, onChange }: FieldControlProps) => (
+const FieldError = ({ id, error }: { id: string; error?: string }) =>
+  error ? (
+    <p className="field-error" id={id}>
+      {error}
+    </p>
+  ) : null;
+
+const describedBy = (fieldId: string, error?: string) =>
+  `adaptive-${fieldId}-help${error ? ` adaptive-${fieldId}-error` : ""}`;
+
+const InputField = ({ field, label, helpText, value, error, onChange }: FieldControlProps) => (
   <div className="field-stack">
     <label htmlFor={`adaptive-${field.id}`}>{label}</label>
     <p id={`adaptive-${field.id}-help`}>{helpText}</p>
     <input
       id={`adaptive-${field.id}`}
-      aria-describedby={`adaptive-${field.id}-help`}
+      aria-describedby={describedBy(field.id, error)}
+      aria-invalid={Boolean(error)}
       type="text"
       value={String(value ?? "")}
       required={field.required}
       onChange={(event) => onChange(event.target.value)}
     />
+    <FieldError id={`adaptive-${field.id}-error`} error={error} />
   </div>
 );
 
@@ -32,12 +45,14 @@ const EmailField = (props: FieldControlProps) => (
     <p id={`adaptive-${props.field.id}-help`}>{props.helpText}</p>
     <input
       id={`adaptive-${props.field.id}`}
-      aria-describedby={`adaptive-${props.field.id}-help`}
+      aria-describedby={describedBy(props.field.id, props.error)}
+      aria-invalid={Boolean(props.error)}
       type="email"
       value={String(props.value ?? "")}
       required={props.field.required}
       onChange={(event) => props.onChange(event.target.value)}
     />
+    <FieldError id={`adaptive-${props.field.id}-error`} error={props.error} />
   </div>
 );
 
@@ -47,12 +62,14 @@ const DateField = (props: FieldControlProps) => (
     <p id={`adaptive-${props.field.id}-help`}>{props.helpText}</p>
     <input
       id={`adaptive-${props.field.id}`}
-      aria-describedby={`adaptive-${props.field.id}-help`}
+      aria-describedby={describedBy(props.field.id, props.error)}
+      aria-invalid={Boolean(props.error)}
       type="date"
       value={String(props.value ?? "")}
       required={props.field.required}
       onChange={(event) => props.onChange(event.target.value)}
     />
+    <FieldError id={`adaptive-${props.field.id}-error`} error={props.error} />
   </div>
 );
 
@@ -62,7 +79,8 @@ const SelectField = (props: FieldControlProps) => (
     <p id={`adaptive-${props.field.id}-help`}>{props.helpText}</p>
     <select
       id={`adaptive-${props.field.id}`}
-      aria-describedby={`adaptive-${props.field.id}-help`}
+      aria-describedby={describedBy(props.field.id, props.error)}
+      aria-invalid={Boolean(props.error)}
       value={String(props.value ?? "")}
       required={props.field.required}
       onChange={(event) => props.onChange(event.target.value)}
@@ -74,13 +92,26 @@ const SelectField = (props: FieldControlProps) => (
         </option>
       ))}
     </select>
+    <FieldError id={`adaptive-${props.field.id}-error`} error={props.error} />
   </div>
 );
 
-const RadioCardsField = ({ field, label, helpText, value, large, onChange }: FieldControlProps) => (
-  <fieldset className="adaptive-fieldset">
+const RadioCardsField = ({
+  field,
+  label,
+  helpText,
+  value,
+  large,
+  error,
+  onChange,
+}: FieldControlProps) => (
+  <fieldset
+    className="adaptive-fieldset"
+    aria-describedby={describedBy(field.id, error)}
+    aria-invalid={Boolean(error)}
+  >
     <legend>{label}</legend>
-    <p>{helpText}</p>
+    <p id={`adaptive-${field.id}-help`}>{helpText}</p>
     <div className="adaptive-choices">
       {field.options?.map((option) => (
         <label
@@ -92,6 +123,8 @@ const RadioCardsField = ({ field, label, helpText, value, large, onChange }: Fie
             type="radio"
             name={`adaptive-${field.id}`}
             aria-label={option.label}
+            aria-describedby={describedBy(field.id, error)}
+            aria-invalid={Boolean(error)}
             checked={String(value ?? "") === String(option.value)}
             onChange={() => onChange(option.value)}
           />
@@ -101,6 +134,7 @@ const RadioCardsField = ({ field, label, helpText, value, large, onChange }: Fie
         </label>
       ))}
     </div>
+    <FieldError id={`adaptive-${field.id}-error`} error={error} />
   </fieldset>
 );
 

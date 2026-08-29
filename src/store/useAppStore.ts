@@ -50,13 +50,13 @@ export interface HumanEventActions {
   lockElement(viewId: string, elementId: string): void;
   unlockElement(viewId: string, elementId: string): void;
   approveProposal(proposalId: string): ApprovedWorkflowTool;
+  returnProposalToEdit(proposalId: string): void;
   rejectProposal(proposalId: string): void;
   disableWorkflowTool(name: string): void;
   deleteWorkflowTool(name: string): void;
   confirmPermitSubmission(): SubmissionConfirmation;
   confirmAddressSubmission(): SubmissionConfirmation;
   recordEdit(): void;
-  recordLockPreserved(): void;
 }
 
 export interface AppState {
@@ -106,6 +106,7 @@ export interface AppState {
   logActivity(entry: ActivityLogInput): void;
   recordWebMCPToolCall(durationMs?: number): void;
   recordWorkflowOperations(count?: number): void;
+  recordLockPreserved(): void;
   recordBlockingChecks(count: number): void;
   registerDynamicToolUnregister(unregister: DynamicToolUnregister | undefined): void;
   reset(): Promise<void>;
@@ -142,6 +143,7 @@ export type ToolAppState = Pick<
   | "logActivity"
   | "recordWebMCPToolCall"
   | "recordWorkflowOperations"
+  | "recordLockPreserved"
   | "recordBlockingChecks"
 >;
 
@@ -346,7 +348,6 @@ export const useAppStore = create<AppState>((set, get) => {
           ...state.views,
           [viewId]: { ...view, lockedElementIds: [...view.lockedElementIds, elementId] },
         },
-        metrics: { ...state.metrics, humanLocksPreserved: state.metrics.humanLocksPreserved + 1 },
       }));
       get().logActivity({
         actor: "human",
@@ -420,6 +421,19 @@ export const useAppStore = create<AppState>((set, get) => {
       });
       persist(get());
       return approved;
+    },
+    returnProposalToEdit(proposalId) {
+      const proposal = get().proposals[proposalId];
+      if (!proposal || proposal.status !== "awaiting_approval")
+        throw transitionError(
+          "HUMAN_APPROVAL_REQUIRED",
+          "Only the proposal awaiting your review can return to editing.",
+        );
+      set((state) => ({
+        proposals: { ...state.proposals, [proposalId]: { ...proposal, status: "draft" } },
+        dialogs: { ...state.dialogs, proposalSheetOpen: false },
+      }));
+      persist(get());
     },
     rejectProposal(proposalId) {
       const proposal = get().proposals[proposalId];
@@ -510,12 +524,6 @@ export const useAppStore = create<AppState>((set, get) => {
     },
     recordEdit() {
       set((state) => ({ metrics: { ...state.metrics, humanEdits: state.metrics.humanEdits + 1 } }));
-      persist(get());
-    },
-    recordLockPreserved() {
-      set((state) => ({
-        metrics: { ...state.metrics, humanLocksPreserved: state.metrics.humanLocksPreserved + 1 },
-      }));
       persist(get());
     },
   };
@@ -788,6 +796,12 @@ export const useAppStore = create<AppState>((set, get) => {
       }));
       persist(get());
     },
+    recordLockPreserved() {
+      set((state) => ({
+        metrics: { ...state.metrics, humanLocksPreserved: state.metrics.humanLocksPreserved + 1 },
+      }));
+      persist(get());
+    },
     recordBlockingChecks(count) {
       set((state) => ({ metrics: { ...state.metrics, blockingChecks: Math.max(0, count) } }));
       persist(get());
@@ -801,7 +815,6 @@ export const useAppStore = create<AppState>((set, get) => {
       } catch {
         /* A failed unregister cannot block a safe reset. */
       } finally {
-        dynamicToolUnregister = undefined;
         clearPersistedState(persistenceStorage);
         set({
           ...seedState(),
@@ -886,6 +899,7 @@ export const getAppState = (): ToolAppState => {
     logActivity: state.logActivity,
     recordWebMCPToolCall: state.recordWebMCPToolCall,
     recordWorkflowOperations: state.recordWorkflowOperations,
+    recordLockPreserved: state.recordLockPreserved,
     recordBlockingChecks: state.recordBlockingChecks,
   };
 };

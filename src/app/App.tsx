@@ -17,6 +17,7 @@ const rootTextClasses = ["text-size-normal", "text-size-large", "text-size-xlarg
 export const App = () => {
   const [runtime, setRuntime] = useState<AppRuntime | null>(null);
   const runtimeRef = useRef<AppRuntime | null>(null);
+  const deleteOpenerRef = useRef<HTMLElement | null>(null);
   const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -79,6 +80,10 @@ export const App = () => {
   }, [reset, setMetadata]);
   const closeSimulator = useCallback(() => setSimulatorOpen(false), []);
   const closeDelete = useCallback(() => setDeleteTarget(null), []);
+  const openDelete = useCallback((name: string, opener: HTMLElement) => {
+    deleteOpenerRef.current = opener;
+    setDeleteTarget(name);
+  }, []);
 
   const disableTool = (name: string) => {
     try {
@@ -117,7 +122,7 @@ export const App = () => {
             onCopied={setToast}
           />
         </div>
-        <RightRail onDisable={disableTool} onDelete={setDeleteTarget} />
+        <RightRail onDisable={disableTool} onDelete={openDelete} onCopied={setToast} />
       </div>
       <footer className="site-footer">
         CivicWeave and Northstar City are fictional. This demonstration does not connect to a
@@ -142,7 +147,12 @@ export const App = () => {
         onClose={closeSimulator}
         onMessage={setToast}
       />
-      <DeleteToolDialog name={deleteTarget} onClose={closeDelete} onDelete={deleteTool} />
+      <DeleteToolDialog
+        name={deleteTarget}
+        returnFocusTarget={deleteOpenerRef.current}
+        onClose={closeDelete}
+        onDelete={deleteTool}
+      />
       <ToastRegion message={toast} />
     </div>
   );
