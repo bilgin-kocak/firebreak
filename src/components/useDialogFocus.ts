@@ -9,6 +9,7 @@ export const useDialogFocus = (
   onClose: () => void,
   returnTarget?: HTMLElement | null,
   getFallbackTarget?: () => HTMLElement | null,
+  preferFallback?: () => boolean,
 ) => {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -52,7 +53,12 @@ export const useDialogFocus = (
         const index = dialogStack.lastIndexOf(dialog);
         if (index >= 0) dialogStack.splice(index, 1);
       }
-      if (capturedTarget?.isConnected) capturedTarget.focus();
+      if (preferFallback?.()) {
+        // Successful actions can unmount more than one modal in the same
+        // commit. Run after every synchronous cleanup so the new page state
+        // owns final focus, even when the former opener is still connected.
+        window.setTimeout(() => getFallbackTarget?.()?.focus(), 0);
+      } else if (capturedTarget?.isConnected) capturedTarget.focus();
       else {
         const fallback = getFallbackTarget?.();
         if (fallback?.isConnected) fallback.focus();
@@ -64,7 +70,7 @@ export const useDialogFocus = (
         }
       }
     };
-  }, [getFallbackTarget, onClose, open, returnTarget]);
+  }, [getFallbackTarget, onClose, open, preferFallback, returnTarget]);
 
   return dialogRef;
 };

@@ -102,10 +102,30 @@ export const WebMCPSimulator = ({ open, runtime, onClose, onMessage }: WebMCPSim
   const [selected, setSelected] = useState("inspect_portal");
   const [input, setInput] = useState('{\n  "serviceId": "all"\n}');
   const [result, setResult] = useState("");
+  const [sampleReady, setSampleReady] = useState(true);
   const registeredNames = useAppStore((state) => state.webmcp.registeredToolNames);
   const activeViewId = useAppStore((state) => state.activeViewId);
   const close = useCallback(() => onClose(), [onClose]);
   const dialogRef = useDialogFocus(open, close);
+  const loadSample = useCallback(
+    (tool: WebMCPToolMetadata) => {
+      try {
+        setInput(JSON.stringify(sampleInputForTool(tool, activeViewId), null, 2));
+        setResult("");
+        setSampleReady(true);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "A verified tool sample is unavailable.";
+        setInput("{}");
+        setResult(
+          JSON.stringify({ ok: false, code: "UNSUPPORTED_SCHEMA_SAMPLE", message }, null, 2),
+        );
+        setSampleReady(false);
+        onMessage(message);
+      }
+    },
+    [activeViewId, onMessage],
+  );
   useEffect(() => {
     if (open && runtime)
       void runtime.adapter.getTools().then((nextTools) => {
@@ -113,10 +133,10 @@ export const WebMCPSimulator = ({ open, runtime, onClose, onMessage }: WebMCPSim
         const chosenTool = nextTools.find((tool) => tool.name === selected) ?? nextTools[0];
         if (chosenTool) {
           setSelected(chosenTool.name);
-          setInput(JSON.stringify(sampleInputForTool(chosenTool, activeViewId), null, 2));
+          loadSample(chosenTool);
         }
       });
-  }, [activeViewId, open, registeredNames, runtime, selected]);
+  }, [loadSample, open, registeredNames, runtime, selected]);
   if (!open) return null;
   const execute = async (name: string, value: unknown) => {
     if (!runtime) return;
@@ -221,8 +241,7 @@ export const WebMCPSimulator = ({ open, runtime, onClose, onMessage }: WebMCPSim
                 onChange={(event) => {
                   setSelected(event.target.value);
                   const tool = tools.find((item) => item.name === event.target.value);
-                  if (tool)
-                    setInput(JSON.stringify(sampleInputForTool(tool, activeViewId), null, 2));
+                  if (tool) loadSample(tool);
                 }}
               >
                 {tools.map((tool) => (
@@ -261,7 +280,7 @@ export const WebMCPSimulator = ({ open, runtime, onClose, onMessage }: WebMCPSim
                 className="button button-primary"
                 type="button"
                 onClick={() => void runSelected()}
-                disabled={!runtime}
+                disabled={!runtime || !sampleReady}
               >
                 <Play size={17} /> Run selected tool
               </button>

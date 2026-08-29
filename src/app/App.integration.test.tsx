@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetAppStoreForTests, useAppStore } from "../store/useAppStore";
+import type { WebMCPToolDefinition } from "../webmcp/types";
 import { App } from "./App";
 
 const promptA =
@@ -77,6 +78,52 @@ const compileGroupedAddressView = async (user: ReturnType<typeof userEvent.setup
   await user.click(within(simulator).getByRole("button", { name: /run selected tool/i }));
   await screen.findByRole("heading", { name: /change your address/i });
   await user.click(within(simulator).getByRole("button", { name: /close simulator/i }));
+};
+
+const installTransientNativeRegistrationFailure = () => {
+  const tools = new Map<string, WebMCPToolDefinition>();
+  const listeners = new Set<() => void>();
+  let dynamicAttempts = 0;
+  const emit = () => listeners.forEach((listener) => listener());
+  Object.defineProperty(document, "modelContext", {
+    configurable: true,
+    value: {
+      async registerTool(definition: WebMCPToolDefinition, options?: { signal?: AbortSignal }) {
+        if (definition.name === "renew_permit_guided" && dynamicAttempts++ === 0) {
+          throw new Error("Transient WebMCP registration failure.");
+        }
+        if (options?.signal?.aborted) return;
+        tools.set(definition.name, definition);
+        emit();
+        options?.signal?.addEventListener(
+          "abort",
+          () => {
+            if (tools.delete(definition.name)) emit();
+          },
+          { once: true },
+        );
+      },
+      async getTools() {
+        return [...tools.values()].map((definition) => ({
+          name: definition.name,
+          description: definition.description,
+          inputSchema: definition.inputSchema,
+          annotations: definition.annotations,
+        }));
+      },
+      async executeTool(name: string, input: unknown, options?: { signal?: AbortSignal }) {
+        const definition = tools.get(name);
+        if (!definition) throw new Error(`Tool '${name}' is not registered.`);
+        return definition.execute(input, { signal: options?.signal });
+      },
+      addEventListener(_type: "toolchange", listener: () => void) {
+        listeners.add(listener);
+      },
+      removeEventListener(_type: "toolchange", listener: () => void) {
+        listeners.delete(listener);
+      },
+    } satisfies NonNullable<Document["modelContext"]>,
+  });
 };
 
 describe("CivicWeave application", () => {
@@ -179,6 +226,32 @@ describe("CivicWeave application", () => {
         .human.setDraftField("parking_permit_renewal", "contactEmail", "unsafe-edit@example.test"),
     ).toThrow(/submitted draft cannot be edited/i);
     expect(useAppStore.getState().serviceDrafts.parking_permit_renewal).toEqual(submittedDraft);
+  });
+
+  it("focuses post-render success after native-like confirmation opened from the document body", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText(/7 registered tools/i);
+    document.body.tabIndex = -1;
+    document.body.focus();
+    act(() => {
+      useAppStore.getState().stageWorkflowDraftForReview("parking_permit_renewal", {
+        vehicleId: "vehicle_aurora",
+        durationMonths: 12,
+        contactEmail: "maya.chen@example.test",
+        fee: 60,
+        saved: true,
+      });
+    });
+
+    const confirmation = await screen.findByRole("dialog", {
+      name: /confirm fictional submission/i,
+    });
+    await user.click(within(confirmation).getByRole("button", { name: /confirm & submit/i }));
+
+    const successHeading = await screen.findByRole("heading", { name: /submission confirmed/i });
+    await waitFor(() => expect(successHeading).toHaveFocus());
+    document.body.removeAttribute("tabindex");
   });
 
   it("completes the generic manual address flow", async () => {
@@ -329,6 +402,10 @@ describe("CivicWeave application", () => {
     expect(screen.queryByText("NST-PP-2026-08421")).not.toBeInTheDocument();
     await user.click(within(confirmation).getByRole("button", { name: /confirm & submit/i }));
     const success = await screen.findByRole("region", { name: /submission confirmed/i });
+    await waitFor(() =>
+      expect(within(success).getByRole("heading", { name: /submission confirmed/i })).toHaveFocus(),
+    );
+    expect(screen.queryByRole("dialog", { name: /webmcp simulator/i })).not.toBeInTheDocument();
     expect(within(success).getByText("NST-PP-2026-08421")).toBeInTheDocument();
     expect(within(screen.getByRole("main")).queryByRole("radio")).not.toBeInTheDocument();
     expect(
@@ -529,6 +606,39 @@ describe("CivicWeave application", () => {
     expect(simulator).toContainElement(document.activeElement as HTMLElement);
     await user.keyboard("{Escape}");
     await waitFor(() => expect(simulator).not.toBeInTheDocument());
+  });
+
+  it("keeps a transient registration failure in review and permits a successful retry", async () => {
+    const user = userEvent.setup();
+    installTransientNativeRegistrationFailure();
+    render(<App />);
+    await compileAndCheck(user);
+    await runSimulatorStep(user, /stage guided tool/i);
+    const sheet = await screen.findByRole("dialog", { name: /review reusable tool/i });
+    const approve = within(sheet).getByRole("button", { name: /approve & register/i });
+
+    await user.click(approve);
+
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent(
+      /transient webmcp registration failure/i,
+    );
+    expect(sheet).toBeInTheDocument();
+    expect(approve).toHaveFocus();
+    expect(
+      Object.values(useAppStore.getState().proposals).find(
+        (proposal) => proposal.status === "awaiting_approval",
+      ),
+    ).toBeDefined();
+    await user.keyboard("{Tab}");
+    expect(sheet).toContainElement(document.activeElement as HTMLElement);
+
+    await user.click(approve);
+
+    await waitFor(() => expect(sheet).not.toBeInTheDocument());
+    expect(useAppStore.getState().approvedWorkflowTools.renew_permit_guided).toMatchObject({
+      status: "registered",
+      enabled: true,
+    });
   });
 
   it("prefills every static simulator tool with canonical JSON and shows complete annotations", async () => {

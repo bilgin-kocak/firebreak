@@ -1,5 +1,5 @@
 import { AlertCircle, CheckCircle2, X } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import type { SubmissionConfirmation } from "../store/useAppStore";
 import { useAppStore } from "../store/useAppStore";
@@ -19,15 +19,27 @@ export const FinalConfirmationDialog = ({
   const setDialog = useAppStore((state) => state.setDialog);
   const confirmPermit = useAppStore((state) => state.human.confirmPermitSubmission);
   const confirmAddress = useAppStore((state) => state.human.confirmAddressSubmission);
+  const submittedRef = useRef(false);
+  useEffect(() => {
+    if (open) submittedRef.current = false;
+  }, [open]);
   const close = useCallback(() => setDialog("finalConfirmationOpen", false), [setDialog]);
   const findFallback = useCallback(
     () => document.querySelector<HTMLElement>("#submission-success-heading"),
     [],
   );
-  const dialogRef = useDialogFocus(open, close, undefined, findFallback);
+  const preferSuccess = useCallback(() => submittedRef.current, []);
+  const dialogRef = useDialogFocus(open, close, undefined, findFallback, preferSuccess);
   if (!open || !serviceId) return null;
-  const confirm = () =>
-    onConfirmed(serviceId === "parking_permit_renewal" ? confirmPermit() : confirmAddress());
+  const confirm = () => {
+    submittedRef.current = true;
+    try {
+      onConfirmed(serviceId === "parking_permit_renewal" ? confirmPermit() : confirmAddress());
+    } catch (error) {
+      submittedRef.current = false;
+      throw error;
+    }
+  };
   return (
     <div className="dialog-backdrop">
       <div

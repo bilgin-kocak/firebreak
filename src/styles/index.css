@@ -1656,6 +1656,13 @@ code {
   font-size: 0.7rem;
   font-weight: 720;
 }
+.approval-attempt-error {
+  flex: 1 0 100%;
+  margin: 0;
+  color: #8d2030;
+  font-size: 0.7rem;
+  font-weight: 720;
+}
 .safety-summary {
   display: flex;
   gap: 11px;

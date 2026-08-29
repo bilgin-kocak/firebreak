@@ -137,6 +137,7 @@ export const App = () => {
       />
       <FinalConfirmationDialog
         onConfirmed={(result) => {
+          setSimulatorOpen(false);
           setConfirmation(result);
           setToast("Fictional submission confirmed.");
         }}

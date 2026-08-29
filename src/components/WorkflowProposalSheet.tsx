@@ -1,5 +1,5 @@
 import { AlertTriangle, ArrowLeft, CheckCircle2, Database, ShieldCheck, X } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 import { operationRegistry } from "../domain/operationRegistry";
 import { getServiceBlueprint } from "../domain/serviceBlueprints";
@@ -14,6 +14,10 @@ interface WorkflowProposalSheetProps {
 }
 
 export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposalSheetProps) => {
+  const [approvalFailure, setApprovalFailure] = useState<{
+    proposalId: string;
+    message: string;
+  } | null>(null);
   const open = useAppStore((state) => state.dialogs.proposalSheetOpen);
   const proposals = useAppStore((state) => state.proposals);
   const approved = useAppStore((state) => state.approvedWorkflowTools);
@@ -44,17 +48,28 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
     return serialized ?? "undefined";
   };
   const approve = async () => {
+    setApprovalFailure(null);
     try {
       await onApprove(proposal.id);
       onMessage(`${proposal.name} registered.`);
     } catch (error) {
-      // Revalidation can move this proposal back to draft while registration
-      // awaits browser work. Reconcile the UI state even though the proposal
-      // is no longer renderable so no detached dialog remains on the stack.
-      setDialog("proposalSheetOpen", false);
-      onMessage(error instanceof Error ? error.message : "The workflow could not be registered.");
+      const message =
+        error instanceof Error ? error.message : "The workflow could not be registered.";
+      const current = useAppStore.getState().proposals[proposal.id];
+      if (!current || current.status !== "awaiting_approval") {
+        // Revalidation moved the proposal out of review; reconcile the
+        // detached sheet and its focus-trap entry.
+        setDialog("proposalSheetOpen", false);
+      } else {
+        // Adapter failures do not invalidate the reviewed definition. Keep
+        // it in the modal review surface so the human can safely retry.
+        setApprovalFailure({ proposalId: proposal.id, message });
+      }
+      onMessage(message);
     }
   };
+  const approvalError =
+    approvalFailure?.proposalId === proposal.id ? approvalFailure.message : undefined;
   const approvalReason = validation.valid
     ? undefined
     : `Resolve ${validation.errors.length} validation ${validation.errors.length === 1 ? "error" : "errors"} and ${blockingChecks.length} blocking ${blockingChecks.length === 1 ? "check" : "checks"} before approval.`;
@@ -213,6 +228,11 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
           </section>
         </div>
         <footer className="dialog-actions">
+          {approvalError ? (
+            <p className="approval-attempt-error" role="alert">
+              Registration did not complete. {approvalError} Review remains open; you can retry.
+            </p>
+          ) : null}
           {approvalReason ? (
             <p className="approval-disabled-reason" id="proposal-approval-reason">
               {approvalReason}
