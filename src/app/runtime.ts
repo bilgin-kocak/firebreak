@@ -73,6 +73,13 @@ export const createJourneyChecksProvider = (
   async getContext(viewId: string) {
     void viewId;
     const root = document.querySelector<HTMLElement>("#adaptive-workspace");
+    if (root && typeof root.getAnimations === "function") {
+      await Promise.all(
+        root
+          .getAnimations({ subtree: true })
+          .map((animation) => animation.finished.catch(() => undefined)),
+      );
+    }
     const targets = root
       ? [...root.querySelectorAll<HTMLElement>(visibleTargetSelector)].filter(isVisibleTarget)
       : [];
@@ -135,7 +142,7 @@ export const bootAppRuntime = async (
     registry,
     dynamicTools,
     dispose() {
-      dynamicTools.disposeAll();
+      void dynamicTools.disposeAll();
       registry.dispose();
     },
   };

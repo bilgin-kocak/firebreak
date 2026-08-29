@@ -139,9 +139,10 @@ export class DynamicToolManager {
     useAppStore.getState().human.deleteWorkflowTool(name);
   }
 
-  public disposeAll(): void {
+  public async disposeAll(): Promise<void> {
     for (const controller of this.controllers.values()) controller.abort();
     this.controllers.clear();
+    await this.registry.settleToolChanges();
   }
 
   private abortRegistration(name: string): void {

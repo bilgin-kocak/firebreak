@@ -1250,7 +1250,7 @@ code {
   white-space: nowrap;
 }
 .count-badge.success {
-  color: var(--success);
+  color: #08704c;
   background: var(--success-soft);
 }
 .count-badge.warning {

@@ -92,7 +92,7 @@ export const WorkflowProposalSheet = ({ onApprove, onMessage }: WorkflowProposal
             <X size={20} />
           </button>
         </header>
-        <div className="proposal-body">
+        <div className="proposal-body" tabIndex={0} aria-label="Workflow proposal details">
           <section className="proposal-intro">
             <span className="compiled-mark">
               <ShieldCheck size={22} />

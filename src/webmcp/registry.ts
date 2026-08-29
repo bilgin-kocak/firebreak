@@ -20,6 +20,7 @@ export class ToolRegistry {
   private readonly getState: () => ToolAppState;
   private readonly now: () => number;
   private readonly unsubscribe: () => void;
+  private toolChangeReconciliation: Promise<void> = Promise.resolve();
 
   public constructor(
     private readonly adapter: WebMCPAdapter,
@@ -28,7 +29,10 @@ export class ToolRegistry {
     this.getState = dependencies.getState ?? getAppState;
     this.now = dependencies.now ?? (() => performance.now());
     this.unsubscribe = adapter.subscribeToToolChange(() => {
-      void this.reconcile(true);
+      this.toolChangeReconciliation = this.toolChangeReconciliation
+        .catch(() => undefined)
+        .then(() => this.reconcile(true));
+      void this.toolChangeReconciliation.catch(() => undefined);
     });
     this.getState().setWebMCPMetadata({ mode: adapter.mode });
   }
@@ -130,6 +134,10 @@ export class ToolRegistry {
 
   public dispose(): void {
     this.unsubscribe();
+  }
+
+  public async settleToolChanges(): Promise<void> {
+    await this.toolChangeReconciliation;
   }
 
   private async reconcile(logToolChange = false): Promise<void> {

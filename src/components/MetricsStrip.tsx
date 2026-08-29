@@ -48,7 +48,9 @@ export const MetricsStrip = () => {
           ["Workflow operations", String(metrics.workflowOperationsExecuted)],
           [
             "Last tool duration",
-            metrics.lastToolDurationMs === null ? "—" : `${metrics.lastToolDurationMs} ms`,
+            metrics.lastToolDurationMs === null
+              ? "—"
+              : `${Math.round(metrics.lastToolDurationMs)} ms`,
           ],
           ["Blocking checks", String(metrics.blockingChecks)],
         ].map(([label, value]) => (
