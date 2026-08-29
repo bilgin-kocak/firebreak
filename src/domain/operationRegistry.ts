@@ -322,7 +322,11 @@ export const operationRegistry: Record<string, OperationDefinition> = {
       assertNotAborted(signal);
       const schema = operationRegistry["address.set_new"]?.inputSchema;
       if (!schema || !validateJsonSchema(schema, args)) throw new Error("New address is invalid");
-      Object.assign(addressDraft(context), args);
+      Object.assign(addressDraft(context), {
+        newStreet: args.street,
+        newCity: args.city,
+        newPostalCode: args.postalCode,
+      });
       return {};
     },
   }),
@@ -383,7 +387,7 @@ export const operationRegistry: Record<string, OperationDefinition> = {
     async execute(context, _args, signal) {
       assertNotAborted(signal);
       const draft = addressDraft(context);
-      if (!draft.street || !draft.city || !draft.postalCode || !draft.effectiveDate) {
+      if (!draft.newStreet || !draft.newCity || !draft.newPostalCode || !draft.effectiveDate) {
         throw new Error("Address draft is incomplete");
       }
       return {};

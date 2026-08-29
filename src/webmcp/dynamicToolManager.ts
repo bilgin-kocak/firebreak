@@ -21,10 +21,22 @@ const writeAnnotations = {
   untrustedContentHint: false,
 } as const;
 
+export interface DynamicToolManagerDependencies {
+  executeWorkflow?: typeof executeWorkflow;
+}
+
+const sameDraftSnapshot = (left: unknown, right: unknown): boolean =>
+  JSON.stringify(left) === JSON.stringify(right);
+
 export class DynamicToolManager {
   private readonly controllers = new Map<string, AbortController>();
+  private readonly executeWorkflow: typeof executeWorkflow;
 
-  public constructor(private readonly registry: ToolRegistry) {
+  public constructor(
+    private readonly registry: ToolRegistry,
+    dependencies: DynamicToolManagerDependencies = {},
+  ) {
+    this.executeWorkflow = dependencies.executeWorkflow ?? executeWorkflow;
     useAppStore.getState().registerDynamicToolUnregister(() => this.disposeAll());
   }
 
@@ -36,7 +48,7 @@ export class DynamicToolManager {
         "Only the human approval control can register a staged workflow.",
       );
     }
-    await this.assertCurrentlyValid(proposal);
+    await this.assertCurrentlyValid(proposal, false);
 
     const controller = new AbortController();
     try {
@@ -58,9 +70,9 @@ export class DynamicToolManager {
     for (const tool of enabledTools) {
       if (this.controllers.has(tool.name)) continue;
       try {
-        await this.assertCurrentlyValid(tool);
+        await this.assertCurrentlyValid(tool, true);
       } catch (error) {
-        if (error instanceof DomainError && error.code === "VIEW_VALIDATION_FAILED") {
+        if (error instanceof DomainError) {
           const current = useAppStore.getState().approvedWorkflowTools[tool.name];
           if (current?.enabled && current.status === "registered") {
             useAppStore.getState().human.disableWorkflowTool(tool.name);
@@ -130,7 +142,10 @@ export class DynamicToolManager {
     this.controllers.delete(name);
   }
 
-  private async assertCurrentlyValid(proposal: WorkflowToolProposal): Promise<void> {
+  private async assertCurrentlyValid(
+    proposal: WorkflowToolProposal,
+    restoringSameDefinition: boolean,
+  ): Promise<void> {
     const state = useAppStore.getState();
     const view = state.views[proposal.viewId];
     if (!view || view.serviceId !== proposal.serviceId) {
@@ -154,14 +169,21 @@ export class DynamicToolManager {
     const validation = validateWorkflowProposal(proposal, {
       staticToolNames: STATIC_TOOL_NAMES,
       enabledCompiledToolNames: Object.values(state.approvedWorkflowTools)
-        .filter((tool) => tool.enabled && tool.name !== proposal.name)
+        .filter((tool) => {
+          if (!tool.enabled) return false;
+          if (!restoringSameDefinition || !("registrationRevision" in proposal)) return true;
+          return !(
+            tool.id === proposal.id && tool.registrationRevision === proposal.registrationRevision
+          );
+        })
         .map((tool) => tool.name),
       journeyChecks: [...(state.journeyChecks[proposal.viewId] ?? []), ...currentChecks],
     });
     if (!validation.valid) {
+      const firstError = validation.errors[0];
       throw new DomainError(
-        "VIEW_VALIDATION_FAILED",
-        validation.errors[0]?.message ?? "The workflow is no longer safe to register.",
+        firstError?.code ?? "VIEW_VALIDATION_FAILED",
+        firstError?.message ?? "The workflow is no longer safe to register.",
         { validationErrors: validation.errors.map((error) => error.code) },
       );
     }
@@ -197,6 +219,11 @@ export class DynamicToolManager {
         "A human-submitted draft is final until the demo is reset.",
       );
     }
+    const executionSnapshot = {
+      currentService: before.currentService,
+      portalMode: before.portalMode,
+      serviceDraft: structuredClone(before.serviceDrafts[proposal.serviceId]),
+    };
     const serviceDrafts = structuredClone(before.serviceDrafts);
     const context: WorkflowExecutionContext = {
       resident: structuredClone(before.resident),
@@ -222,37 +249,34 @@ export class DynamicToolManager {
         });
       },
     };
-    const execution = await executeWorkflow(proposal, input, context, signal);
+    const execution = await this.executeWorkflow(proposal, input, context, signal);
+    if (signal?.aborted) {
+      throw new DomainError(
+        "EXECUTION_CANCELLED",
+        "The workflow was cancelled and its draft changes were rolled back.",
+      );
+    }
+    const live = useAppStore.getState();
+    if (
+      live.currentService !== executionSnapshot.currentService ||
+      live.portalMode !== executionSnapshot.portalMode ||
+      !sameDraftSnapshot(live.serviceDrafts[proposal.serviceId], executionSnapshot.serviceDraft)
+    ) {
+      throw new DomainError(
+        "OPERATION_FAILED",
+        "The live portal changed during execution, so the newer state was preserved.",
+      );
+    }
     if (execution.code !== "DRAFT_STAGED") {
       throw new DomainError(execution.code, this.executionFailureMessage(execution));
     }
-    if (proposal.serviceId === "address_change") {
-      const draft = context.serviceDrafts.address_change ?? {};
-      context.serviceDrafts.address_change = {
-        ...draft,
-        newStreet: draft.street,
-        newCity: draft.city,
-        newPostalCode: draft.postalCode,
-      };
-    }
 
-    const snapshot = {
-      currentService: before.currentService,
-      portalMode: before.portalMode,
-      serviceDrafts: structuredClone(before.serviceDrafts),
-      dialogs: { ...before.dialogs },
-    };
-    try {
-      useAppStore.setState({
-        currentService: proposal.serviceId,
-        portalMode: "draft_in_progress",
-        serviceDrafts: structuredClone(context.serviceDrafts),
-      });
-      useAppStore.getState().stageDraftForReview(proposal.serviceId);
-    } catch (error) {
-      useAppStore.setState(snapshot);
-      throw error;
-    }
+    useAppStore
+      .getState()
+      .stageWorkflowDraftForReview(
+        proposal.serviceId,
+        structuredClone(context.serviceDrafts[proposal.serviceId] ?? {}),
+      );
 
     const draft = context.serviceDrafts[proposal.serviceId] ?? {};
     if (proposal.serviceId === "parking_permit_renewal") {

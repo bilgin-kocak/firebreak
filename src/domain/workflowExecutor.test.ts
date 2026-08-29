@@ -261,10 +261,10 @@ describe("workflow executor", () => {
       status: "awaiting_user_confirmation",
       submitted: false,
     });
-    expect(context.serviceDrafts.address_change).toMatchObject({
-      street: "500 Market Street",
-      city: "Northstar",
-      postalCode: "NS 20419",
+    expect(context.serviceDrafts.address_change).toEqual({
+      newStreet: "500 Market Street",
+      newCity: "Northstar",
+      newPostalCode: "NS 20419",
       effectiveDate: "2026-10-01",
       saved: true,
       status: "staged_for_review",

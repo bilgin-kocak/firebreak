@@ -94,6 +94,7 @@ export interface AppState {
   updateView(view: TaskViewDefinition): void;
   setActiveView(viewId: string | null): void;
   stageDraftForReview(serviceId: ServiceId): void;
+  stageWorkflowDraftForReview(serviceId: ServiceId, draft: Draft): void;
   setJourneyChecks(viewId: string, checks: JourneyCheckResult[]): void;
   createProposal(proposal: WorkflowToolProposal): void;
   validateProposal(proposalId: string): void;
@@ -298,7 +299,7 @@ const validateProposalInState = (state: AppState, proposal: WorkflowToolProposal
   validateWorkflowProposal(proposal, {
     staticToolNames,
     enabledCompiledToolNames: Object.values(state.approvedWorkflowTools)
-      .filter((tool) => tool.enabled && tool.name !== proposal.name)
+      .filter((tool) => tool.enabled)
       .map((tool) => tool.name),
     journeyChecks: state.journeyChecks[proposal.viewId],
   });
@@ -601,6 +602,38 @@ export const useAppStore = create<AppState>((set, get) => {
     stageDraftForReview(serviceId) {
       const draft = assertReviewableDraft(get(), serviceId);
       set((state) => ({
+        portalMode: "staged_for_review",
+        serviceDrafts: {
+          ...state.serviceDrafts,
+          [serviceId]: { ...draft, status: "staged_for_review" },
+        },
+        dialogs: { ...state.dialogs, finalConfirmationOpen: true },
+      }));
+      get().logActivity({
+        actor: "agent",
+        kind: "draft_staged",
+        title: "Draft staged for human review",
+        status: "success",
+      });
+      persist(get());
+    },
+    stageWorkflowDraftForReview(serviceId, draft) {
+      const current = get();
+      if (current.portalMode === "submitted") {
+        throw transitionError(
+          "DRAFT_VALIDATION_FAILED",
+          "A submitted draft cannot return to review. Reset to begin again.",
+        );
+      }
+      const readiness = validateDraftForReview(serviceId, draft, current.resident);
+      if (!readiness.valid) {
+        throw transitionError(
+          "DRAFT_VALIDATION_FAILED",
+          readiness.errors[0] ?? "Draft is not ready for review.",
+        );
+      }
+      set((state) => ({
+        currentService: serviceId,
         portalMode: "staged_for_review",
         serviceDrafts: {
           ...state.serviceDrafts,

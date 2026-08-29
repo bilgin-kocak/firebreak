@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { executeWorkflow as executeTrustedWorkflow } from "../domain/workflowExecutor";
 import { canonicalPreferencesFixture } from "../test/fixtures";
 import { getAppState, resetAppStoreForTests, useAppStore } from "../store/useAppStore";
 import type { WebMCPAdapter } from "./adapter";
@@ -226,6 +227,35 @@ describe("DynamicToolManager", () => {
     );
   });
 
+  it("rejects a different proposal whose name belongs to an enabled saved definition", async () => {
+    const first = await stageCanonicalProposal();
+    const staged = getAppState().proposals[first.proposalId];
+    if (!staged) throw new Error("Canonical proposal was not persisted");
+    const collisionId = "workflow_name_collision";
+    useAppStore.setState({
+      proposals: {
+        ...getAppState().proposals,
+        [collisionId]: { ...structuredClone(staged), id: collisionId },
+      },
+    });
+    const firstManager = new DynamicToolManager(first.registry);
+    await firstManager.approveAndRegister(first.proposalId);
+    firstManager.disposeAll();
+    const adapter = createMemoryAdapter();
+    const registry = new ToolRegistry(adapter);
+    await registerStaticTools(registry);
+    const manager = new DynamicToolManager(registry);
+
+    await expect(manager.approveAndRegister(collisionId)).rejects.toMatchObject({
+      code: "TOOL_NAME_COLLISION",
+    });
+
+    expect((await adapter.getTools()).map((tool) => tool.name)).not.toContain(
+      "renew_permit_guided",
+    );
+    expect(getAppState().approvedWorkflowTools.renew_permit_guided?.id).toBe(first.proposalId);
+  });
+
   it("keeps an invalid restored definition unregistered and persists it as disabled", async () => {
     const first = await stageCanonicalProposal();
     const firstManager = new DynamicToolManager(first.registry);
@@ -407,6 +437,69 @@ describe("DynamicToolManager", () => {
     expect(getAppState().portalMode).toBe("adaptive_view_active");
   });
 
+  it("does not commit when execution is aborted after the executor finishes", async () => {
+    const { adapter, registry, proposalId } = await stageCanonicalProposal();
+    const controller = new AbortController();
+    const manager = new DynamicToolManager(registry, {
+      async executeWorkflow(...args) {
+        const result = await executeTrustedWorkflow(...args);
+        controller.abort();
+        return result;
+      },
+    });
+    await manager.approveAndRegister(proposalId);
+    useAppStore.setState({
+      serviceDrafts: { parking_permit_renewal: { preserved: "before-late-abort" } },
+    });
+    const before = structuredClone(getAppState().serviceDrafts);
+
+    const result = await adapter.executeTool(
+      "renew_permit_guided",
+      { durationMonths: 12 },
+      controller.signal,
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: "EXECUTION_CANCELLED",
+      retryable: false,
+    });
+    expect(getAppState().serviceDrafts).toEqual(before);
+    expect(getAppState().portalMode).toBe("adaptive_view_active");
+  });
+
+  it("preserves newer submitted state changed after execution and before commit", async () => {
+    const { adapter, registry, proposalId } = await stageCanonicalProposal();
+    const newerDraft = {
+      preserved: "newer-human-state",
+      status: "submitted",
+    };
+    const manager = new DynamicToolManager(registry, {
+      async executeWorkflow(...args) {
+        const result = await executeTrustedWorkflow(...args);
+        useAppStore.setState({
+          currentService: "parking_permit_renewal",
+          portalMode: "submitted",
+          serviceDrafts: { parking_permit_renewal: structuredClone(newerDraft) },
+        });
+        return result;
+      },
+    });
+    await manager.approveAndRegister(proposalId);
+
+    const result = await adapter.executeTool("renew_permit_guided", {
+      durationMonths: 12,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: "OPERATION_FAILED",
+      retryable: false,
+    });
+    expect(getAppState().portalMode).toBe("submitted");
+    expect(getAppState().serviceDrafts.parking_permit_renewal).toEqual(newerDraft);
+  });
+
   it("does not regress a human-submitted portal back to review", async () => {
     const { adapter, registry, proposalId } = await stageCanonicalProposal();
     const manager = new DynamicToolManager(registry);
@@ -453,11 +546,12 @@ describe("DynamicToolManager", () => {
       code: "DRAFT_STAGED",
       data: { status: "awaiting_user_confirmation", submitted: false },
     });
-    expect(getAppState().serviceDrafts.address_change).toMatchObject({
+    expect(getAppState().serviceDrafts.address_change).toEqual({
       newStreet: "500 Market Street",
       newCity: "Northstar",
       newPostalCode: "NS 20419",
       effectiveDate: "2026-10-01",
+      saved: true,
       status: "staged_for_review",
     });
   });
