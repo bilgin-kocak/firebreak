@@ -608,6 +608,52 @@ describe("CivicWeave application", () => {
     await waitFor(() => expect(simulator).not.toBeInTheDocument());
   });
 
+  it("returns a proposal to edit and removes its focus trap when fresh checks fail before registration", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await compileAndCheck(user);
+    const simulator = await screen.findByRole("dialog", { name: /webmcp simulator/i });
+    const stageButton = within(simulator).getByRole("button", { name: /stage guided tool/i });
+    await user.click(stageButton);
+    const sheet = await screen.findByRole("dialog", { name: /review reusable tool/i });
+    const approve = within(sheet).getByRole("button", { name: /approve & register/i });
+    const proposal = Object.values(useAppStore.getState().proposals).find(
+      (item) => item.status === "awaiting_approval",
+    );
+    expect(proposal).toBeDefined();
+    const view = useAppStore.getState().views[proposal!.viewId];
+    expect(view).toBeDefined();
+
+    act(() => {
+      useAppStore.setState((state) => ({
+        views: {
+          ...state.views,
+          [view!.id]: {
+            ...view!,
+            hiddenOptionalFields: [...view!.hiddenOptionalFields, "contactEmail"],
+          },
+        },
+      }));
+    });
+    expect(approve).toBeEnabled();
+
+    await user.click(approve);
+
+    await waitFor(() => expect(sheet).not.toBeInTheDocument());
+    expect(useAppStore.getState().proposals[proposal!.id]).toMatchObject({
+      status: "draft",
+      validationErrors: ["CHECKS_FAILED"],
+    });
+    expect(useAppStore.getState().dialogs.proposalSheetOpen).toBe(false);
+    expect(useAppStore.getState().webmcp.registeredToolNames).not.toContain("renew_permit_guided");
+    expect(screen.queryByText(/review remains open; you can retry/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(stageButton).toHaveFocus());
+    await user.keyboard("{Tab}");
+    expect(simulator).toContainElement(document.activeElement as HTMLElement);
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(simulator).not.toBeInTheDocument());
+  });
+
   it("keeps a transient registration failure in review and permits a successful retry", async () => {
     const user = userEvent.setup();
     installTransientNativeRegistrationFailure();

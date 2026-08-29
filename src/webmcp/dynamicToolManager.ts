@@ -48,7 +48,14 @@ export class DynamicToolManager {
         "Only the human approval control can register a staged workflow.",
       );
     }
-    await this.assertCurrentlyValid(proposal, false);
+    try {
+      await this.assertCurrentlyValid(proposal, false);
+    } catch (error) {
+      useAppStore
+        .getState()
+        .invalidateProposalForEdit(proposalId, this.validationErrorCodes(error));
+      throw error;
+    }
 
     const controller = new AbortController();
     try {
@@ -187,6 +194,15 @@ export class DynamicToolManager {
         { validationErrors: validation.errors.map((error) => error.code) },
       );
     }
+  }
+
+  private validationErrorCodes(error: unknown): string[] {
+    if (!(error instanceof DomainError)) return [];
+    const validationErrors = error.details?.validationErrors;
+    if (Array.isArray(validationErrors)) {
+      return validationErrors.filter((item): item is string => typeof item === "string");
+    }
+    return [error.code];
   }
 
   private createDefinition(

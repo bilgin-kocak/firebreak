@@ -269,6 +269,38 @@ describe("DynamicToolManager", () => {
     expect(getAppState().proposals[proposalId]?.status).toBe("awaiting_approval");
   });
 
+  it("returns an awaiting proposal to editable draft when current checks fail before registration", async () => {
+    const { adapter, registry, proposalId } = await stageCanonicalProposal();
+    const proposal = getAppState().proposals[proposalId];
+    if (!proposal) throw new Error("Canonical proposal was not persisted");
+    const view = getAppState().views[proposal.viewId];
+    if (!view) throw new Error("Canonical proposal lost its task view");
+    useAppStore.setState({
+      views: {
+        ...getAppState().views,
+        [view.id]: {
+          ...view,
+          hiddenOptionalFields: [...view.hiddenOptionalFields, "contactEmail"],
+        },
+      },
+    });
+    const manager = new DynamicToolManager(registry);
+
+    await expect(manager.approveAndRegister(proposalId)).rejects.toMatchObject({
+      code: "CHECKS_FAILED",
+      details: { validationErrors: ["CHECKS_FAILED"] },
+    });
+
+    expect((await adapter.getTools()).map((tool) => tool.name)).not.toContain(
+      "renew_permit_guided",
+    );
+    expect(getAppState().proposals[proposalId]).toMatchObject({
+      status: "draft",
+      validationErrors: ["CHECKS_FAILED"],
+    });
+    expect(useAppStore.getState().dialogs.proposalSheetOpen).toBe(false);
+  });
+
   it("re-registers a valid enabled saved approval for the new tab", async () => {
     const first = await stageCanonicalProposal();
     const firstManager = new DynamicToolManager(first.registry);
@@ -319,6 +351,10 @@ describe("DynamicToolManager", () => {
       "renew_permit_guided",
     );
     expect(getAppState().approvedWorkflowTools.renew_permit_guided?.id).toBe(first.proposalId);
+    expect(getAppState().proposals[collisionId]).toMatchObject({
+      status: "draft",
+      validationErrors: ["TOOL_NAME_COLLISION"],
+    });
   });
 
   it("keeps an invalid restored definition unregistered and persists it as disabled", async () => {

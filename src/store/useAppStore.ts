@@ -99,6 +99,7 @@ export interface AppState {
   createProposal(proposal: WorkflowToolProposal): void;
   validateProposal(proposalId: string): void;
   requestProposalApproval(proposalId: string): void;
+  invalidateProposalForEdit(proposalId: string, validationErrors?: string[]): void;
   setWebMCPMetadata(patch: Partial<AppState["webmcp"]>): void;
   setRightRail(tab: RightRailTab): void;
   setDialog(dialog: keyof AppState["dialogs"], open: boolean): void;
@@ -429,11 +430,7 @@ export const useAppStore = create<AppState>((set, get) => {
           "HUMAN_APPROVAL_REQUIRED",
           "Only the proposal awaiting your review can return to editing.",
         );
-      set((state) => ({
-        proposals: { ...state.proposals, [proposalId]: { ...proposal, status: "draft" } },
-        dialogs: { ...state.dialogs, proposalSheetOpen: false },
-      }));
-      persist(get());
+      get().invalidateProposalForEdit(proposalId);
     },
     rejectProposal(proposalId) {
       const proposal = get().proposals[proposalId];
@@ -746,6 +743,23 @@ export const useAppStore = create<AppState>((set, get) => {
         toolName: proposal.name,
         status: "info",
       });
+      persist(get());
+    },
+    invalidateProposalForEdit(proposalId, validationErrors) {
+      const proposal = get().proposals[proposalId];
+      if (!proposal || proposal.status !== "awaiting_approval") return;
+      set((state) => ({
+        proposals: {
+          ...state.proposals,
+          [proposalId]: {
+            ...proposal,
+            status: "draft",
+            validationErrors:
+              validationErrors === undefined ? proposal.validationErrors : [...validationErrors],
+          },
+        },
+        dialogs: { ...state.dialogs, proposalSheetOpen: false },
+      }));
       persist(get());
     },
     setWebMCPMetadata(patch) {
