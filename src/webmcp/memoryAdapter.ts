@@ -7,7 +7,8 @@ const parseInput = (input: unknown): unknown => {
   try {
     return JSON.parse(input) as unknown;
   } catch {
-    throw new DomainError("INVALID_TOOL_INPUT", "Tool input must be valid JSON.");
+    // Preserve malformed text for the registry's Zod/error/logging boundary.
+    return input;
   }
 };
 

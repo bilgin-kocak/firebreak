@@ -15,6 +15,7 @@ export interface ToolRegistryDependencies {
 
 export class ToolRegistry {
   private readonly registrations = new Map<string, ToolRegistration>();
+  private readonly pendingNames = new Set<string>();
   private readonly controllers = new Map<string, AbortController>();
   private readonly getState: () => ToolAppState;
   private readonly now: () => number;
@@ -36,7 +37,7 @@ export class ToolRegistry {
     definition: RegistryToolDefinition<TInput>,
     options: { signal?: AbortSignal } = {},
   ): Promise<void> {
-    if (this.registrations.has(definition.name)) {
+    if (this.registrations.has(definition.name) || this.pendingNames.has(definition.name)) {
       throw new DomainError(
         "TOOL_ALREADY_REGISTERED",
         `Tool '${definition.name}' is already registered.`,
@@ -47,6 +48,7 @@ export class ToolRegistry {
         ? new AbortController()
         : undefined;
     const registrationSignal = options.signal ?? controller?.signal;
+    this.pendingNames.add(definition.name);
     const wrapped = {
       name: definition.name,
       description: definition.description,
@@ -92,23 +94,27 @@ export class ToolRegistry {
       },
     };
 
-    await this.adapter.registerTool(wrapped, { signal: registrationSignal });
-    this.registrations.set(definition.name, {
-      name: definition.name,
-      description: definition.description,
-      inputSchema: definition.inputSchema,
-      annotations: definition.annotations,
-      origin: definition.origin,
-    });
-    if (controller) this.controllers.set(definition.name, controller);
-    await this.reconcile();
-    this.getState().logActivity({
-      actor: "system",
-      kind: "tool_registered",
-      title: "WebMCP tool registered",
-      toolName: definition.name,
-      status: "success",
-    });
+    try {
+      await this.adapter.registerTool(wrapped, { signal: registrationSignal });
+      this.registrations.set(definition.name, {
+        name: definition.name,
+        description: definition.description,
+        inputSchema: definition.inputSchema,
+        annotations: definition.annotations,
+        origin: definition.origin,
+      });
+      if (controller) this.controllers.set(definition.name, controller);
+      await this.reconcile();
+      this.getState().logActivity({
+        actor: "system",
+        kind: "tool_registered",
+        title: "WebMCP tool registered",
+        toolName: definition.name,
+        status: "success",
+      });
+    } finally {
+      this.pendingNames.delete(definition.name);
+    }
   }
 
   public getRegistrations(): ToolRegistration[] {

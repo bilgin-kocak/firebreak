@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { runJourneyChecks } from "../domain/journeyChecks";
+import { runJourneyChecks, type JourneyCheckContext } from "../domain/journeyChecks";
 import { operationRegistry } from "../domain/operationRegistry";
 import { getServiceBlueprint, serviceBlueprints } from "../domain/serviceBlueprints";
 import { compileTaskView, patchTaskView } from "../domain/viewCompiler";
@@ -13,6 +13,15 @@ import type { RegistryToolDefinition } from "./types";
 export interface StaticToolDependencies {
   getState?: () => ToolAppState;
   now?: () => Date;
+  journeyChecksProvider?: JourneyChecksProvider;
+}
+
+export interface JourneyChecksProvider {
+  getContext(
+    viewId: string,
+  ):
+    | Pick<JourneyCheckContext, "presentation" | "dom">
+    | Promise<Pick<JourneyCheckContext, "presentation" | "dom">>;
 }
 
 const readAnnotations = { readOnlyHint: true, untrustedContentHint: false } as const;
@@ -459,8 +468,13 @@ export const createStaticToolDefinitions = (
         if (!view)
           throw new DomainError("VIEW_NOT_FOUND", "The requested task view was not found.");
         const blueprint = getServiceBlueprint(view.serviceId);
+        const renderedContext = input.includeDomChecks
+          ? await dependencies.journeyChecksProvider?.getContext(view.id)
+          : undefined;
         const checks = await runJourneyChecks(view, {
           includeDomChecks: input.includeDomChecks,
+          presentation: renderedContext?.presentation,
+          dom: renderedContext?.dom,
           operationSafety: {
             finalHumanOperationCompilable:
               operationRegistry[blueprint.finalHumanOperationId]?.compilable,

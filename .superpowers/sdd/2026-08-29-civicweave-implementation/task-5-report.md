@@ -163,5 +163,59 @@ Exit 1 after `tsc -b` succeeded. Vite transformed 2 modules, then failed to reso
 
 ## Concerns
 
-- Repository-level production build remains blocked by the pre-existing missing `src/main.tsx`. Lint, format, typecheck, and the full 105-test suite pass.
+- Repository-level production build remains blocked by the pre-existing missing `src/main.tsx`. Lint, format, typecheck, and the latest full 109-test suite pass.
 - Dynamic workflow construction/approval/registration is intentionally not implemented here; Task 5 provides registry controller support and static staging only, with the human approval path reserved for the later dynamic-tool task.
+
+## Fix Round 1
+
+### Root causes and fixes
+
+1. `memoryAdapter.executeTool` parsed string input before invoking the registry-wrapped handler. A malformed JSON string therefore threw directly from the adapter and skipped structured `INVALID_TOOL_INPUT`, timing, Activity entries, and metrics. The adapter now parses valid JSON but forwards malformed text to the registry's strict Zod boundary, where it becomes the same compact, logged failure as any other invalid external input.
+2. `ToolRegistry.register` checked only completed registration metadata. Two calls could both pass that check before either awaited adapter call completed. A synchronous `pendingNames` reservation now covers the whole asynchronous registration, rejects concurrent duplicates, and is released in `finally` so a failed adapter call can be retried safely.
+3. The static `run_journey_checks` handler passed no rendered UI or axe context even when `includeDomChecks` was true. `StaticToolDependencies` now accepts a narrow trusted `JourneyChecksProvider` keyed only by `viewId`; the provider supplies presentation facts and the mounted DOM/axe adapter only when DOM checks are requested. The domain checker remains responsible for interpreting scan results and the shared store persists those results.
+
+### Red evidence
+
+Command:
+
+```text
+npm test -- src/webmcp/registry.test.ts src/webmcp/staticTools.test.ts
+```
+
+Observed result: exit 1; 3 tests failed. Malformed JSON rejected with an uncaught `DomainError`, concurrent registration timed out waiting on the permissive adapter instead of rejecting the reserved duplicate, and the injected critical axe violation was not executed/stored (`blockingFailures` remained 0).
+
+### Green evidence
+
+Command:
+
+```text
+npm test -- src/webmcp/registry.test.ts src/webmcp/staticTools.test.ts src/webmcp/memoryAdapter.test.ts
+```
+
+Observed result: exit 0; 3 files passed, 20 tests passed.
+
+Command:
+
+```text
+npm run typecheck
+npm run lint
+npm run format:check
+```
+
+Observed results after formatting: all exit 0; TypeScript had no diagnostics, ESLint had zero warnings/errors, and Prettier reported all files matched.
+
+Command:
+
+```text
+npm test
+```
+
+Observed result: exit 0; 11 test files passed, 109 tests passed.
+
+### Fix-round self-review
+
+- Valid JSON strings still reach handlers as parsed objects; malformed JSON cannot bypass registry result/log/metric instrumentation.
+- The pending-name reservation is established before the first await and released on every exit path.
+- Failed adapter registration does not leave completed metadata or block a same-name retry.
+- The DOM provider receives only the selected `viewId`, is never called when `includeDomChecks` is false, and cannot replace the trusted domain checker.
+- The original seven names, schemas, annotations, and human-only approval/submission boundaries are unchanged.

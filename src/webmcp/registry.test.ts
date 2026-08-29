@@ -3,9 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DomainError } from "../domain/types";
 import { getAppState, resetAppStoreForTests } from "../store/useAppStore";
+import type { WebMCPAdapter } from "./adapter";
 import { createMemoryAdapter } from "./memoryAdapter";
 import { ToolRegistry } from "./registry";
-import type { RegistryToolDefinition } from "./types";
+import type { RegistryToolDefinition, WebMCPToolDefinition, WebMCPToolMetadata } from "./types";
 
 const definition = (
   execute: RegistryToolDefinition<{ serviceId: string }>["execute"] = vi.fn(async () => ({
@@ -56,6 +57,28 @@ describe("WebMCP tool registry", () => {
     expect(result).toMatchObject({ ok: false, code: "INVALID_TOOL_INPUT", retryable: true });
     expect(execute).not.toHaveBeenCalled();
     expect(JSON.stringify(result).length).toBeLessThan(1500);
+  });
+
+  it("routes malformed stringified JSON through structured failure logging and metrics", async () => {
+    const adapter = createMemoryAdapter();
+    const ticks = [10, 31];
+    const registry = new ToolRegistry(adapter, { now: () => ticks.shift() ?? 31 });
+    await registry.register(definition());
+
+    await expect(adapter.executeTool("inspect_portal", '{"serviceId":')).resolves.toMatchObject({
+      ok: false,
+      code: "INVALID_TOOL_INPUT",
+      retryable: true,
+    });
+    expect(getAppState().metrics).toMatchObject({
+      webmcpToolCalls: 1,
+      lastToolDurationMs: 21,
+    });
+    expect(
+      getAppState()
+        .activity.slice(0, 2)
+        .map((entry) => entry.kind),
+    ).toEqual(["tool_failed", "tool_started"]);
   });
 
   it("times and logs successful calls while updating shared metrics", async () => {
@@ -109,5 +132,72 @@ describe("WebMCP tool registry", () => {
       expect(registry.getRegistrations()).toEqual([]);
       expect(getAppState().webmcp.registeredToolNames).toEqual([]);
     });
+  });
+
+  it("reserves a name while permissive adapter registration is pending", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const registered: WebMCPToolMetadata[] = [];
+    const adapter: WebMCPAdapter = {
+      mode: "memory",
+      async registerTool(tool: WebMCPToolDefinition) {
+        await gate;
+        const { execute: _execute, ...metadata } = tool;
+        void _execute;
+        registered.push(metadata);
+      },
+      async getTools() {
+        return registered;
+      },
+      async executeTool() {
+        return undefined;
+      },
+      subscribeToToolChange() {
+        return () => undefined;
+      },
+    };
+    const registry = new ToolRegistry(adapter);
+
+    const first = registry.register(definition());
+    await expect(registry.register(definition())).rejects.toMatchObject({
+      code: "TOOL_ALREADY_REGISTERED",
+    });
+    release();
+    await first;
+    expect(registry.getRegistrations()).toHaveLength(1);
+  });
+
+  it("releases a reserved name when adapter registration fails so retry can succeed", async () => {
+    let attempt = 0;
+    const registered: WebMCPToolMetadata[] = [];
+    const adapter: WebMCPAdapter = {
+      mode: "memory",
+      async registerTool(tool) {
+        attempt += 1;
+        if (attempt === 1) throw new Error("adapter unavailable");
+        registered.push({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema,
+          annotations: tool.annotations,
+        });
+      },
+      async getTools() {
+        return registered;
+      },
+      async executeTool() {
+        return undefined;
+      },
+      subscribeToToolChange() {
+        return () => undefined;
+      },
+    };
+    const registry = new ToolRegistry(adapter);
+
+    await expect(registry.register(definition())).rejects.toThrow("adapter unavailable");
+    await expect(registry.register(definition())).resolves.toBeUndefined();
+    expect(registry.getRegistrations()).toHaveLength(1);
   });
 });

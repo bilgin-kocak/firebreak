@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getAppState, resetAppStoreForTests, useAppStore } from "../store/useAppStore";
 import { createMemoryAdapter } from "./memoryAdapter";
@@ -68,10 +68,13 @@ const proposalInput = (viewId: string) => ({
   stopAt: "review",
 });
 
-const setup = async () => {
+const setup = async (dependencies: Parameters<typeof registerStaticTools>[1] = {}) => {
   const adapter = createMemoryAdapter();
   const registry = new ToolRegistry(adapter);
-  await registerStaticTools(registry, { now: () => new Date("2026-08-29T10:00:00.000Z") });
+  await registerStaticTools(registry, {
+    now: () => new Date("2026-08-29T10:00:00.000Z"),
+    ...dependencies,
+  });
   return { adapter, registry };
 };
 
@@ -202,6 +205,41 @@ describe("seven static WebMCP tools", () => {
     expect(useAppStore.getState().dialogs.proposalSheetOpen).toBe(true);
     expect(getAppState().approvedWorkflowTools).toEqual({});
     expect((await adapter.getTools()).map((tool) => tool.name)).toEqual(names);
+  });
+
+  it("runs a trusted injected DOM scan only when includeDomChecks is true", async () => {
+    const runAxe = vi.fn(async () => ({
+      violations: [{ id: "color-contrast", impact: "critical" as const }],
+    }));
+    const getContext = vi.fn(() => ({
+      presentation: {
+        labelsPresent: true,
+        headingOrderValid: true,
+        focusableControlsReachable: true,
+        largeTargetsPresent: true,
+        progressPresent: true,
+      },
+      dom: { mounted: true, runAxe },
+    }));
+    const { adapter } = await setup({ journeyChecksProvider: { getContext } });
+    const viewId = await compileView(adapter);
+
+    await expect(
+      adapter.executeTool("run_journey_checks", { viewId, includeDomChecks: true }),
+    ).resolves.toMatchObject({
+      ok: true,
+      code: "CHECKS_COMPLETED",
+      data: { blockingFailures: 1, failedCheckIds: ["axe_dom_scan"] },
+    });
+    expect(runAxe).toHaveBeenCalledTimes(1);
+    expect(getContext).toHaveBeenCalledWith(viewId);
+    expect(getAppState().journeyChecks[viewId]).toContainEqual(
+      expect.objectContaining({ id: "axe_dom_scan", status: "fail" }),
+    );
+
+    await adapter.executeTool("run_journey_checks", { viewId, includeDomChecks: false });
+    expect(runAxe).toHaveBeenCalledTimes(1);
+    expect(getContext).toHaveBeenCalledTimes(1);
   });
 
   it("lists only compact workflow metadata", async () => {
