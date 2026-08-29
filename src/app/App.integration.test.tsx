@@ -721,6 +721,65 @@ describe("CivicWeave application", () => {
     });
   });
 
+  it("uses live registration truth when an enabled saved workflow is unavailable", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await compileAndCheck(user);
+    await approveGuidedTool(user);
+    const simulator = screen.getByRole("dialog", { name: /webmcp simulator/i });
+    await user.click(within(simulator).getByRole("button", { name: /close simulator/i }));
+
+    act(() => {
+      const state = useAppStore.getState();
+      state.setWebMCPMetadata({
+        registeredToolNames: state.webmcp.registeredToolNames.filter(
+          (name) => name !== "renew_permit_guided",
+        ),
+      });
+      useAppStore.setState({ portalMode: "idle", currentService: null, activeViewId: null });
+    });
+
+    expect(useAppStore.getState().approvedWorkflowTools.renew_permit_guided).toMatchObject({
+      status: "registered",
+      enabled: true,
+    });
+    expect(screen.queryByText(promptB)).not.toBeInTheDocument();
+
+    const unavailableSimulator = await openSimulator(user);
+    expect(
+      within(unavailableSimulator).getByRole("button", {
+        name: /invoke guided tool with 12 months/i,
+      }),
+    ).toBeDisabled();
+    await user.click(
+      within(unavailableSimulator).getByRole("button", { name: /close simulator/i }),
+    );
+
+    await user.click(screen.getByRole("tab", { name: /tool surface/i }));
+    const toolRow = screen.getByTestId("tool-row-renew_permit_guided");
+    expect(toolRow).toHaveTextContent("Registration failed");
+    expect(toolRow).not.toHaveTextContent("Registered");
+    expect(toolRow).toHaveTextContent(/reload.*retry registration/i);
+    expect(screen.queryByText(promptB)).not.toBeInTheDocument();
+
+    act(() => {
+      const state = useAppStore.getState();
+      state.setWebMCPMetadata({
+        registeredToolNames: [...state.webmcp.registeredToolNames, "renew_permit_guided"].sort(),
+      });
+    });
+
+    expect(toolRow).toHaveTextContent("Registered");
+    expect(screen.getAllByText(promptB)).toHaveLength(2);
+
+    const availableSimulator = await openSimulator(user);
+    expect(
+      within(availableSimulator).getByRole("button", {
+        name: /invoke guided tool with 12 months/i,
+      }),
+    ).toBeEnabled();
+  });
+
   it("prefills every static simulator tool with canonical JSON and shows complete annotations", async () => {
     const user = userEvent.setup();
     render(<App />);

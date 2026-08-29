@@ -324,6 +324,50 @@ describe("DynamicToolManager", () => {
     );
   });
 
+  it("keeps a failed restored registration unavailable and retryable", async () => {
+    const first = await stageCanonicalProposal();
+    const firstManager = new DynamicToolManager(first.registry);
+    await firstManager.approveAndRegister(first.proposalId);
+    await firstManager.disposeAll();
+
+    const memory = createMemoryAdapter();
+    let dynamicAttempts = 0;
+    const adapter: WebMCPAdapter = {
+      mode: memory.mode,
+      async registerTool(definition, options) {
+        if (definition.name === "renew_permit_guided" && dynamicAttempts++ === 0) {
+          throw new Error("Transient restored registration failure");
+        }
+        await memory.registerTool(definition, options);
+      },
+      getTools: () => memory.getTools(),
+      executeTool: (name, input, signal) => memory.executeTool(name, input, signal),
+      subscribeToToolChange: (listener) => memory.subscribeToToolChange(listener),
+    };
+    const registry = new ToolRegistry(adapter);
+    await registerStaticTools(registry);
+    const manager = new DynamicToolManager(registry);
+
+    await manager.restoreEnabled();
+
+    expect(getAppState().approvedWorkflowTools.renew_permit_guided).toMatchObject({
+      status: "registered",
+      enabled: true,
+    });
+    expect(getAppState().webmcp.registeredToolNames).not.toContain("renew_permit_guided");
+    expect(getAppState().activity).toContainEqual(
+      expect.objectContaining({
+        kind: "tool_failed",
+        title: "Saved workflow could not be registered for this tab",
+        toolName: "renew_permit_guided",
+      }),
+    );
+
+    await manager.restoreEnabled();
+
+    expect(getAppState().webmcp.registeredToolNames).toContain("renew_permit_guided");
+  });
+
   it("rejects a different proposal whose name belongs to an enabled saved definition", async () => {
     const first = await stageCanonicalProposal();
     const staged = getAppState().proposals[first.proposalId];

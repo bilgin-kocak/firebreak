@@ -146,6 +146,31 @@ describe("workflow proposal validator", () => {
     );
   });
 
+  it("rejects a same-service compilable operation outside the blueprint allowlist", () => {
+    const operationId = "permit.internal_audit";
+    const fixture = operationRegistry["permit.load_current"];
+    if (!fixture) throw new Error("Trusted operation fixture is missing");
+    operationRegistry[operationId] = {
+      ...fixture,
+      id: operationId,
+      title: "Internal permit audit",
+      description: "A trusted same-service operation not exposed by the permit blueprint.",
+    };
+    try {
+      const proposal = canonicalProposal();
+      proposal.operations.splice(-1, 0, { operationId, bindings: [] });
+
+      expect(validateWorkflowProposal(proposal).errors).toContainEqual({
+        code: "UNKNOWN_OPERATION",
+        message:
+          "Workflow operation is not allowed by this service blueprint. Remove it and retry staging.",
+        path: "operations.6",
+      });
+    } finally {
+      delete operationRegistry[operationId];
+    }
+  });
+
   it("rejects all human-only operations even when they are added to an allowed workflow", () => {
     const proposal = canonicalProposal();
     proposal.operations.splice(-1, 0, { operationId: "permit.submit", bindings: [] });

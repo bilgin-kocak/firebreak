@@ -57,8 +57,10 @@ const services = [
 ];
 
 export const ServiceDashboard = ({ onStart, onCopied }: ServiceDashboardProps) => {
-  const guidedToolEnabled = useAppStore(
-    (state) => state.approvedWorkflowTools.renew_permit_guided?.enabled === true,
+  const guidedToolAvailable = useAppStore(
+    (state) =>
+      state.approvedWorkflowTools.renew_permit_guided?.enabled === true &&
+      state.webmcp.registeredToolNames.includes("renew_permit_guided"),
   );
   return (
     <div className="dashboard-view">
@@ -94,7 +96,7 @@ export const ServiceDashboard = ({ onStart, onCopied }: ServiceDashboardProps) =
             prompt={PROMPT_A}
             onCopied={onCopied}
           />
-          {guidedToolEnabled ? (
+          {guidedToolAvailable ? (
             <DemoPromptCard
               number={2}
               title="Use the tool you approved"

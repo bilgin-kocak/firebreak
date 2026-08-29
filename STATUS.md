@@ -14,31 +14,31 @@ Authoritative command: `npm run check`
 - ESLint: passed with zero warnings.
 - Prettier: all matched files conform.
 - Strict TypeScript: passed with no diagnostics.
-- Vitest: `16` files passed; `166` tests passed.
+- Vitest: `16` files passed; `169` tests passed.
 - Production build: passed; Vite transformed `1,645` modules.
-- Playwright: `13` tests passed using `4` workers in `28.4s`.
+- Playwright: `13` tests passed using `4` workers in `28.0s`.
 - Accessibility: dense, adaptive, proposal, and submitted browser states have zero serious or critical axe violations in the tested canonical screens.
 - Runtime: canonical `console` error and `pageerror` collections were both empty.
 - Target size: the original browser assertion requiring every large-card target to be at least `44 × 44` CSS px passes. Large-card lock controls additionally pass a `45 × 45` safety-margin assertion after their CSS minimum was raised to `46 × 46`.
 - Evals: `18` valid fixtures with `18` unique IDs.
-- Build advisory: Vite reports the non-blocking main-chunk size advisory (`1,015.96 kB` minified, `285.03 kB` gzip), primarily because the deterministic browser axe scanner is shipped client-side.
+- Build advisory: Vite reports the non-blocking main-chunk size advisory (`1,016.50 kB` minified, `285.18 kB` gzip), primarily because the deterministic browser axe scanner is shipped client-side.
 
 ## Section 26 acceptance evidence
 
 ### Product
 
-| Criterion                                          | Final evidence                                                                                                                                                                                                                   |
-| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Polished fictional Northstar portal and disclaimer | `src/app/App.integration.test.tsx` verifies the six-service portal and persistent disclaimer; `canonical-dense-desktop.png` and `responsive-dense-mobile.png` show the final portal.                                             |
-| Manual Parking Permit Renewal                      | The App integration suite completes the manual parking path and proves submission occurs only after the human confirmation dialog.                                                                                               |
-| Generic Address Change architecture                | `serviceBlueprints.test.ts` asserts all six Section 14 fields; `workflowExecutor.test.ts`, `dynamicToolManager.test.ts`, and the App integration suite exercise the shared compiler, operation registry, manager, and manual UI. |
-| Canonical prompts visible and copyable             | Prompt A is shown initially; exact Prompt B appears only after `renew_permit_guided` is enabled. App integration verifies exact copy text and clipboard calls.                                                                   |
-| Adaptive view visibly differs from dense portal    | `canonical-dense-desktop.png`, `canonical-adaptive-desktop.png`, and the reduced-motion mobile captures show the dense-to-xlarge one-question transformation.                                                                    |
-| Validated schema and approved components only      | `viewCompiler.test.ts`, `journeyChecks.test.ts`, strict tool schemas, and the `FieldKind`-only registry in `AdaptiveField.tsx` cover this boundary.                                                                              |
-| Human edit and lock controls                       | App integration and canonical Playwright coverage edit adaptive values and lock the vehicle through visible controls.                                                                                                            |
-| Agent patches cannot overwrite locks               | `viewCompiler.test.ts`, `staticTools.test.ts`, and the canonical E2E assert atomic `LOCKED_BY_USER` behavior and lock preservation.                                                                                              |
-| Visible deterministic checks                       | The Checks rail and proposal capture show results; canonical E2E requires zero blocking failures before staging.                                                                                                                 |
-| Honest manual/adaptive/compiled metrics            | `MetricsStrip` labels modeled counts, displays all six actual metrics, and is asserted in App integration and final screenshots.                                                                                                 |
+| Criterion                                          | Final evidence                                                                                                                                                                                                                                                      |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Polished fictional Northstar portal and disclaimer | `src/app/App.integration.test.tsx` verifies the six-service portal and persistent disclaimer; `canonical-dense-desktop.png` and `responsive-dense-mobile.png` show the final portal.                                                                                |
+| Manual Parking Permit Renewal                      | The App integration suite completes the manual parking path and proves submission occurs only after the human confirmation dialog.                                                                                                                                  |
+| Generic Address Change architecture                | `serviceBlueprints.test.ts` asserts all six Section 14 fields; `workflowExecutor.test.ts`, `dynamicToolManager.test.ts`, and the App integration suite exercise the shared compiler, operation registry, manager, and manual UI.                                    |
+| Canonical prompts visible and copyable             | Prompt A is shown initially; exact Prompt B appears only when `renew_permit_guided` is both enabled and present in the live registered-tool list. App integration verifies copy text, clipboard calls, restore-failure hiding, honest failure status, and recovery. |
+| Adaptive view visibly differs from dense portal    | `canonical-dense-desktop.png`, `canonical-adaptive-desktop.png`, and the reduced-motion mobile captures show the dense-to-xlarge one-question transformation.                                                                                                       |
+| Validated schema and approved components only      | `viewCompiler.test.ts`, `journeyChecks.test.ts`, strict tool schemas, and the `FieldKind`-only registry in `AdaptiveField.tsx` cover this boundary.                                                                                                                 |
+| Human edit and lock controls                       | App integration and canonical Playwright coverage edit adaptive values and lock the vehicle through visible controls.                                                                                                                                               |
+| Agent patches cannot overwrite locks               | `viewCompiler.test.ts`, `staticTools.test.ts`, and the canonical E2E assert atomic `LOCKED_BY_USER` behavior and lock preservation.                                                                                                                                 |
+| Visible deterministic checks                       | The Checks rail and proposal capture show results; canonical E2E requires zero blocking failures before staging.                                                                                                                                                    |
+| Honest manual/adaptive/compiled metrics            | `MetricsStrip` labels modeled counts, displays all six actual metrics, and is asserted in App integration and final screenshots.                                                                                                                                    |
 
 ### WebMCP
 
@@ -65,7 +65,7 @@ Authoritative command: `npm run check`
 | Criterion                                                            | Final evidence                                                                                                                                             |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | No generated code, markup, styles, selectors, URLs, or network calls | Compiler/tool schemas accept data definitions only; source audit finds no `eval`, `new Function`, `dangerouslySetInnerHTML`, or production fetch boundary. |
-| Trusted registry operations only                                     | Workflow validator tests reject unknown and cross-service operation IDs.                                                                                   |
+| Trusted registry operations only                                     | Workflow validator tests reject unknown, cross-service, and same-service operations omitted from the selected blueprint allowlist.                         |
 | Human-only operations blocked                                        | Validator and executor tests require the precise `HUMAN_ONLY_OPERATION`; a same-service submit no longer emits a misleading cross-service error.           |
 | Failure/cancellation rollback                                        | `workflowExecutor.test.ts` asserts exact draft and portal-state rollback for both services, observer failures, and cancellation.                           |
 | Required fields cannot be hidden                                     | Compiler, validator, static-tool, and eval cases cover compile and patch failure.                                                                          |
@@ -79,7 +79,7 @@ Authoritative command: `npm run check`
 | Strict TypeScript                   | Fresh `npm run check`: passed.                                                                                                                                                         |
 | ESLint zero warnings                | Fresh `npm run check`: passed.                                                                                                                                                         |
 | Prettier                            | Fresh `npm run check`: passed.                                                                                                                                                         |
-| Unit and integration tests          | `16` Vitest files and `166` tests passed.                                                                                                                                              |
+| Unit and integration tests          | `16` Vitest files and `169` tests passed.                                                                                                                                              |
 | Playwright tests                    | All `13` passed using the authoritative four-worker run.                                                                                                                               |
 | Production build                    | Passed with `1,645` modules transformed.                                                                                                                                               |
 | No serious/critical axe findings    | Playwright scans dense, adaptive, proposal, and submitted canonical states; all passed.                                                                                                |
@@ -143,5 +143,5 @@ Environment note: a sandboxed browser run cannot bind `127.0.0.1:5173` (`EPERM`)
 12. **Yes.** The dynamic tool returns `awaiting_user_confirmation` and cannot call `permit.submit`.
 13. **Yes.** Final submission exists only behind the visible human confirmation dialog.
 14. **Yes.** Ordinary-browser simulator mode runs the same definitions and handlers without monkey-patching `document.modelContext`.
-15. **Yes.** The fresh full `npm run check` exits 0 with `166` Vitest and `13` Playwright tests passing.
+15. **Yes.** The fresh full `npm run check` exits 0 with `169` Vitest and `13` Playwright tests passing.
 16. **Yes.** README/submission claims are bounded to implemented, testable behavior and explicitly qualify modeled metrics, eval fixtures, deterministic accessibility checks, browser compatibility, and fictional services.

@@ -91,8 +91,19 @@ export const ToolSurface = ({ onDisable, onDelete, onCopied }: ToolSurfaceProps)
                   <span className="tool-meta">
                     <span>Human-approved workflow</span>
                     <span>Write</span>
-                    <span>{tool.enabled ? "Registered" : "Disabled"}</span>
+                    <span>
+                      {!tool.enabled
+                        ? "Disabled"
+                        : registered.includes(tool.name)
+                          ? "Registered"
+                          : "Registration failed"}
+                    </span>
                   </span>
+                  {tool.enabled && !registered.includes(tool.name) ? (
+                    <p className="tool-availability-note">
+                      Reload this page to retry registration, or disable the saved workflow.
+                    </p>
+                  ) : null}
                   <div className="row-actions">
                     {tool.enabled ? (
                       <button type="button" onClick={() => onDisable(tool.name)}>
@@ -130,7 +141,7 @@ export const ToolSurface = ({ onDisable, onDelete, onCopied }: ToolSurfaceProps)
               </li>
             ))}
           </ul>
-          {approved.renew_permit_guided?.enabled ? (
+          {approved.renew_permit_guided?.enabled && registered.includes("renew_permit_guided") ? (
             <div className="compiled-prompt">
               <DemoPromptCard
                 number={2}

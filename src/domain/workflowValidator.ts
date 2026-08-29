@@ -182,11 +182,25 @@ export const validateWorkflowProposal = (
       );
       return;
     }
-    if (operation.serviceId !== proposal.serviceId) {
+    const belongsToService = operation.serviceId === proposal.serviceId;
+    if (!belongsToService) {
       add(
         errors,
         "CROSS_SERVICE_OPERATION",
         "Workflow operations must belong to the selected service.",
+        `operations.${index}`,
+      );
+    }
+    if (
+      belongsToService &&
+      operation.compilable &&
+      operation.sideEffect !== "human_only" &&
+      !blueprint.allowedOperationIds.includes(operation.id)
+    ) {
+      add(
+        errors,
+        "UNKNOWN_OPERATION",
+        "Workflow operation is not allowed by this service blueprint. Remove it and retry staging.",
         `operations.${index}`,
       );
     }
