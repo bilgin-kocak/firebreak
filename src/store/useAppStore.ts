@@ -101,16 +101,16 @@ export interface AppState {
   setRightRail(tab: RightRailTab): void;
   setDialog(dialog: keyof AppState["dialogs"], open: boolean): void;
   setActivityChronological(chronological: boolean): void;
-  logActivity(
-    entry: Omit<ActivityEntry, "id" | "timestamp"> &
-      Partial<Pick<ActivityEntry, "id" | "timestamp">>,
-  ): void;
+  logActivity(entry: ActivityLogInput): void;
   recordWebMCPToolCall(durationMs?: number): void;
   recordWorkflowOperations(count?: number): void;
   recordBlockingChecks(count: number): void;
   registerDynamicToolUnregister(unregister: DynamicToolUnregister | undefined): void;
   reset(): Promise<void>;
 }
+
+/** Caller input intentionally has no ID or timestamp; the store owns both seams. */
+export type ActivityLogInput = Omit<ActivityEntry, "id" | "timestamp">;
 
 export type ToolAppState = Pick<
   AppState,
@@ -127,6 +127,7 @@ export type ToolAppState = Pick<
   | "activity"
   | "metrics"
   | "rightRail"
+  | "startManualFlow"
   | "addView"
   | "setActiveView"
   | "stageDraftForReview"
@@ -176,6 +177,34 @@ const privateActivityDetail = (detail: string | undefined): string | undefined =
     ? "Details redacted for privacy."
     : value.slice(0, 280);
 };
+const safeActivityActor = (value: unknown): ActivityEntry["actor"] =>
+  value === "agent" || value === "human" || value === "system" ? value : "system";
+const safeActivityKind = (value: unknown): ActivityEntry["kind"] =>
+  [
+    "tool_started",
+    "tool_completed",
+    "tool_failed",
+    "view_compiled",
+    "view_patched",
+    "element_locked",
+    "element_unlocked",
+    "checks_completed",
+    "workflow_staged",
+    "workflow_approved",
+    "workflow_rejected",
+    "tool_registered",
+    "tool_unregistered",
+    "toolchange",
+    "draft_staged",
+    "submission_confirmed",
+    "reset",
+  ].includes(value as string)
+    ? (value as ActivityEntry["kind"])
+    : "tool_failed";
+const safeActivityStatus = (value: unknown): ActivityEntry["status"] =>
+  value === "info" || value === "success" || value === "warning" || value === "error"
+    ? value
+    : "warning";
 const recoveryEntry = (): ActivityEntry => ({
   id: createId("activity"),
   timestamp: systemClock.now().toISOString(),
@@ -664,12 +693,17 @@ export const useAppStore = create<AppState>((set, get) => {
     },
     logActivity(entry) {
       const record: ActivityEntry = {
-        id: entry.id ?? createId("activity"),
-        timestamp: entry.timestamp ?? systemClock.now().toISOString(),
-        ...entry,
+        id: createId("activity"),
+        timestamp: systemClock.now().toISOString(),
+        actor: safeActivityActor(entry.actor),
+        kind: safeActivityKind(entry.kind),
+        status: safeActivityStatus(entry.status),
         title: privateActivityDetail(entry.title) ?? "Activity",
         detail: privateActivityDetail(entry.detail),
         toolName: privateActivityDetail(entry.toolName),
+        ...(typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs)
+          ? { durationMs: Math.max(0, entry.durationMs) }
+          : {}),
       };
       set((state) => ({ activity: [record, ...state.activity].slice(0, 200) }));
       saveActivity(persistenceStorage, get().activity);
@@ -778,6 +812,7 @@ export const getAppState = (): ToolAppState => {
     activity: state.activity,
     metrics: state.metrics,
     rightRail: state.rightRail,
+    startManualFlow: state.startManualFlow,
     addView: state.addView,
     setActiveView: state.setActiveView,
     stageDraftForReview: state.stageDraftForReview,

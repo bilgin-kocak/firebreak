@@ -124,3 +124,29 @@
 ### Remaining Concern
 
 - The production build remains blocked by the separate missing `src/main.tsx` entry. Dynamic browser registration remains responsible for connecting its adapter-specific disable/delete unregister lifecycle to these human-only store operations.
+
+## Fix Round 3
+
+### Red / Green Evidence
+
+1. Red — `npm test -- src/store/useAppStore.test.ts`
+   - Tool projection lacked `startManualFlow`; a forged activity input could replace the generated identifier with an email/payload string.
+2. Green — `npm test -- src/store/useAppStore.test.ts`
+   - 1 file passed, 22 tests passed.
+3. Full verification — `npm run typecheck && npm run lint && npm run format:check && npm test`
+   - Typecheck exit 0; lint exit 0; Prettier clean; 8 files passed, 89 tests passed.
+
+### Changes
+
+- Introduced `ActivityLogInput`, which excludes caller-owned `id` and `timestamp`; `logActivity` generates both internally and ignores forged runtime properties.
+- Defensive activity normalization now bounds actor/kind/status as well as sanitizing title, detail, and tool name before storage.
+- Added `startManualFlow` to `ToolAppState` and `getAppState()`, enabling the legal tool sequence `startManualFlow(serviceId) → addView(view)` without exposing any human-only controls.
+- Retained manual-flow-to-draft human edits as ruled; no adaptive view is required for manual service flows.
+
+### Exact Commands and Output
+
+- `npm test -- src/store/useAppStore.test.ts` — 1 file passed, 22 tests passed.
+- `npm run typecheck` — exit 0.
+- `npm run lint` — exit 0, zero warnings.
+- `npm run format:check` — `All matched files use Prettier code style!`
+- `npm test` — 8 test files passed, 89 tests passed.

@@ -4,7 +4,12 @@ import { canonicalPreferences } from "../domain/seed";
 import { DomainError, type WorkflowToolProposal } from "../domain/types";
 import { PERSISTENCE_KEYS, type PersistenceStorage } from "./persistence";
 import { selectOrderedActivity } from "./selectors";
-import { getAppState, resetAppStoreForTests, useAppStore } from "./useAppStore";
+import {
+  getAppState,
+  resetAppStoreForTests,
+  type ActivityLogInput,
+  useAppStore,
+} from "./useAppStore";
 
 const createStorage = (): PersistenceStorage & { values: Map<string, string> } => {
   const values = new Map<string, string>();
@@ -255,6 +260,16 @@ describe("CivicWeave app store", () => {
     expect(toolState).not.toHaveProperty("confirmPermitSubmission");
   });
 
+  it("lets the tool-facing API enter a service flow before compiling a view without human capabilities", () => {
+    const toolState = getAppState();
+    toolState.startManualFlow("parking_permit_renewal");
+    toolState.addView(view);
+
+    expect(getAppState().portalMode).toBe("adaptive_view_active");
+    expect(toolState).not.toHaveProperty("human");
+    expect(toolState).not.toHaveProperty("confirmPermitSubmission");
+  });
+
   it("enforces workflow proposal transitions through validation, review, registration, disable, and delete", () => {
     const store = useAppStore.getState();
     const draft = { ...validProposal, status: "draft" as const };
@@ -320,6 +335,27 @@ describe("CivicWeave app store", () => {
     expect(storage.getItem(PERSISTENCE_KEYS.activity)).not.toContain("secret");
   });
 
+  it("generates activity IDs internally and never persists a caller-controlled identifier", () => {
+    const storage = createStorage();
+    const store = useAppStore.getState();
+    store.setPersistenceStorage(storage);
+    const safeInput: ActivityLogInput = {
+      actor: "agent",
+      kind: "tool_completed",
+      title: "Completed",
+      status: "success",
+    };
+    // @ts-expect-error Activity IDs are intentionally not accepted from callers.
+    safeInput.id = "activity_maya.chen@example.test_payload={secret}";
+    store.logActivity({
+      ...safeInput,
+      ...({ id: "activity_maya.chen@example.test_payload={secret}" } as Record<string, unknown>),
+    } as ActivityLogInput);
+
+    expect(getAppState().activity[0]?.id).not.toContain("maya.chen@example.test");
+    expect(storage.getItem(PERSISTENCE_KEYS.activity)).not.toContain("secret");
+  });
+
   it("offers newest and chronological activity ordering without mutating the ledger", () => {
     const store = useAppStore.getState();
     store.logActivity({
@@ -327,14 +363,12 @@ describe("CivicWeave app store", () => {
       kind: "reset",
       title: "First",
       status: "info",
-      timestamp: "2026-08-29T00:00:00.000Z",
     });
     store.logActivity({
       actor: "system",
       kind: "reset",
       title: "Second",
       status: "info",
-      timestamp: "2026-08-29T01:00:00.000Z",
     });
 
     expect(selectOrderedActivity(getAppState()).map((entry) => entry.title)).toEqual([
