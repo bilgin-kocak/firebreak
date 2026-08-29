@@ -91,6 +91,7 @@ export interface AppState {
   hydrateFromPersistence(): void;
   startManualFlow(serviceId: ServiceId): void;
   addView(view: TaskViewDefinition): void;
+  updateView(view: TaskViewDefinition): void;
   setActiveView(viewId: string | null): void;
   stageDraftForReview(serviceId: ServiceId): void;
   setJourneyChecks(viewId: string, checks: JourneyCheckResult[]): void;
@@ -129,6 +130,7 @@ export type ToolAppState = Pick<
   | "rightRail"
   | "startManualFlow"
   | "addView"
+  | "updateView"
   | "setActiveView"
   | "stageDraftForReview"
   | "setJourneyChecks"
@@ -566,6 +568,29 @@ export const useAppStore = create<AppState>((set, get) => {
       });
       persist(get());
     },
+    updateView(view) {
+      const current = get();
+      const existing = current.views[view.id];
+      if (
+        !existing ||
+        current.activeViewId !== view.id ||
+        existing.serviceId !== view.serviceId ||
+        JSON.stringify(existing.lockedElementIds) !== JSON.stringify(view.lockedElementIds)
+      ) {
+        throw new DomainError(
+          "VIEW_VALIDATION_FAILED",
+          "VIEW_VALIDATION_FAILED: Only the active view may be safely updated.",
+        );
+      }
+      set((state) => ({ views: { ...state.views, [view.id]: view } }));
+      get().logActivity({
+        actor: "agent",
+        kind: "view_patched",
+        title: "Adaptive task view updated",
+        status: "success",
+      });
+      persist(get());
+    },
     setActiveView(viewId) {
       set({ activeViewId: viewId });
       persist(get());
@@ -814,6 +839,7 @@ export const getAppState = (): ToolAppState => {
     rightRail: state.rightRail,
     startManualFlow: state.startManualFlow,
     addView: state.addView,
+    updateView: state.updateView,
     setActiveView: state.setActiveView,
     stageDraftForReview: state.stageDraftForReview,
     setJourneyChecks: state.setJourneyChecks,
