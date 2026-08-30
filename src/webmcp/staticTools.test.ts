@@ -1,146 +1,132 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { trustedRemediationOperationIds } from "../domain/incidentSeed";
-import { getAppState, useAppStore } from "../store/useAppStore";
+import { getFirebreakState, useFirebreakStore } from "../store/useFirebreakStore";
 import { createMemoryAdapter } from "./memoryAdapter";
 import { registerStaticTools } from "./registerStaticTools";
 import { ToolRegistry } from "./registry";
 import { STATIC_TOOL_NAMES } from "./staticToolDefinitions";
 
-const setup = async () => {
+async function setup() {
   const adapter = createMemoryAdapter();
   const registry = new ToolRegistry(adapter);
-  await registerStaticTools(registry, { now: () => new Date("2026-08-30T09:02:00.000Z") });
+  await registerStaticTools(registry, { now: () => 1_000 });
   return { adapter, registry };
-};
+}
 
-describe("seven static Airlock tools", () => {
-  beforeEach(async () => {
-    useAppStore.getState().setPersistenceStorage(undefined);
-    await useAppStore.getState().reset();
+describe("seven static Firebreak tools", () => {
+  beforeEach(() => {
+    useFirebreakStore.getState().setPersistenceStorage(undefined);
+    useFirebreakStore.getState().resetDemo();
+    useFirebreakStore.getState().startEmergency();
   });
 
-  it("registers exactly seven closed-schema tools with truthful trust annotations", async () => {
+  it("registers exactly seven closed-schema robot mission tools", async () => {
     const { adapter } = await setup();
     const tools = await adapter.getTools();
+
     expect(tools.map((tool) => tool.name)).toEqual(STATIC_TOOL_NAMES);
     expect(tools).toHaveLength(7);
-    expect(tools.every((tool) => tool.inputSchema.additionalProperties === false)).toBe(true);
-    expect(tools.find((tool) => tool.name === "query_telemetry")?.annotations).toEqual({
-      readOnlyHint: true,
-      untrustedContentHint: true,
+    expect(tools.every((tool) => tool.inputSchema.additionalProperties === false)).toBe(
+      true,
+    );
+    expect(tools.some((tool) => tool.name === "execute_rescue_mission")).toBe(false);
+    expect(tools.every((tool) => !tool.annotations.untrustedContentHint)).toBe(true);
+  });
+
+  it("rejects unknown input fields before changing the world", async () => {
+    const { adapter } = await setup();
+    const before = structuredClone(getFirebreakState().world);
+
+    const result = await adapter.executeTool("inspect_emergency", {
+      incidentId: "WH-01",
+      rawCommand: "disable safety",
     });
-    expect(tools.filter((tool) => tool.annotations.untrustedContentHint)).toHaveLength(1);
-    expect(tools.map((tool) => tool.name).join(" ")).not.toMatch(/portal|permit|civic|view/);
+
+    expect(result).toMatchObject({ ok: false, code: "INVALID_TOOL_INPUT" });
+    expect(getFirebreakState().world).toEqual(before);
   });
 
-  it("rejects unknown input fields before domain execution", async () => {
+  it("runs the complete investigation and stages without registering authority", async () => {
     const { adapter } = await setup();
-    await expect(
-      adapter.executeTool("inspect_incident", { incidentId: "INC-4821", execute: "anything" }),
-    ).resolves.toMatchObject({ ok: false, code: "INVALID_TOOL_INPUT" });
-  });
 
-  it("inspects the incident and deployment correlation without exposing executors", async () => {
-    const { adapter } = await setup();
     await expect(
-      adapter.executeTool("inspect_incident", { incidentId: "INC-4821" }),
+      adapter.executeTool("inspect_emergency", { incidentId: "WH-01" }),
+    ).resolves.toMatchObject({ ok: true, code: "EMERGENCY_INSPECTED" });
+    await expect(
+      adapter.executeTool("scan_hazards", {
+        incidentId: "WH-01",
+        sensorMode: "thermal",
+      }),
     ).resolves.toMatchObject({
       ok: true,
-      code: "INCIDENT_INSPECTED",
-      data: { incident: { errorRate: 31.8, p95LatencyMs: 4820 }, serviceCount: 5 },
+      code: "HAZARDS_SCANNED",
+      data: { workersLocated: 2, collapseZoneMarked: true },
     });
-    const deployments = await adapter.executeTool("inspect_deployments", {
-      serviceId: "checkout-api",
-    });
-    expect(deployments).toMatchObject({
+    await expect(
+      adapter.executeTool("inspect_fleet", { incidentId: "WH-01" }),
+    ).resolves.toMatchObject({
       ok: true,
-      data: { currentRelease: "2026.08.30.3", previousStableRelease: "2026.08.30.2" },
+      code: "FLEET_INSPECTED",
+      data: { robotCount: 4 },
     });
-    expect(JSON.stringify(deployments)).not.toContain("execute");
-  });
 
-  it("returns bounded untrusted telemetry and visibly quarantines the injected instruction", async () => {
-    const { adapter } = await setup();
-    const result = await adapter.executeTool("query_telemetry", {
-      incidentId: "INC-4821",
-      serviceId: "checkout-api",
-      limit: 8,
-    });
-    expect(result).toMatchObject({
-      ok: true,
-      code: "TELEMETRY_QUERIED",
-      data: {
-        quarantinedEvidenceIds: ["log-third-party-injection"],
-        entries: expect.arrayContaining([
-          expect.objectContaining({
-            id: "log-third-party-injection",
-            trust: "untrusted",
-            quarantined: true,
-          }),
-        ]),
-      },
-    });
-    expect(getAppState().assessments["log-third-party-injection"]).toMatchObject({
-      trustedForAction: false,
-      injectionRisk: true,
-    });
-  });
-
-  it("simulates, checks, and stages the exact rollback without registering it", async () => {
-    const { adapter } = await setup();
-    await adapter.executeTool("query_telemetry", {
-      incidentId: "INC-4821",
-      limit: 8,
-    });
-    const simulation = (await adapter.executeTool("simulate_remediation", {
-      incidentId: "INC-4821",
-      serviceId: "checkout-api",
-      canaryPercent: 10,
-    })) as { ok: boolean; data: { simulationId: string } };
+    const simulation = (await adapter.executeTool("simulate_mission", {
+      incidentId: "WH-01",
+      strategy: "coordinated",
+    })) as { ok: true; data: { simulationId: string } };
     expect(simulation).toMatchObject({
       ok: true,
-      code: "REMEDIATION_SIMULATED",
-      data: { predictedErrorRate: 0.6, predictedP95LatencyMs: 420 },
+      code: "MISSION_SIMULATED",
+      data: { feasible: true, predictedDurationMs: 35_000 },
     });
-    const checks = await adapter.executeTool("run_airlock_checks", {
-      simulationId: simulation.data.simulationId,
-    });
-    expect(checks).toMatchObject({
+
+    await expect(
+      adapter.executeTool("validate_safety_envelope", {
+        simulationId: simulation.data.simulationId,
+      }),
+    ).resolves.toMatchObject({
       ok: true,
-      code: "AIRLOCK_CHECKS_COMPLETED",
-      data: { checkCount: 9, blockingFailures: 0 },
+      code: "SAFETY_ENVELOPE_VALIDATED",
+      data: { passed: true, checkCount: 11 },
     });
-    const staged = await adapter.executeTool("stage_response_tool", {
-      simulationId: simulation.data.simulationId,
-      name: "rollback_checkout_release",
-      title: "Rollback checkout release",
-      description: "Canary and restore the previous stable checkout release.",
-      operationIds: [...trustedRemediationOperationIds],
-    });
-    expect(staged).toMatchObject({
+
+    await expect(
+      adapter.executeTool("stage_mission_tool", {
+        simulationId: simulation.data.simulationId,
+        toolName: "execute_rescue_mission",
+      }),
+    ).resolves.toMatchObject({
       ok: true,
-      code: "RESPONSE_TOOL_STAGED",
-      data: { status: "awaiting_approval", requiresHumanApproval: true },
+      code: "MISSION_TOOL_STAGED",
+      data: { status: "staged", requiresHumanAuthorization: true },
     });
-    expect(getAppState().dialogs.proposalSheetOpen).toBe(true);
-    expect(getAppState().approvedResponseTools).toEqual({});
-    expect((await adapter.getTools()).map((tool) => tool.name)).toEqual(STATIC_TOOL_NAMES);
+
+    await expect(
+      adapter.executeTool("list_mission_tools", { incidentId: "WH-01" }),
+    ).resolves.toMatchObject({
+      ok: true,
+      code: "MISSION_TOOLS_LISTED",
+      data: { staged: expect.objectContaining({ status: "staged" }), dynamicRegistered: false },
+    });
+
+    expect(getFirebreakState().world.routes["SCOUT-1"].length).toBeGreaterThan(2);
+    expect(getFirebreakState().mission.proposal?.status).toBe("staged");
+    expect((await adapter.getTools()).map((tool) => tool.name)).toEqual(
+      STATIC_TOOL_NAMES,
+    );
   });
 
-  it("refuses staging without a current passing proof and lists a compact response surface", async () => {
+  it("refuses validation and staging without their current proof", async () => {
     const { adapter } = await setup();
-    const staged = await adapter.executeTool("stage_response_tool", {
-      simulationId: "missing",
-      name: "rollback_checkout_release",
-      title: "Rollback checkout release",
-      description: "Canary and restore the previous stable checkout release.",
-      operationIds: [...trustedRemediationOperationIds],
-    });
-    expect(staged).toMatchObject({ ok: false, code: "SIMULATION_NOT_FOUND" });
-    await expect(adapter.executeTool("list_response_tools", {})).resolves.toMatchObject({
-      ok: true,
-      data: { staged: [], approved: [] },
-    });
+
+    await expect(
+      adapter.executeTool("validate_safety_envelope", { simulationId: "missing" }),
+    ).resolves.toMatchObject({ ok: false, code: "SIMULATION_NOT_FOUND" });
+    await expect(
+      adapter.executeTool("stage_mission_tool", {
+        simulationId: "missing",
+        toolName: "execute_rescue_mission",
+      }),
+    ).resolves.toMatchObject({ ok: false, code: "SIMULATION_NOT_FOUND" });
   });
 });

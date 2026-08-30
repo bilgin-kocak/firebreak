@@ -232,3 +232,32 @@ export interface FirebreakSnapshot {
   events: MissionEvent[];
   receipt: MissionReceipt | null;
 }
+
+export type FirebreakErrorCode =
+  | "INVALID_TOOL_INPUT"
+  | "TOOL_ALREADY_REGISTERED"
+  | "TOOL_NOT_FOUND"
+  | "UNSUPPORTED_BROWSER"
+  | "EMERGENCY_NOT_ACTIVE"
+  | "HAZARD_SCAN_REQUIRED"
+  | "SIMULATION_NOT_FOUND"
+  | "SIMULATION_STALE"
+  | "SAFETY_CHECKS_FAILED"
+  | "HUMAN_AUTHORIZATION_REQUIRED"
+  | "AUTHORITY_EXPIRED"
+  | "AUTHORITY_USED"
+  | "AUTHORITY_REVOKED"
+  | "EXECUTION_CANCELLED"
+  | "DRIVER_DISCONNECTED"
+  | "OPERATION_FAILED";
+
+export class FirebreakError extends Error {
+  public constructor(
+    public readonly code: FirebreakErrorCode,
+    message: string,
+    public readonly details?: Record<string, unknown>,
+  ) {
+    super(message);
+    this.name = "FirebreakError";
+  }
+}

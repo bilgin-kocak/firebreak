@@ -1,5 +1,5 @@
-import { AirlockError } from "../domain/airlockTypes";
-import { getAppState, type ToolAppState } from "../store/useAppStore";
+import { FirebreakError } from "../domain/firebreakTypes";
+import { getFirebreakState, type FirebreakState } from "../store/useFirebreakStore";
 import type { WebMCPAdapter } from "./adapter";
 import { compactResult, errorResult } from "./results";
 import type { RegistryToolDefinition, ToolOrigin, WebMCPToolMetadata } from "./types";
@@ -9,7 +9,7 @@ export interface ToolRegistration extends WebMCPToolMetadata {
 }
 
 export interface ToolRegistryDependencies {
-  getState?: () => ToolAppState;
+  getState?: () => FirebreakState;
   now?: () => number;
 }
 
@@ -17,7 +17,7 @@ export class ToolRegistry {
   private readonly registrations = new Map<string, ToolRegistration>();
   private readonly pendingNames = new Set<string>();
   private readonly controllers = new Map<string, AbortController>();
-  private readonly getState: () => ToolAppState;
+  private readonly getState: () => FirebreakState;
   private readonly now: () => number;
   private readonly unsubscribe: () => void;
   private toolChangeReconciliation: Promise<void> = Promise.resolve();
@@ -26,7 +26,7 @@ export class ToolRegistry {
     private readonly adapter: WebMCPAdapter,
     dependencies: ToolRegistryDependencies = {},
   ) {
-    this.getState = dependencies.getState ?? getAppState;
+    this.getState = dependencies.getState ?? getFirebreakState;
     this.now = dependencies.now ?? (() => performance.now());
     this.unsubscribe = adapter.subscribeToToolChange(() => {
       this.toolChangeReconciliation = this.toolChangeReconciliation
@@ -34,7 +34,7 @@ export class ToolRegistry {
         .then(() => this.reconcile(true));
       void this.toolChangeReconciliation.catch(() => undefined);
     });
-    this.getState().setWebMCPMetadata({ mode: adapter.mode });
+    this.getState().setWebMCP({ mode: adapter.mode });
   }
 
   public async register<TInput>(
@@ -42,7 +42,7 @@ export class ToolRegistry {
     options: { signal?: AbortSignal } = {},
   ): Promise<void> {
     if (this.registrations.has(definition.name) || this.pendingNames.has(definition.name)) {
-      throw new AirlockError(
+      throw new FirebreakError(
         "TOOL_ALREADY_REGISTERED",
         `Tool '${definition.name}' is already registered.`,
       );
@@ -60,39 +60,15 @@ export class ToolRegistry {
       annotations: definition.annotations,
       execute: async (input: unknown, context?: { signal?: AbortSignal }) => {
         const startedAt = this.now();
-        const state = this.getState();
-        state.logActivity({
-          actor: "agent",
-          kind: "tool_started",
-          title: "WebMCP tool started",
-          toolName: definition.name,
-          status: "info",
-        });
         try {
           const parsed = await definition.inputValidator.parseAsync(input);
           const output = compactResult(await definition.execute(parsed, context?.signal));
-          const durationMs = Math.max(0, this.now() - startedAt);
-          this.getState().recordWebMCPToolCall(durationMs);
-          this.getState().logActivity({
-            actor: "agent",
-            kind: "tool_completed",
-            title: "WebMCP tool completed",
-            toolName: definition.name,
-            durationMs,
-            status: "success",
-          });
+          void Math.max(0, this.now() - startedAt);
+          this.getState().recordToolCall();
           return output;
         } catch (error) {
-          const durationMs = Math.max(0, this.now() - startedAt);
-          this.getState().recordWebMCPToolCall(durationMs);
-          this.getState().logActivity({
-            actor: "agent",
-            kind: "tool_failed",
-            title: "WebMCP tool failed safely",
-            toolName: definition.name,
-            durationMs,
-            status: "error",
-          });
+          void Math.max(0, this.now() - startedAt);
+          this.getState().recordToolCall();
           return compactResult(errorResult(error));
         }
       },
@@ -109,15 +85,6 @@ export class ToolRegistry {
       });
       if (controller) this.controllers.set(definition.name, controller);
       await this.reconcile();
-      if (this.registrations.has(definition.name)) {
-        this.getState().logActivity({
-          actor: "system",
-          kind: "tool_registered",
-          title: "WebMCP tool registered",
-          toolName: definition.name,
-          status: "success",
-        });
-      }
     } finally {
       this.pendingNames.delete(definition.name);
     }
@@ -151,18 +118,10 @@ export class ToolRegistry {
         this.controllers.delete(name);
       }
     }
-    this.getState().setWebMCPMetadata({
+    this.getState().setWebMCP({
       mode: this.adapter.mode,
       registeredToolNames: names,
-      ...(logToolChange ? { lastToolChangeAt: new Date().toISOString() } : {}),
+      ...(logToolChange ? { lastToolChangeAt: Date.now() } : {}),
     });
-    if (logToolChange) {
-      this.getState().logActivity({
-        actor: "system",
-        kind: "toolchange",
-        title: "WebMCP tool surface changed",
-        status: "info",
-      });
-    }
   }
 }

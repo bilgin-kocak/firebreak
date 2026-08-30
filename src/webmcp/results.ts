@@ -1,6 +1,6 @@
 import { ZodError } from "zod";
 
-import { AirlockError, type AirlockErrorCode } from "../domain/airlockTypes";
+import { FirebreakError, type FirebreakErrorCode } from "../domain/firebreakTypes";
 
 export interface ToolSuccess<TData = Record<string, unknown>> {
   ok: true;
@@ -11,7 +11,7 @@ export interface ToolSuccess<TData = Record<string, unknown>> {
 
 export interface ToolFailure {
   ok: false;
-  code: AirlockErrorCode;
+  code: FirebreakErrorCode;
   message: string;
   retryable: boolean;
   details?: Record<string, unknown>;
@@ -26,7 +26,7 @@ export const successResult = <TData extends Record<string, unknown>>(
 ): ToolSuccess<TData> => ({ ok: true, code, message, ...(data ? { data } : {}) });
 
 export const failureResult = (
-  code: AirlockErrorCode,
+  code: FirebreakErrorCode,
   message: string,
   retryable = false,
   details?: Record<string, unknown>,
@@ -46,7 +46,7 @@ export const errorResult = (error: unknown): ToolFailure => {
       },
     );
   }
-  if (error instanceof AirlockError) {
+  if (error instanceof FirebreakError) {
     return failureResult(error.code, error.message, false, error.details);
   }
   return failureResult(

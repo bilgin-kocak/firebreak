@@ -46,6 +46,7 @@ export interface FirebreakState {
   setChecks(checks: SafetyCheckReport): void;
   stageProposal(proposal: MissionProposal): void;
   authorizeProposal(proposalId: string, now?: number): MissionProposal;
+  markProposalRegistered(proposalId: string): MissionProposal;
   beginExecution(proposalId: string): void;
   applyProgress(event: MissionProgressEvent): void;
   finishExecution(result: MissionExecutionResult): void;
@@ -216,9 +217,24 @@ export const useFirebreakStore = create<FirebreakState>((set, get) => {
       }));
       return authorized;
     },
-    beginExecution(proposalId) {
+    markProposalRegistered(proposalId) {
       const proposal = get().mission.proposal;
       if (!proposal || proposal.id !== proposalId || proposal.status !== "authorized") {
+        throw new Error("Only current human-authorized authority can be registered");
+      }
+      const registered: MissionProposal = { ...proposal, status: "registered" };
+      update((state) => ({
+        mission: { ...state.mission, proposal: registered },
+      }));
+      return registered;
+    },
+    beginExecution(proposalId) {
+      const proposal = get().mission.proposal;
+      if (
+        !proposal ||
+        proposal.id !== proposalId ||
+        !["authorized", "registered"].includes(proposal.status)
+      ) {
         throw new Error("Mission is not authorized");
       }
       update((state) => ({

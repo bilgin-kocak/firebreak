@@ -1,299 +1,234 @@
 import { z } from "zod";
 
-import { runAirlockChecks } from "../domain/airlockChecks";
-import type { ApprovedResponseTool, ResponseToolProposal } from "../domain/airlockTypes";
-import { AirlockError } from "../domain/airlockTypes";
+import type { MissionRobotDriver } from "../control/controlTypes";
+import { executeMission } from "../domain/missionExecutor";
+import { missionStateHash } from "../domain/missionSimulator";
+import { validateSafetyEnvelope } from "../domain/safetyCompiler";
 import {
-  executeRemediation,
-  type RemediationExecutionOptions,
-} from "../domain/remediationExecutor";
-import { getAppState, useAppStore } from "../store/useAppStore";
+  FirebreakError,
+  type MissionProposal,
+} from "../domain/firebreakTypes";
+import { getFirebreakState } from "../store/useFirebreakStore";
 import type { ToolRegistry } from "./registry";
 import { successResult } from "./results";
 import type { RegistryToolDefinition } from "./types";
 
-const annotations = { readOnlyHint: false, untrustedContentHint: false } as const;
+const TOOL_NAME = "execute_rescue_mission";
+const inputValidator = z.object({ strategy: z.literal("coordinated") }).strict();
 const inputSchema = {
   type: "object",
   properties: {
-    canaryPercent: {
-      type: "integer",
-      enum: [5, 10, 25],
-      description: "Bounded checkout traffic percentage for the rollback canary.",
+    strategy: {
+      type: "string",
+      enum: ["coordinated"],
+      description: "Execute only the exact reviewed coordinated route plan.",
     },
   },
-  required: ["canaryPercent"],
+  required: ["strategy"],
   additionalProperties: false,
 } as const;
-const inputValidator = z
-  .object({ canaryPercent: z.union([z.literal(5), z.literal(10), z.literal(25)]) })
-  .strict();
 
-type ExecuteRemediation = (
-  proposal: ResponseToolProposal,
-  options: RemediationExecutionOptions,
-) => ReturnType<typeof executeRemediation>;
-
-export interface DynamicToolManagerDependencies {
-  executeRemediation?: ExecuteRemediation;
-  now?: () => Date;
+export interface DynamicMissionToolManagerDependencies {
+  driver: MissionRobotDriver;
+  now?: () => number;
 }
 
-const combineAbortSignals = (
+function combineAbortSignals(
   signals: Array<AbortSignal | undefined>,
-): { signal: AbortSignal; cleanup(): void } => {
+): { signal: AbortSignal; cleanup(): void } {
   const controller = new AbortController();
-  const activeSignals = signals.filter((signal): signal is AbortSignal => Boolean(signal));
-  const abort = () => controller.abort();
-  for (const signal of activeSignals) {
+  const active = signals.filter((signal): signal is AbortSignal => Boolean(signal));
+  const listeners = new Map<AbortSignal, () => void>();
+  for (const signal of active) {
+    const abort = () => controller.abort(signal.reason);
+    listeners.set(signal, abort);
     if (signal.aborted) abort();
     else signal.addEventListener("abort", abort, { once: true });
   }
   return {
     signal: controller.signal,
     cleanup() {
-      for (const signal of activeSignals) signal.removeEventListener("abort", abort);
+      for (const [signal, listener] of listeners) {
+        signal.removeEventListener("abort", listener);
+      }
     },
   };
-};
+}
 
-export class DynamicToolManager {
-  private readonly controllers = new Map<string, AbortController>();
-  private readonly executing = new Set<string>();
-  private readonly execute: ExecuteRemediation;
-  private readonly now: () => Date;
-  private receiptSequence = 0;
+export class DynamicMissionToolManager {
+  private controller: AbortController | null = null;
+  private executing = false;
+  private readonly now: () => number;
 
   public constructor(
     private readonly registry: ToolRegistry,
-    dependencies: DynamicToolManagerDependencies = {},
+    private readonly dependencies: DynamicMissionToolManagerDependencies,
   ) {
-    this.execute = dependencies.executeRemediation ?? executeRemediation;
-    this.now = dependencies.now ?? (() => new Date());
-    useAppStore.getState().registerDynamicToolUnregister(() => this.disposeAll());
+    this.now = dependencies.now ?? Date.now;
   }
 
-  public async approveAndRegister(proposalId: string): Promise<ApprovedResponseTool> {
-    const proposal = getAppState().proposals[proposalId];
-    if (!proposal || proposal.status !== "awaiting_approval") {
-      throw new AirlockError(
-        "HUMAN_APPROVAL_REQUIRED",
-        "Only the visible human approval control can register a staged response.",
+  public async approveAndRegister(proposalId: string): Promise<MissionProposal> {
+    const state = getFirebreakState();
+    const proposal = state.mission.proposal;
+    if (!proposal || proposal.id !== proposalId || proposal.status !== "staged") {
+      throw new FirebreakError(
+        "HUMAN_AUTHORIZATION_REQUIRED",
+        "Use the visible Authorize Mission control for the current staged proposal.",
       );
     }
-    this.assertCurrentlyValid(proposal);
+    this.assertCurrent(proposal);
+
+    const authorized = state.authorizeProposal(proposalId, this.now());
     const controller = new AbortController();
     try {
-      await this.registry.register(this.createDefinition(proposal), { signal: controller.signal });
-      const approved = getAppState().human.approveResponseTool(proposalId);
-      this.controllers.set(approved.name, controller);
-      return approved;
+      await this.registry.register(this.createDefinition(authorized.id), {
+        signal: controller.signal,
+      });
+      this.controller = controller;
+      return getFirebreakState().markProposalRegistered(authorized.id);
     } catch (error) {
-      controller.abort();
+      controller.abort(error);
+      getFirebreakState().revokeMission("Mission registration failed safely.");
       throw error;
     }
   }
 
-  public async restoreEnabled(): Promise<void> {
-    for (const tool of Object.values(getAppState().approvedResponseTools)) {
-      if (!tool.enabled || tool.status !== "registered" || this.controllers.has(tool.name))
-        continue;
-      try {
-        this.assertCurrentlyValid(tool);
-        const controller = new AbortController();
-        await this.registry.register(this.createDefinition(tool), { signal: controller.signal });
-        this.controllers.set(tool.name, controller);
-      } catch {
-        getAppState().disableResponseTool(tool.name);
-        getAppState().logActivity({
-          actor: "system",
-          kind: "tool_failed",
-          title: "Saved response authority was not restored",
-          toolName: tool.name,
-          status: "warning",
-        });
-      }
+  public revoke(reason = "Mission authority revoked by operator"): void {
+    this.controller?.abort(new Error(reason));
+    this.controller = null;
+    const proposal = getFirebreakState().mission.proposal;
+    if (proposal && !["completed", "cancelled", "failed"].includes(proposal.status)) {
+      getFirebreakState().revokeMission(reason);
     }
   }
 
-  public disable(name: string): void {
-    const tool = getAppState().approvedResponseTools[name];
-    if (!tool || tool.status !== "registered") {
-      throw new AirlockError("RESPONSE_NOT_APPROVED", "No registered response tool was found.");
-    }
-    this.abort(name);
-    getAppState().disableResponseTool(name);
-    getAppState().logActivity({
-      actor: "human",
-      kind: "tool_unregistered",
-      title: "Response tool disabled",
-      toolName: name,
-      status: "warning",
-    });
+  /** @deprecated Retained only while the legacy view is replaced by Firebreak controls. */
+  public disable(_name: string): void {
+    this.revoke("Mission authority disabled by operator");
   }
 
-  public delete(name: string): void {
-    if (!getAppState().approvedResponseTools[name]) {
-      throw new AirlockError("RESPONSE_NOT_APPROVED", "No saved response tool was found.");
-    }
-    this.abort(name);
-    getAppState().deleteResponseTool(name);
+  /** @deprecated Retained only while the legacy view is replaced by Firebreak controls. */
+  public delete(_name: string): void {
+    this.revoke("Mission authority deleted by operator");
   }
 
-  public async disposeAll(): Promise<void> {
-    for (const controller of this.controllers.values()) controller.abort();
-    this.controllers.clear();
+  public async destroy(): Promise<void> {
+    this.controller?.abort(new Error("Firebreak runtime stopped"));
+    this.controller = null;
     await this.registry.settleToolChanges();
   }
 
-  private abort(name: string): void {
-    this.controllers.get(name)?.abort();
-    this.controllers.delete(name);
-  }
-
-  private assertCurrentlyValid(proposal: ResponseToolProposal): void {
-    const state = getAppState();
-    const simulation = state.simulations[proposal.simulationId];
-    if (!simulation) throw new AirlockError("SIMULATION_NOT_FOUND", "Simulation proof is missing.");
+  private assertCurrent(proposal: MissionProposal): void {
+    const state = getFirebreakState();
+    const simulation = state.mission.simulation;
+    if (!simulation || simulation.id !== proposal.simulationId) {
+      throw new FirebreakError("SIMULATION_NOT_FOUND", "Mission simulation proof is missing.");
+    }
     if (
-      proposal.incidentRevision !== state.incidentState.incident.revision ||
-      simulation.incidentRevision !== state.incidentState.incident.revision ||
-      state.checkRevisions[proposal.simulationId] !== state.incidentState.incident.revision
+      proposal.incidentRevision !== state.world.revision ||
+      proposal.stateHash !== missionStateHash(state.world) ||
+      simulation.incidentRevision !== state.world.revision
     ) {
-      throw new AirlockError(
+      throw new FirebreakError(
         "SIMULATION_STALE",
-        "Response authority is bound to an older revision.",
+        "The warehouse changed after the mission was simulated.",
       );
     }
-    if (new Date(proposal.policy.expiresAt).getTime() <= this.now().getTime()) {
-      throw new AirlockError("POLICY_EXPIRED", "Response authority expired before registration.");
-    }
-    if (proposal.policy.used) {
-      throw new AirlockError("RESPONSE_ALREADY_USED", "This response authority was already used.");
-    }
-    const liveChecks = runAirlockChecks({
-      state: state.incidentState,
-      simulation,
-      assessments: Object.values(state.assessments),
-      operationIds: proposal.operations.map((operation) => operation.operationId),
-      now: this.now(),
-    });
-    if (liveChecks.some((check) => check.blocking && check.status !== "pass")) {
-      throw new AirlockError("CHECKS_FAILED", "Live Airlock gates no longer pass.");
+    const report = validateSafetyEnvelope(state.world, simulation);
+    if (!report.passed) {
+      throw new FirebreakError(
+        "SAFETY_CHECKS_FAILED",
+        "The live mission no longer passes the safety envelope.",
+        {
+          failedCheckIds: report.checks
+            .filter((check) => check.status === "failed")
+            .map((check) => check.id),
+        },
+      );
     }
   }
 
   private createDefinition(
-    proposal: ResponseToolProposal,
+    proposalId: string,
   ): RegistryToolDefinition<z.infer<typeof inputValidator>> {
     return {
-      name: "rollback_checkout_release",
+      name: TOOL_NAME,
       description:
-        "Execute the human-approved, one-use checkout rollback for INC-4821. Captures a snapshot, runs a bounded canary, promotes only after healthy telemetry, resolves the incident, then unregisters itself.",
+        "Execute the exact human-authorized, one-use coordinated rescue mission. Moves only the four allowlisted robots on the reviewed routes, then unregisters itself.",
       inputSchema,
-      annotations,
+      annotations: { readOnlyHint: false, untrustedContentHint: false },
       inputValidator,
       origin: "human_approved_workflow",
-      execute: async (input, signal) => {
-        if (this.executing.has(proposal.name)) {
-          throw new AirlockError(
-            "RESPONSE_ALREADY_USED",
-            "This one-use response is already executing.",
+      execute: async (_input, callSignal) => {
+        if (this.executing) {
+          throw new FirebreakError("AUTHORITY_USED", "The one-use mission is already executing.");
+        }
+        const state = getFirebreakState();
+        const live = state.mission.proposal;
+        if (!live || live.id !== proposalId || live.status !== "registered") {
+          throw new FirebreakError(
+            "HUMAN_AUTHORIZATION_REQUIRED",
+            "The mission tool does not have current human authority.",
           );
         }
-        this.executing.add(proposal.name);
-        const executionSignal = combineAbortSignals([
-          signal,
-          this.controllers.get(proposal.name)?.signal,
-        ]);
-        const state = getAppState();
-        const approved = state.approvedResponseTools[proposal.name];
-        const attemptStartedAt = this.now().toISOString();
-        const attemptReceiptId = `receipt-${this.now().getTime()}-${++this.receiptSequence}`;
-        const blockedEvidenceIds = Object.values(state.assessments)
-          .filter((assessment) => assessment.injectionRisk)
-          .map((assessment) => assessment.evidenceId);
+        if (live.consumedAt !== null) {
+          throw new FirebreakError("AUTHORITY_USED", "The mission authority was already used.");
+        }
+        if (live.expiresAt === null || live.expiresAt <= this.now()) {
+          throw new FirebreakError("AUTHORITY_EXPIRED", "The mission authority expired.");
+        }
+        this.assertCurrent(live);
+
+        this.executing = true;
+        const before = structuredClone(state.world);
+        const authority: MissionProposal = { ...structuredClone(live), status: "authorized" };
+        state.beginExecution(live.id);
+        const combined = combineAbortSignals([callSignal, this.controller?.signal]);
         try {
-          if (!approved || !approved.enabled || approved.status !== "registered") {
-            throw new AirlockError("RESPONSE_NOT_APPROVED", "The rollback tool is not enabled.");
-          }
-          this.assertCurrentlyValid(approved);
-          const workingState = structuredClone(state.incidentState);
-          const receipt = await this.execute(structuredClone(approved), {
-            state: workingState,
-            canaryPercent: input.canaryPercent,
-            quarantinedEvidenceIds: blockedEvidenceIds,
-            signal: executionSignal.signal,
+          const result = await executeMission({
+            snapshot: before,
+            proposal: authority,
+            driver: this.dependencies.driver,
+            signal: combined.signal,
             now: this.now,
-            onProgress: (entry) => getAppState().recordProgress(entry),
+            onProgress: (event) => getFirebreakState().applyProgress(event),
           });
-          const current = getAppState().approvedResponseTools[proposal.name];
-          if (
-            executionSignal.signal.aborted ||
-            !current ||
-            !current.enabled ||
-            current.status !== "registered" ||
-            current.approvedAt !== approved.approvedAt
-          ) {
-            throw new AirlockError(
+          if (result.outcome !== "succeeded") result.snapshot.phase = "active";
+          getFirebreakState().finishExecution(result);
+
+          this.controller?.abort(
+            new Error(
+              result.outcome === "succeeded"
+                ? "One-use mission completed"
+                : result.receipt.reason ?? "Mission ended",
+            ),
+          );
+          this.controller = null;
+          await this.registry.settleToolChanges();
+
+          if (result.outcome === "cancelled") {
+            throw new FirebreakError(
               "EXECUTION_CANCELLED",
-              "Response authority was revoked before recovery committed.",
+              result.receipt.reason ?? "Mission execution was cancelled.",
             );
           }
-          getAppState().replaceIncidentState(workingState);
-          getAppState().saveReceipt(receipt);
-          getAppState().completeResponseTool(proposal.name);
-
-          setTimeout(() => {
-            this.abort(proposal.name);
-            getAppState().logActivity({
-              actor: "system",
-              kind: "tool_unregistered",
-              title: "One-use response tool automatically unregistered",
-              toolName: proposal.name,
-              status: "success",
-            });
-          }, 0);
-
-          return successResult("INCIDENT_RESOLVED", "Checkout recovered; one-use tool consumed.", {
-            receiptId: receipt.id,
-            finalErrorRate: receipt.finalErrorRate,
-            finalP95LatencyMs: receipt.finalP95LatencyMs,
-            productionMutations: receipt.productionMutations,
-            blockedEvidenceIds: receipt.blockedEvidenceIds,
-          });
-        } catch (error) {
-          const current = getAppState().approvedResponseTools[proposal.name];
-          if (current?.enabled && current.status === "registered") {
-            const cancelled = error instanceof AirlockError && error.code === "EXECUTION_CANCELLED";
-            const incidentState = getAppState().incidentState;
-            const currentRelease =
-              incidentState.deployments.find((deployment) => deployment.current)?.version ??
-              "2026.08.30.3";
-            const stableRelease =
-              incidentState.deployments.find((deployment) => deployment.stable)?.version ??
-              "2026.08.30.2";
-            getAppState().saveReceipt({
-              id: attemptReceiptId,
-              incidentId: "INC-4821",
-              toolName: "rollback_checkout_release",
-              status: cancelled ? "cancelled" : "failed",
-              canaryPercent: input.canaryPercent,
-              fromRelease: currentRelease,
-              toRelease: stableRelease,
-              finalErrorRate: incidentState.incident.errorRate,
-              finalP95LatencyMs: incidentState.incident.p95LatencyMs,
-              productionMutations: 0,
-              blockedEvidenceIds,
-              operationIds: current.operations.map((operation) => operation.operationId),
-              startedAt: attemptStartedAt,
-              completedAt: this.now().toISOString(),
-            });
+          if (result.outcome === "failed") {
+            throw new FirebreakError(
+              "OPERATION_FAILED",
+              result.receipt.reason ?? "A robot driver failed safely.",
+            );
           }
-          throw error;
+          return successResult("MISSION_EXECUTED", "Workers rescued and Battery Bay B secured.", {
+            receiptId: result.receipt.id,
+            rescuedWorkers: result.receipt.rescuedWorkers,
+            fireContained: result.receipt.fireContained,
+            containerSafe: result.receipt.containerSafe,
+            safetyViolations: result.receipt.safetyViolations,
+            durationMs: result.receipt.durationMs,
+          });
         } finally {
-          executionSignal.cleanup();
-          this.executing.delete(proposal.name);
+          combined.cleanup();
+          this.executing = false;
         }
       },
     };

@@ -1,4 +1,4 @@
-import { AirlockError } from "../domain/airlockTypes";
+import { FirebreakError } from "../domain/firebreakTypes";
 import type { WebMCPAdapter } from "./adapter";
 
 type NativeModelContext = NonNullable<Document["modelContext"]>;
@@ -7,7 +7,7 @@ export const createNativeAdapter = (modelContext: NativeModelContext): WebMCPAda
   mode: "native",
   async registerTool(definition, options) {
     if (!document.modelContext) {
-      throw new AirlockError("UNSUPPORTED_BROWSER", "Native WebMCP is not available.");
+      throw new FirebreakError("UNSUPPORTED_BROWSER", "Native WebMCP is not available.");
     }
     // Keep the standard top-level integration explicit and reviewable in the production bundle.
     await document.modelContext.registerTool(definition, { signal: options?.signal });
