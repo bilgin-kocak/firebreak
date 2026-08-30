@@ -1,6 +1,6 @@
 import { ZodError } from "zod";
 
-import { DomainError, type ErrorCode } from "../domain/types";
+import { AirlockError, type AirlockErrorCode } from "../domain/airlockTypes";
 
 export interface ToolSuccess<TData = Record<string, unknown>> {
   ok: true;
@@ -11,7 +11,7 @@ export interface ToolSuccess<TData = Record<string, unknown>> {
 
 export interface ToolFailure {
   ok: false;
-  code: ErrorCode;
+  code: AirlockErrorCode;
   message: string;
   retryable: boolean;
   details?: Record<string, unknown>;
@@ -26,7 +26,7 @@ export const successResult = <TData extends Record<string, unknown>>(
 ): ToolSuccess<TData> => ({ ok: true, code, message, ...(data ? { data } : {}) });
 
 export const failureResult = (
-  code: ErrorCode,
+  code: AirlockErrorCode,
   message: string,
   retryable = false,
   details?: Record<string, unknown>,
@@ -46,7 +46,7 @@ export const errorResult = (error: unknown): ToolFailure => {
       },
     );
   }
-  if (error instanceof DomainError) {
+  if (error instanceof AirlockError) {
     return failureResult(error.code, error.message, false, error.details);
   }
   return failureResult(
@@ -57,7 +57,7 @@ export const errorResult = (error: unknown): ToolFailure => {
 };
 
 /** Keeps the WebMCP boundary JSON-compatible and within the typical metadata budget. */
-export const compactResult = (result: unknown, maxChars = 1_500): unknown => {
+export const compactResult = (result: unknown, maxChars = 6_000): unknown => {
   const json = JSON.stringify(result);
   if (json.length <= maxChars) return JSON.parse(json) as unknown;
   if (typeof result === "object" && result !== null && "ok" in result) {

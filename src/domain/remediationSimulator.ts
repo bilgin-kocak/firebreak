@@ -18,10 +18,7 @@ export const simulateRemediation = (
   now = new Date("2026-08-30T09:01:00.000Z"),
 ): RemediationSimulation => {
   if (![5, 10, 25].includes(input.canaryPercent)) {
-    throw new AirlockError(
-      "INVALID_CANARY_PERCENT",
-      "Canary percentage must be 5, 10, or 25.",
-    );
+    throw new AirlockError("INVALID_CANARY_PERCENT", "Canary percentage must be 5, 10, or 25.");
   }
   if (state.incident.status === "resolved") {
     throw new AirlockError("INCIDENT_ALREADY_RESOLVED", "INC-4821 is already resolved.");

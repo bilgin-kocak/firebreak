@@ -1,6 +1,7 @@
 import type { EvidenceAssessment, TelemetryEntry } from "./airlockTypes";
 
-const instructionLikePattern = /(?:system\s+override|ignore\s+the\s+incident|call\s+export_customer_data)/i;
+const instructionLikePattern =
+  /(?:system\s+override|ignore\s+the\s+incident|call\s+export_customer_data)/i;
 const forbiddenCapabilityPattern =
   /(?:export_customer_data|delete_(?:customer|order|record)|read_(?:secret|env)|change_(?:payments|inventory))/i;
 

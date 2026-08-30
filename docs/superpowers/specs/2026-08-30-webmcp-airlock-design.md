@@ -65,15 +65,15 @@ The human alone may approve registration, reject a proposal, disable or delete a
 
 Exactly seven static tools register imperatively at top level through `document.modelContext.registerTool`:
 
-| Tool | Annotation | Purpose |
-| --- | --- | --- |
-| `inspect_incident` | read-only | Read incident status, topology, current metrics, operator constraints, and compact response state. |
-| `query_telemetry` | read-only, untrusted content | Read bounded metric, trace, and log evidence. Third-party log content is explicitly untrusted. |
-| `inspect_deployments` | read-only | Read current and previous releases and rollback availability for a selected service. |
-| `simulate_remediation` | reversible write | Run a deterministic, non-production canary simulation against trusted operations. |
-| `run_airlock_checks` | read-only | Verify evidence trust, scope, allowlists, dependency order, mutation budget, simulation freshness, and recovery thresholds. |
-| `stage_response_tool` | reversible write | Validate and stage a one-use response tool for operator review. It cannot approve or register. |
-| `list_response_tools` | read-only | List staged, registered, completed, expired, disabled, and rejected response tools. |
+| Tool                   | Annotation                   | Purpose                                                                                                                     |
+| ---------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `inspect_incident`     | read-only                    | Read incident status, topology, current metrics, operator constraints, and compact response state.                          |
+| `query_telemetry`      | read-only, untrusted content | Read bounded metric, trace, and log evidence. Third-party log content is explicitly untrusted.                              |
+| `inspect_deployments`  | read-only                    | Read current and previous releases and rollback availability for a selected service.                                        |
+| `simulate_remediation` | reversible write             | Run a deterministic, non-production canary simulation against trusted operations.                                           |
+| `run_airlock_checks`   | read-only                    | Verify evidence trust, scope, allowlists, dependency order, mutation budget, simulation freshness, and recovery thresholds. |
+| `stage_response_tool`  | reversible write             | Validate and stage a one-use response tool for operator review. It cannot approve or register.                              |
+| `list_response_tools`  | read-only                    | List staged, registered, completed, expired, disabled, and rejected response tools.                                         |
 
 All inputs use narrow schemas with `additionalProperties: false`. Every handler revalidates input at execution time.
 
@@ -117,7 +117,7 @@ interface IncidentPolicy {
     "customer_data_export",
     "record_deletion",
     "secret_access",
-    "unrelated_service_change"
+    "unrelated_service_change",
   ];
   maxProductionMutations: 1;
   simulationRevision: number;

@@ -38,9 +38,7 @@ describe("runAirlockChecks", () => {
     const checks = runAirlockChecks({
       state,
       simulation,
-      assessments: state.telemetry
-        .filter((entry) => !entry.injectionFixture)
-        .map(classifyEvidence),
+      assessments: state.telemetry.filter((entry) => !entry.injectionFixture).map(classifyEvidence),
       operationIds: [...trustedRemediationOperationIds],
     });
 

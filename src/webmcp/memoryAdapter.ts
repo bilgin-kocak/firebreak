@@ -1,4 +1,4 @@
-import { DomainError } from "../domain/types";
+import { AirlockError } from "../domain/airlockTypes";
 import type { WebMCPAdapter } from "./adapter";
 import type { WebMCPToolDefinition, WebMCPToolMetadata } from "./types";
 
@@ -21,7 +21,7 @@ export const createMemoryAdapter = (): WebMCPAdapter => {
     mode: "memory",
     async registerTool(definition, options) {
       if (tools.has(definition.name)) {
-        throw new DomainError(
+        throw new AirlockError(
           "TOOL_ALREADY_REGISTERED",
           `Tool '${definition.name}' is already registered.`,
         );
@@ -48,7 +48,7 @@ export const createMemoryAdapter = (): WebMCPAdapter => {
     async executeTool(name, input, signal) {
       const definition = tools.get(name);
       if (!definition) {
-        throw new DomainError("TOOL_NOT_FOUND", `Tool '${name}' is not registered.`);
+        throw new AirlockError("TOOL_NOT_FOUND", `Tool '${name}' is not registered.`);
       }
       return definition.execute(parseInput(input), { signal });
     },

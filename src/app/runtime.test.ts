@@ -1,45 +1,20 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
-import { createJourneyChecksProvider } from "./runtime";
+import { useAppStore } from "../store/useAppStore";
+import { STATIC_TOOL_NAMES } from "../webmcp/staticToolDefinitions";
+import { bootAppRuntime } from "./runtime";
 
-describe("mounted journey presentation checks", () => {
-  afterEach(() => {
-    document.body.replaceChildren();
+describe("Airlock runtime", () => {
+  beforeEach(async () => {
+    useAppStore.getState().setPersistenceStorage(undefined);
+    await useAppStore.getState().reset();
+    Object.defineProperty(document, "modelContext", { configurable: true, value: undefined });
   });
 
-  it("measures every visible large-card control and fails for one undersized target", async () => {
-    document.body.innerHTML = `
-      <section id="adaptive-workspace" class="controls-large_cards">
-        <h1>Adaptive task</h1>
-        <button id="title-lock">Lock title</button>
-        <label class="large-card-control"><input type="radio" name="duration">12 months</label>
-        <button id="copy-lock">Lock copy</button>
-        <button id="next">Next question</button>
-        <progress max="2" value="1"></progress>
-      </section>
-    `;
-    let undersized = true;
-    const measured: string[] = [];
-    const provider = createJourneyChecksProvider({
-      measureTarget(element) {
-        measured.push(element.id || element.className);
-        return element.id === "copy-lock" && undersized
-          ? { width: 43, height: 44 }
-          : { width: 44, height: 44 };
-      },
-      runAxe: vi.fn().mockResolvedValue({ violations: [] }),
-    });
-
-    const failing = await provider.getContext("view_1");
-    expect(measured).toEqual(
-      expect.arrayContaining(["title-lock", "large-card-control", "copy-lock", "next"]),
-    );
-    expect(failing.presentation.largeTargetsPresent).toBe(false);
-
-    undersized = false;
-    measured.length = 0;
-    const passing = await provider.getContext("view_1");
-    expect(measured).toHaveLength(4);
-    expect(passing.presentation.largeTargetsPresent).toBe(true);
+  it("boots the same seven tools in ordinary-browser memory mode", async () => {
+    const runtime = await bootAppRuntime();
+    expect(runtime.adapter.mode).toBe("memory");
+    expect((await runtime.adapter.getTools()).map((tool) => tool.name)).toEqual(STATIC_TOOL_NAMES);
+    runtime.dispose();
   });
 });

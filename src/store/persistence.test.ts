@@ -1,99 +1,134 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { canonicalPreferences } from "../domain/seed";
+import { validateResponseProposal } from "../domain/airlockPolicy";
+import { createInitialIncidentState, trustedRemediationOperationIds } from "../domain/incidentSeed";
+import { simulateRemediation } from "../domain/remediationSimulator";
 import {
+  clearPersistedState,
+  createMemoryStorage,
+  loadIncidentEnvelope,
+  loadResponseEnvelope,
+  loadUiEnvelope,
   PERSISTENCE_KEYS,
-  loadActivity,
-  loadViews,
-  saveActivity,
-  saveViews,
-  type PersistenceStorage,
+  saveIncidentEnvelope,
+  saveResponseEnvelope,
+  saveUiEnvelope,
 } from "./persistence";
 
-const createStorage = (): PersistenceStorage & { values: Map<string, string> } => {
-  const values = new Map<string, string>();
-  return {
-    values,
-    getItem: (key) => values.get(key) ?? null,
-    setItem: (key, value) => values.set(key, value),
-    removeItem: (key) => values.delete(key),
-  };
-};
-
-const validView = {
-  id: "view_1",
-  serviceId: "parking_permit_renewal" as const,
-  title: "Renew permit",
-  goal: "Renew my permit",
-  preferences: canonicalPreferences,
-  fieldOrder: ["vehicleId", "permitDurationMonths", "contactEmail", "currentPermitSummary"],
-  hiddenOptionalFields: [],
-  copyOverrides: [],
-  lockedElementIds: [],
-  requireHumanConfirmation: true as const,
-  revision: 1,
-  createdAt: "2026-08-29T00:00:00.000Z",
-  updatedAt: "2026-08-29T00:00:00.000Z",
-};
-
-describe("guarded CivicWeave persistence", () => {
-  let storage: PersistenceStorage & { values: Map<string, string> };
-
-  beforeEach(() => {
-    storage = createStorage();
+const responseFixture = () => {
+  const incidentState = createInitialIncidentState();
+  const simulation = simulateRemediation(incidentState, {
+    serviceId: "checkout-api",
+    canaryPercent: 10,
   });
+  const proposal = validateResponseProposal(
+    {
+      incidentId: "INC-4821",
+      name: "rollback_checkout_release",
+      title: "Rollback checkout",
+      description: "Safely restore the previous stable release.",
+      simulationId: simulation.id,
+      incidentRevision: 1,
+      operations: trustedRemediationOperationIds.map((operationId) => ({ operationId })),
+    },
+    { policy: incidentState.policy, simulation, createId: () => "response-1" },
+  );
+  return { simulation, proposal };
+};
 
-  it("uses the four exact versioned storage keys", () => {
-    expect(PERSISTENCE_KEYS).toEqual({
-      session: "civicweave:v1:session",
-      views: "civicweave:v1:views",
-      workflowTools: "civicweave:v1:workflow-tools",
-      activity: "civicweave:v1:activity",
+describe("Airlock persistence", () => {
+  it("round-trips three independently validated envelopes", () => {
+    const storage = createMemoryStorage();
+    const incidentState = createInitialIncidentState();
+    const { simulation, proposal } = responseFixture();
+    saveIncidentEnvelope(storage, { incidentState, assessments: {} });
+    saveResponseEnvelope(storage, {
+      simulations: { [simulation.id]: simulation },
+      checks: {},
+      checkRevisions: {},
+      proposals: { [proposal.id]: proposal },
+      approvedResponseTools: {},
+      progress: [],
+      receipt: null,
+      recoveryPhase: "idle",
+      activity: [],
     });
+    saveUiEnvelope(storage, {
+      dialogs: { proposalSheetOpen: false, simulatorOpen: false },
+      rightRail: { activeTab: "evidence", chronological: false },
+      webmcp: { mode: "memory", registeredToolNames: [], lastToolChangeAt: null },
+      metrics: { webmcpToolCalls: 0, lastToolDurationMs: null, blockingChecks: 0 },
+    });
+
+    expect(loadIncidentEnvelope(storage).data?.incidentState).toEqual(incidentState);
+    expect(loadResponseEnvelope(storage).data?.proposals[proposal.id]).toEqual(proposal);
+    expect(loadUiEnvelope(storage).data?.rightRail.activeTab).toBe("evidence");
   });
 
-  it("restores a schema-valid version-one view envelope", () => {
-    saveViews(storage, [validView]);
+  it("discards only a corrupt envelope and reports recovery", () => {
+    const storage = createMemoryStorage({
+      [PERSISTENCE_KEYS.incident]: "{not-json",
+    });
+    saveUiEnvelope(storage, {
+      dialogs: { proposalSheetOpen: false, simulatorOpen: false },
+      rightRail: { activeTab: "activity", chronological: false },
+      webmcp: { mode: "memory", registeredToolNames: [], lastToolChangeAt: null },
+      metrics: { webmcpToolCalls: 0, lastToolDurationMs: null, blockingChecks: 0 },
+    });
 
-    expect(loadViews(storage)).toEqual({ data: [validView], recovered: false });
+    expect(loadIncidentEnvelope(storage)).toEqual({ data: null, recovered: true });
+    expect(loadUiEnvelope(storage).recovered).toBe(false);
+    expect(storage.getItem(PERSISTENCE_KEYS.incident)).toBeNull();
   });
 
-  it("discards a version mismatch without throwing", () => {
-    storage.setItem(PERSISTENCE_KEYS.views, JSON.stringify({ version: 2, data: [validView] }));
+  it("filters expired and stale registered response tools during load", () => {
+    const storage = createMemoryStorage();
+    const { simulation, proposal } = responseFixture();
+    const approved = {
+      ...proposal,
+      status: "registered" as const,
+      approvedAt: "2026-08-30T09:02:00.000Z",
+      registrationRevision: 1,
+      enabled: true,
+    };
+    saveResponseEnvelope(storage, {
+      simulations: { [simulation.id]: simulation },
+      checks: {},
+      checkRevisions: {},
+      proposals: {},
+      approvedResponseTools: { rollback_checkout_release: approved },
+      progress: [],
+      receipt: null,
+      recoveryPhase: "idle",
+      activity: [],
+    });
 
-    expect(loadViews(storage)).toEqual({ data: [], recovered: true });
-    expect(storage.getItem(PERSISTENCE_KEYS.views)).toBeNull();
+    expect(
+      loadResponseEnvelope(storage, {
+        incidentRevision: 1,
+        now: new Date("2026-08-30T09:03:00.000Z"),
+      }).data?.approvedResponseTools.rollback_checkout_release,
+    ).toEqual(approved);
+    expect(
+      loadResponseEnvelope(storage, {
+        incidentRevision: 2,
+        now: new Date("2026-08-30T09:03:00.000Z"),
+      }).data?.approvedResponseTools,
+    ).toEqual({});
+    expect(
+      loadResponseEnvelope(storage, {
+        incidentRevision: 1,
+        now: new Date("2026-08-30T09:20:00.000Z"),
+      }).data?.approvedResponseTools,
+    ).toEqual({});
   });
 
-  it("discards malformed JSON without throwing", () => {
-    storage.setItem(PERSISTENCE_KEYS.activity, "{not-json");
+  it("clears exactly the three Airlock keys", () => {
+    const storage = createMemoryStorage({ outsider: "keep" });
+    for (const key of Object.values(PERSISTENCE_KEYS)) storage.setItem(key, "saved");
 
-    expect(loadActivity(storage)).toEqual({ data: [], recovered: true });
-    expect(storage.getItem(PERSISTENCE_KEYS.activity)).toBeNull();
-  });
+    clearPersistedState(storage);
 
-  it("discards schema-invalid definitions rather than restoring unsafe data", () => {
-    storage.setItem(
-      PERSISTENCE_KEYS.views,
-      JSON.stringify({ version: 1, data: [{ ...validView, requireHumanConfirmation: false }] }),
-    );
-
-    expect(loadViews(storage)).toEqual({ data: [], recovered: true });
-  });
-
-  it("round-trips compact activity entries through a guarded envelope", () => {
-    const entries = [
-      {
-        id: "activity_1",
-        timestamp: "2026-08-29T00:00:00.000Z",
-        actor: "system" as const,
-        kind: "reset" as const,
-        title: "Demo reset",
-        status: "info" as const,
-      },
-    ];
-    saveActivity(storage, entries);
-
-    expect(loadActivity(storage)).toEqual({ data: entries, recovered: false });
+    expect(storage.dump()).toEqual({ outsider: "keep" });
   });
 });

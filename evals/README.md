@@ -1,23 +1,21 @@
-# CivicWeave WebMCP eval fixtures
+# WebMCP Airlock eval fixtures
 
-`webmcp-cases.json` is a set of schema and tool-selection fixtures for the two CivicWeave services and the compiled `renew_permit_guided` tool. The cases cover normal routing, second-service reuse, human-lock preservation, schema rejection, safe workflow failure, and refusal to submit through an agent tool.
+`webmcp-cases.json` contains tool-selection, strict-schema, lifecycle, and refusal fixtures for incident `INC-4821` and the dynamic `rollback_checkout_release` tool.
 
-These fixtures describe expected tool choices and argument subsets. They are not a claim that a particular model will always make that choice. The deterministic Vitest and Playwright suites verify the browser, domain, safety, and end-to-end behavior once a tool call is made.
+These cases describe expected choices and safety outcomes. They do not claim a particular model will always select the expected tool. Once a call is made, the deterministic Vitest and Playwright suites verify the real browser, domain, policy, execution, and lifecycle behavior.
 
 ## Fixture fields
 
 - `id`: stable case identifier.
-- `pageState`: prerequisite state supplied by the eval harness.
-- `messages`: user-facing conversation turns.
-- `expectedTool`: expected next tool, or `null` when no WebMCP tool may perform the request.
-- `expectedArgumentsSubset`: required subset of the tool input; generated IDs such as `viewId` may be supplied by the harness.
-- `expectedOutcome`: optional result or safety behavior to assert.
+- `pageState`: prerequisite state created through earlier tool calls and human UI actions.
+- `messages`: conversation turns presented to the agent.
+- `expectedTool`: next tool name, or `null` when no WebMCP capability may satisfy the request.
+- `expectedArgumentsSubset`: required subset of the generated input.
+- `expectedOutcome`: result, rejection, or lifecycle behavior to assert.
 
-An eval runner should reject unexpected tool names, compare only the declared argument subset, then execute through the same page adapter used by the app. For stateful cases, it should create the named `pageState` through earlier trusted calls and human UI actions rather than mutating internal store data.
+A harness should reject unexpected tool names, compare only the declared argument subset, and execute through the same page adapter as the application. State such as `response_tool_registered` must be produced through the prior trusted calls and the visible approval control—not by mutating the store.
 
-## Validation
-
-From the repository root:
+## Validate
 
 ```sh
 node -e "JSON.parse(require('node:fs').readFileSync('evals/webmcp-cases.json', 'utf8')); console.log('eval JSON valid')"
@@ -25,4 +23,4 @@ npm run format:check
 npm run test:e2e
 ```
 
-The refusal case intentionally expects `null`: CivicWeave exposes no WebMCP submit tool. A person must use the visible **Confirm & Submit** control after reviewing the fictional draft.
+The refusal fixtures intentionally expect `null`: Airlock exposes no customer export, secret read, deletion, unrelated-service mutation, arbitrary command, or second-use capability.

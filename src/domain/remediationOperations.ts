@@ -1,8 +1,4 @@
-import type {
-  IncidentState,
-  RecoveryPhase,
-  ResponseToolProposal,
-} from "./airlockTypes";
+import type { IncidentState, RecoveryPhase, ResponseToolProposal } from "./airlockTypes";
 
 export interface RemediationOperationContext {
   state: IncidentState;

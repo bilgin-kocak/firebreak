@@ -1,9 +1,4 @@
-export type ServiceId =
-  | "storefront"
-  | "checkout-api"
-  | "payments"
-  | "orders"
-  | "inventory";
+export type ServiceId = "storefront" | "checkout-api" | "payments" | "orders" | "inventory";
 
 export type ServiceStatus = "healthy" | "degraded" | "critical" | "recovering";
 export type IncidentStatus = "active" | "recovering" | "resolved";
@@ -64,10 +59,7 @@ export interface IncidentRecord {
 }
 
 export type ForbiddenCapability =
-  | "customer_data_export"
-  | "record_deletion"
-  | "secret_access"
-  | "unrelated_service_change";
+  "customer_data_export" | "record_deletion" | "secret_access" | "unrelated_service_change";
 
 export interface IncidentPolicy {
   incidentId: "INC-4821";
@@ -128,12 +120,7 @@ export interface ResponseOperationStep {
 }
 
 export type ResponseToolStatus =
-  | "awaiting_approval"
-  | "registered"
-  | "rejected"
-  | "disabled"
-  | "expired"
-  | "completed";
+  "awaiting_approval" | "registered" | "rejected" | "disabled" | "expired" | "completed";
 
 export interface ResponseToolProposal {
   id: string;
@@ -224,6 +211,9 @@ export interface AirlockActivityEntry {
 
 export type AirlockErrorCode =
   | "INVALID_TOOL_INPUT"
+  | "TOOL_ALREADY_REGISTERED"
+  | "TOOL_NOT_FOUND"
+  | "UNSUPPORTED_BROWSER"
   | "INCIDENT_NOT_FOUND"
   | "INCIDENT_ALREADY_RESOLVED"
   | "EVIDENCE_NOT_FOUND"

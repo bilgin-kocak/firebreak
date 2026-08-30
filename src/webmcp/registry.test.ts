@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DomainError } from "../domain/types";
+import { AirlockError } from "../domain/airlockTypes";
 import { getAppState, resetAppStoreForTests } from "../store/useAppStore";
 import type { WebMCPAdapter } from "./adapter";
 import { createMemoryAdapter } from "./memoryAdapter";
@@ -9,20 +9,20 @@ import { ToolRegistry } from "./registry";
 import type { RegistryToolDefinition, WebMCPToolDefinition, WebMCPToolMetadata } from "./types";
 
 const definition = (
-  execute: RegistryToolDefinition<{ serviceId: string }>["execute"] = vi.fn(async () => ({
+  execute: RegistryToolDefinition<{ incidentId: string }>["execute"] = vi.fn(async () => ({
     ok: true as const,
   })),
 ) => ({
-  name: "inspect_portal",
-  description: "Inspect one portal service.",
+  name: "inspect_incident",
+  description: "Inspect one incident.",
   inputSchema: {
     type: "object",
-    properties: { serviceId: { type: "string" } },
-    required: ["serviceId"],
+    properties: { incidentId: { type: "string" } },
+    required: ["incidentId"],
     additionalProperties: false,
   },
   annotations: { readOnlyHint: true, untrustedContentHint: false },
-  inputValidator: z.object({ serviceId: z.string() }).strict(),
+  inputValidator: z.object({ incidentId: z.string() }).strict(),
   origin: "built_in" as const,
   execute,
 });
@@ -35,12 +35,12 @@ describe("WebMCP tool registry", () => {
     await registry.register(definition());
 
     expect(registry.getRegistrations()).toEqual([
-      expect.objectContaining({ name: "inspect_portal", origin: "built_in" }),
+      expect.objectContaining({ name: "inspect_incident", origin: "built_in" }),
     ]);
     await expect(registry.register(definition())).rejects.toMatchObject({
       code: "TOOL_ALREADY_REGISTERED",
     });
-    expect(getAppState().webmcp.registeredToolNames).toEqual(["inspect_portal"]);
+    expect(getAppState().webmcp.registeredToolNames).toEqual(["inspect_incident"]);
   });
 
   it("validates every external input before domain execution", async () => {
@@ -49,8 +49,8 @@ describe("WebMCP tool registry", () => {
     const registry = new ToolRegistry(adapter);
     await registry.register(definition(execute));
 
-    const result = await adapter.executeTool("inspect_portal", {
-      serviceId: "parking_permit_renewal",
+    const result = await adapter.executeTool("inspect_incident", {
+      incidentId: "INC-4821",
       arbitraryCode: "alert(1)",
     });
 
@@ -65,7 +65,7 @@ describe("WebMCP tool registry", () => {
     const registry = new ToolRegistry(adapter, { now: () => ticks.shift() ?? 31 });
     await registry.register(definition());
 
-    await expect(adapter.executeTool("inspect_portal", '{"serviceId":')).resolves.toMatchObject({
+    await expect(adapter.executeTool("inspect_incident", '{"incidentId":')).resolves.toMatchObject({
       ok: false,
       code: "INVALID_TOOL_INPUT",
       retryable: true,
@@ -87,7 +87,7 @@ describe("WebMCP tool registry", () => {
     const registry = new ToolRegistry(adapter, { now: () => ticks.shift() ?? 34 });
     await registry.register(definition());
 
-    await adapter.executeTool("inspect_portal", { serviceId: "all" });
+    await adapter.executeTool("inspect_incident", { incidentId: "INC-4821" });
 
     expect(getAppState().metrics).toMatchObject({
       webmcpToolCalls: 1,
@@ -105,18 +105,20 @@ describe("WebMCP tool registry", () => {
     const registry = new ToolRegistry(adapter);
     await registry.register(
       definition(async () => {
-        throw new DomainError("LOCKED_BY_USER", "A human lock blocks this patch.", {
-          lockedElementIds: ["field:vehicleId"],
+        throw new AirlockError("CHECKS_FAILED", "Current Airlock checks block this response.", {
+          failedCheckIds: ["untrusted-evidence"],
         });
       }),
     );
 
-    await expect(adapter.executeTool("inspect_portal", { serviceId: "all" })).resolves.toEqual({
+    await expect(
+      adapter.executeTool("inspect_incident", { incidentId: "INC-4821" }),
+    ).resolves.toEqual({
       ok: false,
-      code: "LOCKED_BY_USER",
-      message: "A human lock blocks this patch.",
+      code: "CHECKS_FAILED",
+      message: "Current Airlock checks block this response.",
       retryable: false,
-      details: { lockedElementIds: ["field:vehicleId"] },
+      details: { failedCheckIds: ["untrusted-evidence"] },
     });
     expect(getAppState().activity[0]).toMatchObject({ kind: "tool_failed", status: "error" });
   });
@@ -145,7 +147,7 @@ describe("WebMCP tool registry", () => {
     expect(getAppState().webmcp.registeredToolNames).toEqual([]);
     expect(
       getAppState().activity.filter(
-        (entry) => entry.kind === "tool_registered" && entry.toolName === "inspect_portal",
+        (entry) => entry.kind === "tool_registered" && entry.toolName === "inspect_incident",
       ),
     ).toEqual([]);
   });

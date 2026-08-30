@@ -1,112 +1,86 @@
-# CivicWeave submission draft
+# WebMCP challenge submission draft
 
-This prose is ready to edit for the challenge form. Replace the three explicit link placeholders before publishing; no links, usage figures, model-accuracy claims, or endorsements are implied here.
+## Project name
 
-## Project title
-
-CivicWeave
+WebMCP Airlock
 
 ## Tagline
 
-The portal that compiles itself around your goal.
+Safe autonomy for production incidents.
 
-## One-line summary
+## Short description
 
-CivicWeave lets a person and an agent safely compile an accessible task interface and a reusable WebMCP tool from website-owned capabilities, register that tool live after human approval, and stop every execution before human-only submission.
+WebMCP Airlock lets an incident agent investigate a fictional checkout outage, quarantine hostile telemetry, prove a safe rollback, and propose a one-use response tool. A human approves the exact permission envelope once; the tool then runs autonomously, restores checkout, records an audit receipt, and unregisters itself.
 
 ## The problem
 
-Public-service portals are usually organized around agencies, menus, and forms, while people arrive with goals and constraints: renew a permit, use plain language, make controls larger, preserve information already on file, and never submit without asking. People must translate their needs into a fixed interface. Agents that only click the same interface inherit its ambiguity and brittleness.
+Incident-response agents are often trapped between two unsafe choices. Read-only agents can explain an outage but cannot recover it. Broadly privileged agents can act, but a hallucination, stale observation, or malicious log entry can cause production damage.
 
-## The solution
+Airlock demonstrates a third option: compile temporary production authority from a fresh deterministic proof. The site owns the allowed operations, affected service, dependency order, expiry, mutation budget, canary thresholds, and rollback behavior. The agent receives only the capability needed for this incident and only after one visible human authorization.
 
-CivicWeave is a fully client-side demonstration inside the fictional Northstar City Services portal. A resident describes the task and interaction preferences. Through WebMCP, the agent reads typed service capabilities and asks the website to compile a temporary interface from trusted fields and approved presentation rules. The resident can edit and lock that shared interface. The website then runs deterministic journey and accessibility checks.
+## What it does
 
-Once the journey passes, the agent can stage a reusable workflow proposal. A human reviews its schema, bindings, operation sequence, and stop boundary, then explicitly approves registration. CivicWeave registers the new tool live. The agent can discover and invoke it immediately, but execution prepares only a visible draft and stops for human confirmation.
+The canonical incident is a checkout failure after release `2026.08.30.3`. Through seven static WebMCP tools, an agent:
 
-## How CivicWeave uses WebMCP
+1. Inspects the incident and service topology.
+2. Queries bounded telemetry whose result is explicitly annotated as untrusted.
+3. Quarantines a visible prompt-injection attempt hidden in third-party content.
+4. Correlates the failure with the latest checkout deployment.
+5. Simulates a 10% canary of previous stable release `2026.08.30.2`.
+6. Runs nine deterministic safety gates.
+7. Stages—but cannot approve—a one-use `rollback_checkout_release` tool.
 
-CivicWeave registers exactly seven imperative tools in the top-level document: `inspect_portal`, `compile_task_view`, `inspect_task_view`, `patch_task_view`, `run_journey_checks`, `stage_workflow_tool`, and `list_workflow_tools`. These tools share the live page state with the resident and expose narrow JSON Schemas instead of relying on screen scraping.
+The operator reviews the exact permission envelope and approves once. The eighth tool registers live and emits `toolchange`. When invoked, it captures a snapshot, canaries, promotes the rollback, resolves the incident, and returns a receipt. Checkout improves from 31.8% errors and 4,820 ms p95 latency to 0.6% and 420 ms. The registration is aborted after success, emits a second `toolchange`, and cannot be invoked again.
 
-The defining moment comes after the agent stages `renew_permit_guided`. Staging cannot approve or register anything. When the person clicks **Approve & Register**, the page revalidates the saved definition, creates an `AbortController`, calls `document.modelContext.registerTool(...)`, displays the newly registered tool, and records the browser’s `toolchange` event. The agent then invokes the new tool in the same session for a 12-month permit.
+## Why WebMCP is essential
 
-This is not WebMCP wrapped around ordinary buttons. The available tool surface grows live from a validated, human-approved workflow definition.
+Airlock is built around the website's live capability surface, not DOM scraping or a simulated chat response. Seven static tools register imperatively through `document.modelContext.registerTool`. The human-approved response is derived from the validated proposal and registered dynamically in the same page session. An `AbortController` owns its lifetime. The Tool Surface visibly moves seven → eight → seven as browser capabilities change.
 
-## Why it is better with a human and agent together
+Without WebMCP, this would be a static incident dashboard. With WebMCP, the website can expose typed evidence and policy-aware operations, the agent can reason over shared state, and the operator can grant a new capability at the moment it becomes safe.
 
-The agent is good at turning natural-language intent into a constrained interface and operation sequence. The website is authoritative about field IDs, schemas, validation, live data, and safe operations. The human remains authoritative about edits, locks, tool approval, disabling or deleting tools, and final submission.
+## What is technically distinctive
 
-That separation is visible throughout the experience: the agent proposes; the website validates; the person approves. Human choices win when a field or copy block is locked. The dynamic tool can prepare but cannot submit.
+- Exactly seven strict static tools and one derived dynamic tool.
+- Closed JSON schemas and runtime revalidation on every call.
+- Explicit `untrustedContentHint` on telemetry plus deterministic quarantine.
+- Revision-bound simulation and check proofs that cannot survive state changes.
+- Trusted operation registry; no arbitrary code, URL, selector, network, or shell execution.
+- Scope, dependency, forbidden-capability, expiry, and production-mutation enforcement.
+- One human goal-level authorization followed by autonomous bounded execution.
+- Full snapshot restoration on failure or cancellation.
+- Immutable receipt and successful one-use self-unregistration.
+- Native and ordinary-browser adapters sharing identical handlers.
+- Versioned persistence with safe recovery and revalidation.
 
-## Creativity and ambition
+## User experience
 
-Most tool-enabled sites expose a fixed catalog. CivicWeave demonstrates a safe toolsmith architecture in which the website can compile both a task-specific interface and a new reusable capability without generating executable code. The workflow is data: bounded metadata, a narrow parameter schema, ordered references to prewritten operations, and a hard stop at review.
+The interface is designed as a cinematic but credible operations room. Its central service topology is a living explanation of the incident: the checkout path starts red, a hostile telemetry path is visibly blocked, the canary moves through amber, and the full path ends green. Evidence provenance, policy constraints, recovery phases, tool lifecycle, and the final receipt remain understandable without opening developer tools.
 
-The same generic compiler, validators, operation registry, dynamic lifecycle, and human boundaries support both Parking Permit Renewal and Address Change. The goal is not arbitrary website automation; it is a deep proof that one trusted application can offer many interfaces and a tool surface that grows with the user.
+The responsive mobile layout preserves the same narrative without horizontal overflow. Dialogs trap and restore focus, interactive targets are at least 44 by 44 pixels, the topology includes a complete text alternative, reduced motion is supported, and all tested canonical states have zero serious or critical axe findings.
 
-## Potential impact
+## Safety boundaries
 
-This pattern could help complex service portals serve people with different accessibility needs, levels of familiarity, and task goals without surrendering control of business rules or side effects. Website owners keep authority over data, components, validation, and operations. People gain a simpler interface and reusable capability while retaining explicit control over consequential actions.
+Airlock is a fictional local demonstration. It never reaches real infrastructure, credentials, secrets, customer data, or external networks. It does not claim its deterministic fixture detector solves prompt injection generally. Its claim is narrower and testable: a website can label untrusted evidence, exclude it from authority decisions, compile a narrowly scoped temporary tool from a fresh proof, and revoke that tool automatically.
 
-The demonstration is intentionally narrow and fictional, but the architecture applies to other trusted, form-heavy applications that can define safe fields and reversible operations.
-
-## Technical implementation
-
-CivicWeave is a static Vite, React, and strict TypeScript application. Zustand holds shared in-browser state, Zod validates external inputs, and plain CSS provides the responsive municipal interface. A safe interface compiler interprets schema-validated definitions through website-owned React components. A workflow compiler accepts only trusted operations from the selected service, validates dependencies and bindings, derives a schema with `additionalProperties: false`, and always terminates at review.
-
-A narrow WebMCP adapter uses native `document.modelContext` when available and an in-memory simulator in ordinary browsers. Dynamic tools are registered with `AbortController`, revalidated before registration and reload, and unregistered when disabled or deleted. Workflow execution snapshots the service draft, runs operations sequentially, and rolls back on cancellation or failure. Versioned `localStorage` persists the current session, views, approved definitions, and redacted activity.
-
-**CivicWeave does not generate executable code. It generates validated interface and workflow definitions interpreted by website-owned components and operations.**
-
-## Safety and permission model
-
-- An agent can inspect, compile, patch unlocked interface definitions, run checks, stage a proposal, list tools, and invoke an approved tool.
-- An agent cannot lock or unlock content, approve registration, disable or delete tools, or submit a draft.
-- Every tool input is revalidated at execution time.
-- Every dynamic proposal is revalidated before registration and after reload.
-- Generated copy is rendered as escaped text; no generated value is executed.
-- Workflows reference only prewritten same-service operations and cannot include `human_only` operations.
-- Failed or cancelled execution restores the full draft snapshot.
-- No arbitrary JavaScript, HTML, CSS, selectors, URLs, or network requests are generated or executed.
-- No real municipal system, payment, identity provider, database, or external service is connected.
-
-## Testing and evals
-
-The repository includes strict typechecking, zero-warning linting, formatting checks, Vitest unit and integration coverage, a production build, and Playwright browser tests. The browser suite injects a native-like top-level `modelContext` before page load and exercises the full two-prompt journey: seven static tools, interface compilation, a human lock, deterministic checks, proposal staging, human registration, visible `toolchange`, dynamic invocation, review staging, and final human-only confirmation.
-
-Additional Playwright coverage checks reload and re-registration, disable and reset behavior, keyboard navigation, desktop and mobile overflow, axe serious/critical findings, screenshots, and runtime console errors. The `evals/` fixtures cover schema/tool selection, both services, safe failures, lock preservation, invalid dynamic input, and refusal to submit. They are fixtures and deterministic browser checks, not a guarantee of any particular model’s selection behavior or formal accessibility certification.
-
-### Testing instructions
+## How to run
 
 ```sh
 npm install
-npx playwright install chromium
-npm run check
+npm run dev
 ```
 
-For an ordinary browser, run `npm run dev`, open the app, click **How to test**, and follow the simulator’s canonical steps. In a browser exposing native WebMCP, confirm the header says **Native WebMCP**, then use the two copyable prompt cards.
+Open the printed local URL and use **Simulator** in an ordinary browser. No keys or accounts are required. Run `npm run check` for lint, formatting, strict typecheck, unit and integration tests, production build, Playwright, accessibility, persistence, responsive, and runtime-error checks.
+
+## Links
+
+- Live demo: `[ADD DEPLOYED URL]`
+- Source: `[ADD REPOSITORY URL]`
+- Demo video: `[ADD VIDEO URL]`
 
 ## Built with
 
-- Vite
-- React
-- TypeScript
-- Zustand
-- Zod
-- Lucide React
-- Plain CSS
-- Vitest and React Testing Library
-- Playwright
-- axe-core
-- ESLint and Prettier
-- Imperative WebMCP with a first-party native/memory adapter
+React 19, TypeScript, Vite, Zustand, Zod, imperative WebMCP, Vitest, Playwright, Testing Library, axe-core, and Lucide icons.
 
-## Links to add before submission
+## License
 
-- Live demo: `LIVE_DEMO_URL_TO_ADD`
-- Repository: `REPOSITORY_URL_TO_ADD`
-- Video: `VIDEO_URL_TO_ADD`
-
-## Disclaimer
-
-CivicWeave and Northstar City are fictional. This demonstration does not connect to a government service or submit real information. All residents, vehicles, addresses, permits, fees, and confirmation numbers shown are fictional test data.
+MIT

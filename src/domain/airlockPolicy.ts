@@ -94,7 +94,9 @@ const assertOperationSequence = (steps: ResponseOperationStep[], policy: Inciden
   }
   if (
     steps.length !== trustedRemediationOperationIds.length ||
-    trustedRemediationOperationIds.some((operationId, index) => steps[index]?.operationId !== operationId)
+    trustedRemediationOperationIds.some(
+      (operationId, index) => steps[index]?.operationId !== operationId,
+    )
   ) {
     throw new AirlockError(
       "DEPENDENCY_ORDER_INVALID",

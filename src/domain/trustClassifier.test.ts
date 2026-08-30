@@ -13,7 +13,8 @@ describe("classifyEvidence", () => {
       evidenceId: "log-third-party-injection",
       trustedForAction: false,
       injectionRisk: true,
-      reason: "Third-party content contains an instruction-like request for a forbidden capability.",
+      reason:
+        "Third-party content contains an instruction-like request for a forbidden capability.",
     });
   });
 

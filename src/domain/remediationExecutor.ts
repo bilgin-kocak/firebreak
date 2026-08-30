@@ -68,7 +68,10 @@ export const executeRemediation = async (
       try {
         await operation.execute(context, options.signal);
       } catch (error) {
-        if (options.signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+        if (
+          options.signal?.aborted ||
+          (error instanceof DOMException && error.name === "AbortError")
+        ) {
           throw new AirlockError("EXECUTION_CANCELLED", "Recovery was cancelled.");
         }
         throw error;

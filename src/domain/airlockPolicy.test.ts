@@ -21,7 +21,9 @@ const simulation: RemediationSimulation = {
   createdAt: "2026-08-30T09:01:00.000Z",
 };
 
-const input = (operations: readonly string[] = trustedRemediationOperationIds): ResponseProposalInput => ({
+const input = (
+  operations: readonly string[] = trustedRemediationOperationIds,
+): ResponseProposalInput => ({
   incidentId: "INC-4821",
   name: "rollback_checkout_release",
   title: "Rollback checkout safely",
@@ -90,7 +92,8 @@ describe("validateResponseProposal", () => {
     const reversed = [...trustedRemediationOperationIds];
     [reversed[2], reversed[3]] = [reversed[3]!, reversed[2]!];
     expectCode(
-      () => validateResponseProposal(input(reversed), { policy: createCanonicalPolicy(), simulation }),
+      () =>
+        validateResponseProposal(input(reversed), { policy: createCanonicalPolicy(), simulation }),
       "DEPENDENCY_ORDER_INVALID",
     );
   });

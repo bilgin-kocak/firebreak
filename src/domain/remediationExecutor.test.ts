@@ -113,9 +113,7 @@ describe("executeRemediation", () => {
     const { state, proposal } = setup();
     proposal.policy.used = true;
 
-    await expect(
-      executeRemediation(proposal, { state, canaryPercent: 10 }),
-    ).rejects.toEqual(
+    await expect(executeRemediation(proposal, { state, canaryPercent: 10 })).rejects.toEqual(
       expect.objectContaining<Partial<AirlockError>>({ code: "RESPONSE_ALREADY_USED" }),
     );
   });

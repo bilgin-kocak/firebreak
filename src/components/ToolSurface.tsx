@@ -1,165 +1,70 @@
-import { Ban, Braces, Check, Trash2 } from "lucide-react";
+import { CheckCircle2, Cpu, RadioTower } from "lucide-react";
 
-import { STATIC_TOOL_NAMES } from "../webmcp/staticToolDefinitions";
 import { useAppStore } from "../store/useAppStore";
-import { DemoPromptCard } from "./DemoPromptCard";
-import { PROMPT_B } from "./ServiceDashboard";
 
-interface ToolSurfaceProps {
-  onDisable(name: string): void;
-  onDelete(name: string, opener: HTMLElement): void;
-  onCopied(message: string): void;
-}
-
-const staticDescriptions: Record<(typeof STATIC_TOOL_NAMES)[number], string> = {
-  inspect_portal: "Inspect trusted service capabilities.",
-  compile_task_view: "Compile a safe adaptive interface.",
-  inspect_task_view: "Read the active view and human locks.",
-  patch_task_view: "Apply a safe, atomic view patch.",
-  run_journey_checks: "Verify completeness and accessibility.",
-  stage_workflow_tool: "Stage a reusable tool for human review.",
-  list_workflow_tools: "List compiled workflow metadata.",
-};
-
-export const ToolSurface = ({ onDisable, onDelete, onCopied }: ToolSurfaceProps) => {
-  const registered = useAppStore((state) => state.webmcp.registeredToolNames);
-  const approved = useAppStore((state) => state.approvedWorkflowTools);
-  const proposals = useAppStore((state) => state.proposals);
-  const lastChange = useAppStore((state) => state.webmcp.lastToolChangeAt);
-  const validationErrorProposals = Object.values(proposals).filter(
-    (proposal) => proposal.validationErrors.length > 0 && !approved[proposal.name],
-  );
-  const hasCompiledRows = Object.values(approved).length > 0 || validationErrorProposals.length > 0;
+export const ToolSurface = ({
+  onInvoke,
+  onDisable,
+  onDelete,
+}: {
+  onInvoke(): Promise<void>;
+  onDisable(): void;
+  onDelete(): void;
+}) => {
+  const names = useAppStore((state) => state.webmcp.registeredToolNames);
+  const approved = useAppStore((state) => state.approvedResponseTools.rollback_checkout_release);
+  const dynamicLive = names.includes("rollback_checkout_release");
   return (
-    <section className="rail-panel" aria-labelledby="tool-surface-heading">
-      <div className="rail-panel-heading">
+    <section className="rail-section" aria-labelledby="tools-title">
+      <div className="panel-heading">
         <div>
-          <p className="eyebrow">Live capability graph</p>
-          <h2 id="tool-surface-heading" tabIndex={-1}>
-            Tool Surface
-          </h2>
+          <span className="eyebrow">LIVE AGENT SURFACE</span>
+          <h2 id="tools-title">{names.length || 7} tools registered</h2>
         </div>
-        <span className="count-badge">{registered.length} live</span>
+        <RadioTower size={18} />
       </div>
-      <h3 className="tool-group-heading">Static</h3>
       <ul className="tool-list">
-        {STATIC_TOOL_NAMES.map((name) => (
-          <li key={name} className="tool-row">
-            <span className="tool-icon">
-              <Braces size={16} />
-            </span>
-            <div>
-              <code>{name}</code>
-              <p>{staticDescriptions[name]}</p>
-              <span className="tool-meta">
-                <span>Built-in</span>
-                <span>
-                  {name.startsWith("inspect") || name.startsWith("list") || name.startsWith("run")
-                    ? "Read"
-                    : "Write"}
-                </span>
-                <span>
-                  {registered.includes(name) ? (
-                    <>
-                      <Check size={12} /> Registered
-                    </>
-                  ) : (
-                    "Unavailable"
-                  )}
-                </span>
-              </span>
-            </div>
+        {names
+          .filter((name) => name !== "rollback_checkout_release")
+          .map((name) => (
+            <li key={name}>
+              <Cpu size={13} />
+              <span className="mono">{name}</span>
+              <small>static</small>
+            </li>
+          ))}
+        {dynamicLive ? (
+          <li className="dynamic-tool-row">
+            <CheckCircle2 size={14} />
+            <span className="mono">rollback_checkout_release</span>
+            <small>ONE USE · LIVE</small>
           </li>
-        ))}
+        ) : null}
       </ul>
-      <h3 className="tool-group-heading">Compiled</h3>
-      {hasCompiledRows ? (
-        <>
-          <ul className="tool-list">
-            {Object.values(approved).map((tool) => (
-              <li
-                key={tool.name}
-                data-testid={`tool-row-${tool.name}`}
-                className={`tool-row compiled-row ${lastChange ? "row-pulse" : ""}`}
-              >
-                <span className="tool-icon">
-                  <Braces size={16} />
-                </span>
-                <div>
-                  <code>{tool.name}</code>
-                  <p>{tool.description}</p>
-                  <span className="tool-meta">
-                    <span>Human-approved workflow</span>
-                    <span>Write</span>
-                    <span>
-                      {!tool.enabled
-                        ? "Disabled"
-                        : registered.includes(tool.name)
-                          ? "Registered"
-                          : "Registration failed"}
-                    </span>
-                  </span>
-                  {tool.enabled && !registered.includes(tool.name) ? (
-                    <p className="tool-availability-note">
-                      Reload this page to retry registration, or disable the saved workflow.
-                    </p>
-                  ) : null}
-                  <div className="row-actions">
-                    {tool.enabled ? (
-                      <button type="button" onClick={() => onDisable(tool.name)}>
-                        <Ban size={14} /> Disable
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={(event) => onDelete(tool.name, event.currentTarget)}
-                    >
-                      <Trash2 size={14} /> Delete
-                    </button>
-                  </div>
-                </div>
-              </li>
-            ))}
-            {validationErrorProposals.map((proposal) => (
-              <li
-                key={proposal.id}
-                data-testid={`tool-row-${proposal.name}-validation-error`}
-                className="tool-row compiled-row validation-error-row"
-              >
-                <span className="tool-icon">
-                  <Braces size={16} />
-                </span>
-                <div>
-                  <code>{proposal.name}</code>
-                  <p>{proposal.description}</p>
-                  <span className="tool-meta">
-                    <span>Compiled proposal</span>
-                    <span>Write</span>
-                    <span>Validation error</span>
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-          {approved.renew_permit_guided?.enabled && registered.includes("renew_permit_guided") ? (
-            <div className="compiled-prompt">
-              <DemoPromptCard
-                number={2}
-                title="Use the tool you approved"
-                prompt={PROMPT_B}
-                onCopied={onCopied}
-              />
-            </div>
-          ) : null}
-        </>
-      ) : (
-        <div className="empty-state compact">
-          <Braces size={20} />
+      {dynamicLive ? (
+        <div className="prompt-b-card">
+          <span className="prompt-label">PROMPT B</span>
           <p>
-            <strong>No compiled tools yet</strong>
-            <span>Human-approved workflows appear here live.</span>
+            Use <span className="mono">rollback_checkout_release</span> with a 10% canary.
           </p>
+          <button className="button button-recovery" type="button" onClick={() => void onInvoke()}>
+            Invoke approved response
+          </button>
+          <div className="tool-human-actions">
+            <button type="button" onClick={onDisable}>
+              Disable
+            </button>
+            <button type="button" onClick={onDelete}>
+              Delete
+            </button>
+          </div>
         </div>
+      ) : (
+        <p className="rail-empty">
+          {approved?.status === "completed"
+            ? "One-use tool consumed and unregistered."
+            : "A response tool appears here only after human approval."}
+        </p>
       )}
     </section>
   );

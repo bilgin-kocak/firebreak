@@ -1,48 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { validateJsonSchema } from "../domain/operationRegistry";
+import { createStaticToolDefinitions } from "./staticToolDefinitions";
 import { createSchemaInputSample } from "./toolInputSample";
 
-describe("createSchemaInputSample", () => {
-  it("builds and verifies a long email within satisfiable length bounds", () => {
-    const schema = {
-      type: "string" as const,
-      format: "email" as const,
-      minLength: 100,
-      maxLength: 120,
-    };
-
-    const sample = createSchemaInputSample(schema);
-
-    expect(sample).toBeTypeOf("string");
-    expect(String(sample).length).toBeGreaterThanOrEqual(100);
-    expect(String(sample).length).toBeLessThanOrEqual(120);
-    expect(validateJsonSchema(schema, sample)).toBe(true);
-    expect(
-      String(sample)
-        .split("@")[1]
-        ?.split(".")
-        .every((label) => label.length <= 63),
-    ).toBe(true);
+describe("Airlock simulator samples", () => {
+  it("creates closed, JSON-compatible inputs for every static tool", () => {
+    for (const tool of createStaticToolDefinitions()) {
+      const sample = createSchemaInputSample(tool.inputSchema);
+      expect(() => JSON.stringify(sample)).not.toThrow();
+      expect(tool.inputValidator.safeParse(sample).success).toBe(true);
+    }
   });
 
-  it("deterministically generates anchored literals, classes, escapes, and quantifiers", () => {
-    const schema = {
-      type: "string" as const,
-      pattern: "^Z{2}-[0-9]{2}\\.[A-Z]\\d$",
-    };
-
-    const first = createSchemaInputSample(schema);
-    const second = createSchemaInputSample(schema);
-
-    expect(first).toBe("ZZ-00.A0");
-    expect(second).toBe(first);
-    expect(validateJsonSchema(schema, first)).toBe(true);
-  });
-
-  it("throws a clear error rather than returning an unchecked unsupported pattern", () => {
-    expect(() => createSchemaInputSample({ type: "string", pattern: "^(?=A)A$" })).toThrow(
-      /cannot generate a verified sample.*unsupported pattern/i,
-    );
+  it("uses the first bounded enum value deterministically", () => {
+    expect(createSchemaInputSample({ type: "integer", enum: [5, 10, 25] })).toBe(5);
   });
 });

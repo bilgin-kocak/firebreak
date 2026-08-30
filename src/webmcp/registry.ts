@@ -1,4 +1,4 @@
-import { DomainError } from "../domain/types";
+import { AirlockError } from "../domain/airlockTypes";
 import { getAppState, type ToolAppState } from "../store/useAppStore";
 import type { WebMCPAdapter } from "./adapter";
 import { compactResult, errorResult } from "./results";
@@ -42,7 +42,7 @@ export class ToolRegistry {
     options: { signal?: AbortSignal } = {},
   ): Promise<void> {
     if (this.registrations.has(definition.name) || this.pendingNames.has(definition.name)) {
-      throw new DomainError(
+      throw new AirlockError(
         "TOOL_ALREADY_REGISTERED",
         `Tool '${definition.name}' is already registered.`,
       );

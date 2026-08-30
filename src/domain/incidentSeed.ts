@@ -16,7 +16,9 @@ export const trustedRemediationOperationIds = [
   "incident.resolve",
 ] as const;
 
-export const createCanonicalPolicy = (now = new Date("2026-08-30T09:00:00.000Z")): IncidentPolicy => ({
+export const createCanonicalPolicy = (
+  now = new Date("2026-08-30T09:00:00.000Z"),
+): IncidentPolicy => ({
   incidentId: "INC-4821",
   serviceIds: ["checkout-api"],
   allowedOperationIds: [...trustedRemediationOperationIds],
