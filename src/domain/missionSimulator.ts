@@ -97,7 +97,6 @@ export function missionStateHash(snapshot: FirebreakSnapshot): string {
     JSON.stringify({
       incidentId: snapshot.incidentId,
       revision: snapshot.revision,
-      phase: snapshot.phase,
       robots: ROBOT_IDS.map((id) => ({
         id,
         position: snapshot.robots[id].position,

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createFirebreakSeed, ROBOT_IDS } from "./firebreakSeed";
 import {
   minimumSynchronizedSeparation,
+  missionStateHash,
   routeIntersectsPolygon,
   simulateCoordinatedMission,
 } from "./missionSimulator";
@@ -52,6 +53,20 @@ describe("simulateCoordinatedMission", () => {
     expect(revised.id).not.toBe(first.id);
     expect(revised.stateHash).not.toBe(first.stateHash);
     expect(first.incidentRevision).toBe(1);
+  });
+
+  it("does not invalidate physical proof when only the review phase changes", () => {
+    const snapshot = createFirebreakSeed();
+
+    expect(missionStateHash({ ...snapshot, phase: "planned" })).toBe(
+      missionStateHash(snapshot),
+    );
+    expect(
+      missionStateHash({
+        ...snapshot,
+        hazards: { ...snapshot.hazards, smoke: 0.7 },
+      }),
+    ).not.toBe(missionStateHash(snapshot));
   });
 
   it("reports no safe route when the forbidden zone covers the warehouse", () => {
