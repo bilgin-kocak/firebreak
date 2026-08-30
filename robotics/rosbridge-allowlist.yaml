@@ -1,0 +1,42 @@
+# Firebreak companion policy. Mirror these exact names in the rosbridge-side
+# authorization / network policy used by your deployment. Rosbridge does not
+# automatically load this project-owned file.
+version: 1
+transport:
+  local_plaintext_hosts:
+    - localhost
+    - 127.0.0.1
+  remote_requires_tls: true
+publish:
+  message_types:
+    geometry_msgs/msg/Twist:
+      - /firebreak/scout-1/cmd_vel
+      - /firebreak/medic-2/cmd_vel
+      - /firebreak/suppress-3/cmd_vel
+      - /firebreak/haul-4/cmd_vel
+    geometry_msgs/msg/PoseStamped:
+      - /firebreak/scout-1/goal_pose
+      - /firebreak/medic-2/goal_pose
+      - /firebreak/suppress-3/goal_pose
+      - /firebreak/haul-4/goal_pose
+    std_msgs/msg/Bool:
+      - /firebreak/fleet/emergency_stop
+subscribe:
+  message_types:
+    nav_msgs/msg/Odometry:
+      - /firebreak/scout-1/odom
+      - /firebreak/medic-2/odom
+      - /firebreak/suppress-3/odom
+      - /firebreak/haul-4/odom
+    sensor_msgs/msg/BatteryState:
+      - /firebreak/scout-1/battery
+      - /firebreak/medic-2/battery
+      - /firebreak/suppress-3/battery
+      - /firebreak/haul-4/battery
+deny:
+  arbitrary_topics: true
+  arbitrary_message_types: true
+  services: true
+  parameters: true
+  actions: true
+  raw_rosbridge_operations: true
