@@ -1,5 +1,8 @@
 import type {
   FirebreakSnapshot,
+  MissionAction,
+  MissionProgressEvent,
+  MissionRoute,
   PolygonPoint,
   RobotId,
   Vector3Value,
@@ -7,7 +10,7 @@ import type {
 import type {
   BrowserDriverOptions,
   ManualRobotCommand,
-  RobotDriver,
+  MissionRobotDriver,
 } from "./controlTypes";
 
 const WORLD_BOUNDS = { minX: -13.5, maxX: 13.5, minZ: -9.5, maxZ: 9.5 };
@@ -111,7 +114,83 @@ function tryContextAction(snapshot: FirebreakSnapshot, robotId: RobotId): boolea
   return false;
 }
 
-export class BrowserSimulationDriver implements RobotDriver {
+function applyMissionAction(
+  snapshot: FirebreakSnapshot,
+  action: MissionAction | undefined,
+): void {
+  if (!action) return;
+  if (action === "scan-hazards") {
+    snapshot.hazards.scanned = true;
+    updateObjective(snapshot, "scan-hazards");
+  } else if (action === "rescue-worker-a") {
+    snapshot.workers["WORKER-A"] = {
+      ...snapshot.workers["WORKER-A"],
+      status: "rescuing",
+      assignedRobot: "MEDIC-2",
+    };
+  } else if (action === "deliver-worker-a") {
+    snapshot.workers["WORKER-A"] = {
+      ...snapshot.workers["WORKER-A"],
+      status: "safe",
+      assignedRobot: "MEDIC-2",
+      position: { x: -12, y: 0.9, z: 6 },
+    };
+  } else if (action === "isolate-power") {
+    snapshot.hazards.powerIsolated = true;
+  } else if (action === "suppress-fire") {
+    snapshot.hazards.fire = {
+      ...snapshot.hazards.fire,
+      intensity: 0.08,
+      contained: true,
+    };
+    updateObjective(snapshot, "contain-fire");
+  } else if (action === "rescue-worker-b") {
+    snapshot.workers["WORKER-B"] = {
+      ...snapshot.workers["WORKER-B"],
+      status: "rescuing",
+      assignedRobot: "HAUL-4",
+    };
+  } else if (action === "pickup-container") {
+    snapshot.hazards.container = {
+      ...snapshot.hazards.container,
+      status: "moving",
+    };
+  } else if (action === "deliver-worker-b-and-container") {
+    snapshot.workers["WORKER-B"] = {
+      ...snapshot.workers["WORKER-B"],
+      status: "safe",
+      assignedRobot: "HAUL-4",
+      position: { x: -9, y: 0.9, z: 8 },
+    };
+    snapshot.hazards.container = {
+      ...snapshot.hazards.container,
+      position: { ...snapshot.hazards.container.targetPosition },
+      status: "safe",
+    };
+    updateObjective(snapshot, "rescue-workers");
+    updateObjective(snapshot, "move-container");
+  }
+}
+
+function defaultWait(milliseconds: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const handle = window.setTimeout(resolve, milliseconds);
+    signal.addEventListener(
+      "abort",
+      () => {
+        window.clearTimeout(handle);
+        reject(signal.reason);
+      },
+      { once: true },
+    );
+  });
+}
+
+export class BrowserSimulationDriver implements MissionRobotDriver {
   readonly mode = "browser" as const;
   private connected = true;
 
@@ -175,6 +254,59 @@ export class BrowserSimulationDriver implements RobotDriver {
     snapshot.elapsedMs += command.deltaMs;
     snapshot.revision += 1;
     this.options.commitSnapshot(snapshot);
+  }
+
+  async executeRoute(
+    route: MissionRoute,
+    options: {
+      signal: AbortSignal;
+      onProgress: (event: MissionProgressEvent) => void;
+    },
+  ): Promise<void> {
+    if (!this.connected) throw new Error("Browser simulation is disconnected");
+    const wait = this.options.wait ?? defaultWait;
+    const playbackRate = Math.max(1, this.options.playbackRate ?? 3.5);
+    const initialBattery = this.options.readSnapshot().robots[route.robotId].battery;
+
+    for (let index = 1; index < route.waypoints.length; index += 1) {
+      if (options.signal.aborted) throw options.signal.reason;
+      const previous = route.waypoints[index - 1]!;
+      const waypoint = route.waypoints[index]!;
+      await wait((waypoint.atMs - previous.atMs) / playbackRate, options.signal);
+      if (options.signal.aborted) throw options.signal.reason;
+
+      const snapshot = structuredClone(this.options.readSnapshot());
+      const progress = index / (route.waypoints.length - 1);
+      applyMissionAction(snapshot, waypoint.action);
+      snapshot.robots[route.robotId] = {
+        ...snapshot.robots[route.robotId],
+        position: { ...waypoint.position },
+        battery:
+          initialBattery +
+          (route.predictedBatteryEnd - initialBattery) * progress,
+        routeProgress: progress,
+        status: waypoint.action
+          ? index === route.waypoints.length - 1
+            ? "complete"
+            : "acting"
+          : "enroute",
+      };
+      snapshot.revision += 1;
+      this.options.commitSnapshot(snapshot);
+      options.onProgress({
+        robotId: route.robotId,
+        progress,
+        status:
+          index === route.waypoints.length - 1
+            ? "complete"
+            : waypoint.action
+              ? "acting"
+              : "enroute",
+        message: waypoint.action
+          ? `${route.robotId}: ${waypoint.action}`
+          : `${route.robotId} following approved route`,
+      });
+    }
   }
 
   async stopAll(reason: string): Promise<void> {

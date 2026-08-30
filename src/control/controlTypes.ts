@@ -1,5 +1,7 @@
 import type {
   FirebreakSnapshot,
+  MissionProgressEvent,
+  MissionRoute,
   RobotId,
 } from "../domain/firebreakTypes";
 
@@ -39,7 +41,19 @@ export interface RobotDriver {
   stopAll(reason: string): Promise<void>;
 }
 
+export interface MissionRobotDriver extends RobotDriver {
+  executeRoute(
+    route: MissionRoute,
+    options: {
+      signal: AbortSignal;
+      onProgress: (event: MissionProgressEvent) => void;
+    },
+  ): Promise<void>;
+}
+
 export interface BrowserDriverOptions {
   readSnapshot: () => FirebreakSnapshot;
   commitSnapshot: (snapshot: FirebreakSnapshot) => void;
+  wait?: (milliseconds: number, signal: AbortSignal) => Promise<void>;
+  playbackRate?: number;
 }

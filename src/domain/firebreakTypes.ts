@@ -91,6 +91,130 @@ export interface MissionEvent {
   message: string;
 }
 
+export type MissionStrategy = "coordinated";
+export type MissionAction =
+  | "scan-hazards"
+  | "rescue-worker-a"
+  | "deliver-worker-a"
+  | "isolate-power"
+  | "suppress-fire"
+  | "rescue-worker-b"
+  | "pickup-container"
+  | "deliver-worker-b-and-container";
+
+export interface MissionWaypoint {
+  position: Vector3Value;
+  atMs: number;
+  action?: MissionAction;
+}
+
+export interface MissionRoute {
+  robotId: RobotId;
+  waypoints: MissionWaypoint[];
+  durationMs: number;
+  predictedBatteryEnd: number;
+}
+
+export interface MissionPredictions {
+  rescuedWorkers: number;
+  fireContained: boolean;
+  containerSafe: boolean;
+  safetyViolations: number;
+}
+
+export interface MissionSimulation {
+  id: string;
+  incidentId: "WH-01";
+  incidentRevision: number;
+  stateHash: string;
+  strategy: MissionStrategy;
+  feasible: boolean;
+  reasonCode: "READY" | "NO_SAFE_ROUTE" | "ROBOT_CONFLICT";
+  durationMs: number;
+  routes: Record<RobotId, MissionRoute>;
+  predictions: MissionPredictions;
+}
+
+export type SafetyCheckId =
+  | "revision"
+  | "state"
+  | "robots"
+  | "routes"
+  | "geofence"
+  | "separation"
+  | "battery"
+  | "duration"
+  | "roles"
+  | "rollback"
+  | "budget";
+
+export interface SafetyCheck {
+  id: SafetyCheckId;
+  label: string;
+  status: "passed" | "failed";
+  detail: string;
+}
+
+export interface SafetyCheckReport {
+  simulationId: string;
+  incidentRevision: number;
+  stateHash: string;
+  passed: boolean;
+  checks: SafetyCheck[];
+}
+
+export type MissionProposalStatus =
+  | "staged"
+  | "authorized"
+  | "registered"
+  | "executing"
+  | "completed"
+  | "cancelled"
+  | "failed"
+  | "expired"
+  | "revoked";
+
+export interface MissionProposal {
+  id: string;
+  incidentId: "WH-01";
+  incidentRevision: number;
+  stateHash: string;
+  simulationId: string;
+  strategy: MissionStrategy;
+  status: MissionProposalStatus;
+  routes: Record<RobotId, MissionRoute>;
+  allowedRobotIds: RobotId[];
+  checks: SafetyCheck[];
+  createdAt: number;
+  authorizedAt: number | null;
+  expiresAt: number | null;
+  oneUse: true;
+  consumedAt: number | null;
+}
+
+export interface MissionReceipt {
+  id: string;
+  proposalId: string;
+  outcome: "succeeded" | "cancelled" | "failed";
+  startedAt: number;
+  completedAt: number;
+  durationMs: number;
+  rescuedWorkers: number;
+  fireContained: boolean;
+  containerSafe: boolean;
+  safetyViolations: number;
+  finalBattery: Record<RobotId, number>;
+  partialProgress: Record<RobotId, number>;
+  reason: string | null;
+}
+
+export interface MissionProgressEvent {
+  robotId: RobotId;
+  progress: number;
+  status: "enroute" | "acting" | "complete";
+  message: string;
+}
+
 export interface FirebreakSnapshot {
   version: 1;
   incidentId: "WH-01";
@@ -106,5 +230,5 @@ export interface FirebreakSnapshot {
   objectives: ObjectiveState[];
   routes: Record<RobotId, Vector3Value[]>;
   events: MissionEvent[];
-  receipt: null;
+  receipt: MissionReceipt | null;
 }

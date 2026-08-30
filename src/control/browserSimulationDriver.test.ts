@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createFirebreakSeed } from "../domain/firebreakSeed";
 import type { FirebreakSnapshot } from "../domain/firebreakTypes";
+import { simulateCoordinatedMission } from "../domain/missionSimulator";
 import { BrowserSimulationDriver } from "./browserSimulationDriver";
 
 function activeSeed(): FirebreakSnapshot {
@@ -144,5 +145,33 @@ describe("BrowserSimulationDriver", () => {
     expect(snapshot.events.at(-1)?.message).toBe(
       "All robots stopped: Controller disconnected",
     );
+  });
+
+  it("plays an approved route through deterministic progress updates", async () => {
+    let snapshot = activeSeed();
+    const route = simulateCoordinatedMission(snapshot).routes["SCOUT-1"];
+    const progress: number[] = [];
+    const driver = new BrowserSimulationDriver({
+      readSnapshot: () => snapshot,
+      commitSnapshot: (next) => {
+        snapshot = next;
+      },
+      wait: async () => undefined,
+      playbackRate: 4,
+    });
+
+    await driver.executeRoute(route, {
+      signal: new AbortController().signal,
+      onProgress: (event) => progress.push(event.progress),
+    });
+
+    expect(progress.at(-1)).toBe(1);
+    expect(snapshot.robots["SCOUT-1"].position).toEqual(
+      route.waypoints.at(-1)?.position,
+    );
+    expect(snapshot.robots["SCOUT-1"].battery).toBe(
+      route.predictedBatteryEnd,
+    );
+    expect(snapshot.hazards.scanned).toBe(true);
   });
 });
