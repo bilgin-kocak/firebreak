@@ -309,6 +309,29 @@ export const loadResponseEnvelope = (
     responseEnvelopeDataSchema as z.ZodType<ResponseEnvelopeData>,
   );
   if (!loaded.data || !options) return loaded;
+  const simulations = Object.fromEntries(
+    Object.entries(loaded.data.simulations).filter(
+      ([, simulation]) => simulation.incidentRevision === options.incidentRevision,
+    ),
+  );
+  const checkRevisions = Object.fromEntries(
+    Object.entries(loaded.data.checkRevisions).filter(
+      ([simulationId, revision]) =>
+        Boolean(simulations[simulationId]) && revision === options.incidentRevision,
+    ),
+  );
+  const checks = Object.fromEntries(
+    Object.entries(loaded.data.checks).filter(([simulationId]) =>
+      Boolean(simulations[simulationId] && checkRevisions[simulationId]),
+    ),
+  );
+  const proposals = Object.fromEntries(
+    Object.entries(loaded.data.proposals).filter(
+      ([, proposal]) =>
+        proposal.incidentRevision === options.incidentRevision &&
+        Boolean(simulations[proposal.simulationId] && checkRevisions[proposal.simulationId]),
+    ),
+  );
   const approvedResponseTools = Object.fromEntries(
     Object.entries(loaded.data.approvedResponseTools).filter(([, tool]) =>
       Boolean(
@@ -317,15 +340,29 @@ export const loadResponseEnvelope = (
         tool.registrationRevision === options.incidentRevision &&
         tool.incidentRevision === options.incidentRevision &&
         !tool.policy.used &&
-        new Date(tool.policy.expiresAt).getTime() > options.now.getTime(),
+        new Date(tool.policy.expiresAt).getTime() > options.now.getTime() &&
+        simulations[tool.simulationId] &&
+        checkRevisions[tool.simulationId] &&
+        proposals[tool.id],
       ),
     ),
   );
   const filtered =
+    Object.keys(simulations).length !== Object.keys(loaded.data.simulations).length ||
+    Object.keys(checks).length !== Object.keys(loaded.data.checks).length ||
+    Object.keys(checkRevisions).length !== Object.keys(loaded.data.checkRevisions).length ||
+    Object.keys(proposals).length !== Object.keys(loaded.data.proposals).length ||
     Object.keys(approvedResponseTools).length !==
-    Object.keys(loaded.data.approvedResponseTools).length;
+      Object.keys(loaded.data.approvedResponseTools).length;
   return {
-    data: { ...loaded.data, approvedResponseTools },
+    data: {
+      ...loaded.data,
+      simulations,
+      checks,
+      checkRevisions,
+      proposals,
+      approvedResponseTools,
+    },
     recovered: loaded.recovered || filtered,
   };
 };

@@ -109,6 +109,24 @@ describe("executeRemediation", () => {
     expect(state).toEqual(before);
   });
 
+  it("restores the snapshot when cancellation arrives after the final progress event", async () => {
+    const { state, proposal } = setup();
+    const before = structuredClone(state);
+    const controller = new AbortController();
+
+    await expect(
+      executeRemediation(proposal, {
+        state,
+        canaryPercent: 10,
+        signal: controller.signal,
+        onProgress: (entry) => {
+          if (entry.phase === "incident_resolved") controller.abort();
+        },
+      }),
+    ).rejects.toMatchObject({ code: "EXECUTION_CANCELLED" });
+    expect(state).toEqual(before);
+  });
+
   it("rejects a response policy that has already been consumed", async () => {
     const { state, proposal } = setup();
     proposal.policy.used = true;

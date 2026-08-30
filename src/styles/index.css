@@ -808,6 +808,24 @@ h3 {
   border: 1px solid rgba(93, 226, 165, 0.45);
   border-radius: 50%;
 }
+.receipt-failed {
+  border-color: rgba(255, 93, 93, 0.5);
+  background: linear-gradient(140deg, rgba(255, 93, 93, 0.09), var(--panel-3));
+}
+.receipt-cancelled {
+  border-color: rgba(245, 185, 66, 0.5);
+  background: linear-gradient(140deg, rgba(245, 185, 66, 0.09), var(--panel-3));
+}
+.receipt-failed .receipt-seal,
+.receipt-failed dd {
+  color: var(--red);
+  border-color: rgba(255, 93, 93, 0.45);
+}
+.receipt-cancelled .receipt-seal,
+.receipt-cancelled dd {
+  color: var(--amber);
+  border-color: rgba(245, 185, 66, 0.45);
+}
 .receipt-panel dl {
   grid-column: 1/-1;
   display: grid;

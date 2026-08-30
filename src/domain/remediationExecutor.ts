@@ -82,6 +82,9 @@ export const executeRemediation = async (
         detail: operation.detail,
         timestamp: now().toISOString(),
       });
+      if (options.signal?.aborted) {
+        throw new AirlockError("EXECUTION_CANCELLED", "Recovery was cancelled.");
+      }
     }
     if (context.productionMutations !== proposal.policy.maxProductionMutations) {
       throw new AirlockError(

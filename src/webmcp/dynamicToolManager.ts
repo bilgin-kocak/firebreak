@@ -39,10 +39,30 @@ export interface DynamicToolManagerDependencies {
   now?: () => Date;
 }
 
+const combineAbortSignals = (
+  signals: Array<AbortSignal | undefined>,
+): { signal: AbortSignal; cleanup(): void } => {
+  const controller = new AbortController();
+  const activeSignals = signals.filter((signal): signal is AbortSignal => Boolean(signal));
+  const abort = () => controller.abort();
+  for (const signal of activeSignals) {
+    if (signal.aborted) abort();
+    else signal.addEventListener("abort", abort, { once: true });
+  }
+  return {
+    signal: controller.signal,
+    cleanup() {
+      for (const signal of activeSignals) signal.removeEventListener("abort", abort);
+    },
+  };
+};
+
 export class DynamicToolManager {
   private readonly controllers = new Map<string, AbortController>();
+  private readonly executing = new Set<string>();
   private readonly execute: ExecuteRemediation;
   private readonly now: () => Date;
+  private receiptSequence = 0;
 
   public constructor(
     private readonly registry: ToolRegistry,
@@ -175,24 +195,51 @@ export class DynamicToolManager {
       inputValidator,
       origin: "human_approved_workflow",
       execute: async (input, signal) => {
+        if (this.executing.has(proposal.name)) {
+          throw new AirlockError(
+            "RESPONSE_ALREADY_USED",
+            "This one-use response is already executing.",
+          );
+        }
+        this.executing.add(proposal.name);
+        const executionSignal = combineAbortSignals([
+          signal,
+          this.controllers.get(proposal.name)?.signal,
+        ]);
         const state = getAppState();
         const approved = state.approvedResponseTools[proposal.name];
-        if (!approved || !approved.enabled || approved.status !== "registered") {
-          throw new AirlockError("RESPONSE_NOT_APPROVED", "The rollback tool is not enabled.");
-        }
-        this.assertCurrentlyValid(approved);
-        const workingState = structuredClone(state.incidentState);
+        const attemptStartedAt = this.now().toISOString();
+        const attemptReceiptId = `receipt-${this.now().getTime()}-${++this.receiptSequence}`;
+        const blockedEvidenceIds = Object.values(state.assessments)
+          .filter((assessment) => assessment.injectionRisk)
+          .map((assessment) => assessment.evidenceId);
         try {
-          const receipt = await this.execute(approved, {
+          if (!approved || !approved.enabled || approved.status !== "registered") {
+            throw new AirlockError("RESPONSE_NOT_APPROVED", "The rollback tool is not enabled.");
+          }
+          this.assertCurrentlyValid(approved);
+          const workingState = structuredClone(state.incidentState);
+          const receipt = await this.execute(structuredClone(approved), {
             state: workingState,
             canaryPercent: input.canaryPercent,
-            quarantinedEvidenceIds: Object.values(state.assessments)
-              .filter((assessment) => assessment.injectionRisk)
-              .map((assessment) => assessment.evidenceId),
-            signal,
+            quarantinedEvidenceIds: blockedEvidenceIds,
+            signal: executionSignal.signal,
             now: this.now,
             onProgress: (entry) => getAppState().recordProgress(entry),
           });
+          const current = getAppState().approvedResponseTools[proposal.name];
+          if (
+            executionSignal.signal.aborted ||
+            !current ||
+            !current.enabled ||
+            current.status !== "registered" ||
+            current.approvedAt !== approved.approvedAt
+          ) {
+            throw new AirlockError(
+              "EXECUTION_CANCELLED",
+              "Response authority was revoked before recovery committed.",
+            );
+          }
           getAppState().replaceIncidentState(workingState);
           getAppState().saveReceipt(receipt);
           getAppState().completeResponseTool(proposal.name);
@@ -216,12 +263,37 @@ export class DynamicToolManager {
             blockedEvidenceIds: receipt.blockedEvidenceIds,
           });
         } catch (error) {
-          getAppState().setRecoveryPhase(
-            error instanceof AirlockError && error.code === "EXECUTION_CANCELLED"
-              ? "cancelled"
-              : "failed",
-          );
+          const current = getAppState().approvedResponseTools[proposal.name];
+          if (current?.enabled && current.status === "registered") {
+            const cancelled = error instanceof AirlockError && error.code === "EXECUTION_CANCELLED";
+            const incidentState = getAppState().incidentState;
+            const currentRelease =
+              incidentState.deployments.find((deployment) => deployment.current)?.version ??
+              "2026.08.30.3";
+            const stableRelease =
+              incidentState.deployments.find((deployment) => deployment.stable)?.version ??
+              "2026.08.30.2";
+            getAppState().saveReceipt({
+              id: attemptReceiptId,
+              incidentId: "INC-4821",
+              toolName: "rollback_checkout_release",
+              status: cancelled ? "cancelled" : "failed",
+              canaryPercent: input.canaryPercent,
+              fromRelease: currentRelease,
+              toRelease: stableRelease,
+              finalErrorRate: incidentState.incident.errorRate,
+              finalP95LatencyMs: incidentState.incident.p95LatencyMs,
+              productionMutations: 0,
+              blockedEvidenceIds,
+              operationIds: current.operations.map((operation) => operation.operationId),
+              startedAt: attemptStartedAt,
+              completedAt: this.now().toISOString(),
+            });
+          }
           throw error;
+        } finally {
+          executionSignal.cleanup();
+          this.executing.delete(proposal.name);
         }
       },
     };

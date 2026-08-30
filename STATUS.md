@@ -34,6 +34,7 @@ WebMCP Airlock is fully implemented as a static, browser-local React application
 | AbortController lifecycle    | Disable, delete, reset, successful consumption, and expiry remove dynamic registration safely.                                                                                     |
 | Visible `toolchange`         | Tool Surface count and dynamic highlighting update; Activity exposes `WebMCP tool surface changed`; canonical E2E asserts both native events.                                      |
 | Failure safety               | Cancellation and operation failure restore the complete snapshot and record a failed/cancelled receipt.                                                                            |
+| Concurrency and revocation   | An in-flight lock rejects simultaneous one-use calls; caller cancellation or registration abort cancels execution, and revoked/reset authority cannot commit stale state.          |
 | Durable recovery             | Versioned `airlock.incident.v1`, `airlock.responses.v1`, and `airlock.ui.v1` envelopes revalidate on hydration; corrupt, stale, expired, and completed authority does not restore. |
 | No hidden production power   | No backend, network request, credential, arbitrary code, shell, URL, selector, customer-data export, deletion, secret access, or unrelated-service operation exists.               |
 
@@ -46,7 +47,7 @@ The latest complete component gate passed:
 | ESLint                     | Passed with zero warnings                                                                        |
 | Prettier check             | Passed                                                                                           |
 | Strict TypeScript check    | Passed                                                                                           |
-| Unit and integration tests | 15 files, 67 tests passed                                                                        |
+| Unit and integration tests | 16 files, 75 tests passed                                                                        |
 | Production build           | Passed; 1,630 modules transformed                                                                |
 | Playwright                 | 11 tests passed                                                                                  |
 | Accessibility              | Zero serious or critical axe findings in initial, proposal, live-tool, and recovered states      |

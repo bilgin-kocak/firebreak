@@ -416,12 +416,17 @@ export const useAppStore = create<AppState>((set, get) => {
     },
     saveReceipt(receipt) {
       update(() => ({ receipt: structuredClone(receipt), recoveryPhase: receipt.status }));
+      const resolved = receipt.status === "incident_resolved";
       logActivity({
         actor: "airlock",
-        kind: "incident_resolved",
-        title: "Incident resolved with an immutable receipt",
+        kind: resolved ? "incident_resolved" : "tool_failed",
+        title: resolved
+          ? "Incident resolved with an immutable receipt"
+          : receipt.status === "cancelled"
+            ? "Recovery cancelled with an audit receipt"
+            : "Recovery failed with an audit receipt",
         toolName: receipt.toolName,
-        status: "success",
+        status: resolved ? "success" : receipt.status === "cancelled" ? "warning" : "error",
       });
     },
     completeResponseTool(name) {

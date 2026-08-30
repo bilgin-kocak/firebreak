@@ -161,9 +161,91 @@ describe("one-use rollback tool lifecycle", () => {
       adapter.executeTool("rollback_checkout_release", { canaryPercent: 10 }),
     ).resolves.toMatchObject({ ok: false, code: "OPERATION_FAILED" });
     expect(getAppState().incidentState).toEqual(before);
+    expect(getAppState().receipt).toMatchObject({
+      status: "failed",
+      productionMutations: 0,
+    });
+    expect(getAppState().recoveryPhase).toBe("failed");
     expect((await adapter.getTools()).map((tool) => tool.name)).toContain(
       "rollback_checkout_release",
     );
+  });
+
+  it("records caller cancellation without consuming or unregistering the response", async () => {
+    const { adapter, manager } = await setup();
+    const proposal = stageCanonicalProposal();
+    await manager.approveAndRegister(proposal.id);
+    const before = structuredClone(getAppState().incidentState);
+    const execution = new AbortController();
+    execution.abort();
+
+    await expect(
+      adapter.executeTool("rollback_checkout_release", { canaryPercent: 10 }, execution.signal),
+    ).resolves.toMatchObject({ ok: false, code: "EXECUTION_CANCELLED" });
+    expect(getAppState().incidentState).toEqual(before);
+    expect(getAppState().receipt).toMatchObject({
+      status: "cancelled",
+      productionMutations: 0,
+    });
+    expect(getAppState().approvedResponseTools.rollback_checkout_release).toMatchObject({
+      status: "registered",
+      enabled: true,
+      policy: { used: false },
+    });
+  });
+
+  it("allows only one in-flight invocation of the one-use response", async () => {
+    let releaseFirst: () => void = () => undefined;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const executeRemediation = vi.fn(async () => {
+      if (executeRemediation.mock.calls.length === 1) await firstGate;
+      throw new AirlockError("OPERATION_FAILED", "test gate released");
+    });
+    const adapter = createMemoryAdapter();
+    const registry = new ToolRegistry(adapter);
+    await registerStaticTools(registry);
+    const manager = new DynamicToolManager(registry, { executeRemediation });
+    const proposal = stageCanonicalProposal();
+    await manager.approveAndRegister(proposal.id);
+
+    const first = adapter.executeTool("rollback_checkout_release", { canaryPercent: 10 });
+    await vi.waitFor(() => expect(executeRemediation).toHaveBeenCalledTimes(1));
+    await expect(
+      adapter.executeTool("rollback_checkout_release", { canaryPercent: 10 }),
+    ).resolves.toMatchObject({ ok: false, code: "RESPONSE_ALREADY_USED" });
+    expect(executeRemediation).toHaveBeenCalledTimes(1);
+
+    releaseFirst();
+    await expect(first).resolves.toMatchObject({ ok: false, code: "OPERATION_FAILED" });
+  });
+
+  it("cancels an in-flight response when its registration is disabled", async () => {
+    const executeRemediation = vi.fn(
+      async (_proposal, options) =>
+        new Promise<never>((_resolve, reject) => {
+          const cancel = () =>
+            reject(new AirlockError("EXECUTION_CANCELLED", "registration revoked"));
+          if (options.signal?.aborted) cancel();
+          else options.signal?.addEventListener("abort", cancel, { once: true });
+        }),
+    );
+    const adapter = createMemoryAdapter();
+    const registry = new ToolRegistry(adapter);
+    await registerStaticTools(registry);
+    const manager = new DynamicToolManager(registry, { executeRemediation });
+    const proposal = stageCanonicalProposal();
+    await manager.approveAndRegister(proposal.id);
+    const before = structuredClone(getAppState().incidentState);
+
+    const execution = adapter.executeTool("rollback_checkout_release", { canaryPercent: 10 });
+    await vi.waitFor(() => expect(executeRemediation).toHaveBeenCalledTimes(1));
+    manager.disable("rollback_checkout_release");
+
+    await expect(execution).resolves.toMatchObject({ ok: false, code: "EXECUTION_CANCELLED" });
+    expect(getAppState().incidentState).toEqual(before);
+    expect(getAppState().recoveryPhase).toBe("idle");
   });
 
   it("disables and deletes a registered response through human UI commands", async () => {

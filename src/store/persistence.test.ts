@@ -93,9 +93,9 @@ describe("Airlock persistence", () => {
     };
     saveResponseEnvelope(storage, {
       simulations: { [simulation.id]: simulation },
-      checks: {},
-      checkRevisions: {},
-      proposals: {},
+      checks: { [simulation.id]: [] },
+      checkRevisions: { [simulation.id]: 1 },
+      proposals: { [proposal.id]: { ...proposal, status: "registered" } },
       approvedResponseTools: { rollback_checkout_release: approved },
       progress: [],
       receipt: null,
@@ -121,6 +121,27 @@ describe("Airlock persistence", () => {
         now: new Date("2026-08-30T09:20:00.000Z"),
       }).data?.approvedResponseTools,
     ).toEqual({});
+  });
+
+  it("discards stale and dangling response graphs during reconciliation", () => {
+    const storage = createMemoryStorage();
+    const { simulation, proposal } = responseFixture();
+    saveResponseEnvelope(storage, {
+      simulations: { [simulation.id]: simulation },
+      checks: { [simulation.id]: [] },
+      checkRevisions: { [simulation.id]: 1 },
+      proposals: { [proposal.id]: proposal },
+      approvedResponseTools: {},
+      progress: [],
+      receipt: null,
+      recoveryPhase: "idle",
+      activity: [],
+    });
+
+    expect(loadResponseEnvelope(storage, { incidentRevision: 2, now: new Date() })).toMatchObject({
+      recovered: true,
+      data: { simulations: {}, checks: {}, checkRevisions: {}, proposals: {} },
+    });
   });
 
   it("clears exactly the three Airlock keys", () => {
