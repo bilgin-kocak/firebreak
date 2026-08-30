@@ -110,7 +110,7 @@ export class ToolRegistry {
   }
 
   private async reconcile(logToolChange = false): Promise<void> {
-    const names = (await this.adapter.getTools()).map((tool) => tool.name).sort();
+    const names = (await this.adapter.getTools()).map((tool) => tool.name);
     const activeNames = new Set(names);
     for (const name of this.registrations.keys()) {
       if (!activeNames.has(name)) {

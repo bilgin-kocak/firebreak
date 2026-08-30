@@ -1,61 +1,71 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useAppStore } from "../store/useAppStore";
-import { CANONICAL_PROMPT_A } from "../components/AirlockSimulator";
+import { getFirebreakState, useFirebreakStore } from "../store/useFirebreakStore";
+import { STATIC_TOOL_NAMES } from "../webmcp/staticToolDefinitions";
 import { App } from "./App";
 
-describe("WebMCP Airlock application", () => {
-  beforeEach(async () => {
-    useAppStore.getState().setPersistenceStorage(undefined);
-    await useAppStore.getState().reset();
-    Object.defineProperty(document, "modelContext", { configurable: true, value: undefined });
+vi.mock("../scene/FirebreakScene", () => ({
+  FirebreakScene: () => (
+    <div role="img" aria-label="Interactive warehouse rescue scene with four emergency robots" />
+  ),
+}));
+
+describe("WebMCP Firebreak application", () => {
+  beforeEach(() => {
+    useFirebreakStore.getState().setPersistenceStorage(undefined);
+    useFirebreakStore.getState().resetDemo();
+    Object.defineProperty(document, "modelContext", {
+      configurable: true,
+      value: undefined,
+    });
   });
 
-  it("renders the complete fictional incident with an accessible topology alternative", async () => {
-    render(<App />);
-    expect(
-      screen.getByRole("heading", { name: "Checkout is failing in production" }),
-    ).toBeVisible();
-    expect(screen.getAllByText("31.8%")[0]).toBeVisible();
-    expect(screen.getAllByText("4,820", { exact: false })[0]).toBeVisible();
-    expect(screen.getByText(/fictional local demonstration/i)).toBeVisible();
-    expect(screen.getByText(/text view of service status/i)).toBeVisible();
-    await waitFor(() => expect(useAppStore.getState().webmcp.registeredToolNames).toHaveLength(7));
+  it("makes the robot rescue problem and playable controls immediately clear", async () => {
+    render(<App accelerated />);
+
+    expect(screen.getByRole("heading", { name: /rescue two workers/i })).toBeVisible();
+    expect(screen.getByText(/you drive one robot. the agent coordinates four/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: /start emergency/i })).toBeVisible();
+    expect(screen.getByRole("group", { name: /robot fleet/i })).toBeVisible();
+    expect(screen.getByText(/WASD or left stick/i)).toBeVisible();
+    await waitFor(() =>
+      expect(getFirebreakState().webmcp.registeredToolNames).toEqual(STATIC_TOOL_NAMES),
+    );
   });
 
-  it("completes the canonical two-prompt journey with one human approval", async () => {
+  it("completes the canonical two-prompt journey with one visible human authorization", async () => {
     const user = userEvent.setup();
-    render(<App />);
-    await waitFor(() => expect(useAppStore.getState().webmcp.registeredToolNames).toHaveLength(7));
-
-    await user.click(screen.getByRole("button", { name: /simulator/i }));
-    expect(screen.getByText(CANONICAL_PROMPT_A)).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /run investigation/i }));
-
-    expect(await screen.findByRole("heading", { name: /approve one-use response/i })).toBeVisible();
-    expect(screen.getByText("rollback_checkout_release")).toBeVisible();
-    expect(screen.getByText(/9\/9 safety gates pass/i)).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /approve & register once/i }));
-
+    render(<App accelerated />);
     await waitFor(() =>
-      expect(useAppStore.getState().webmcp.registeredToolNames).toContain(
-        "rollback_checkout_release",
+      expect(getFirebreakState().webmcp.registeredToolNames).toHaveLength(7),
+    );
+
+    await user.click(screen.getByRole("button", { name: /start emergency/i }));
+    await user.click(screen.getByRole("button", { name: /ask agent to plan rescue/i }));
+    await waitFor(() => expect(getFirebreakState().mission.proposal?.status).toBe("staged"));
+
+    const proposal = screen.getByRole("dialog", { name: /authorize rescue mission/i });
+    expect(within(proposal).getByText(/four allowlisted robots/i)).toBeVisible();
+    expect(within(proposal).getByText(/collapse zone excluded/i)).toBeVisible();
+    expect(getFirebreakState().webmcp.registeredToolNames).toHaveLength(7);
+
+    await user.click(within(proposal).getByRole("button", { name: /authorize one mission/i }));
+    await waitFor(() =>
+      expect(getFirebreakState().webmcp.registeredToolNames).toContain(
+        "execute_rescue_mission",
       ),
     );
-    expect(screen.getByRole("button", { name: /invoke approved response/i })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /invoke approved response/i }));
+    expect(screen.getByText(/8 tools live/i)).toBeVisible();
 
-    expect(await screen.findByRole("heading", { name: "Checkout path restored" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Checkout recovered" })).toBeVisible();
-    expect(screen.getByText("CURRENT · restored stable")).toBeVisible();
-    expect(screen.getByText("ROLLED BACK · incident release")).toBeVisible();
-    expect(screen.getByText(/hostile evidence path blocked/i)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /execute approved rescue/i }));
+    await waitFor(() => expect(getFirebreakState().world.phase).toBe("resolved"));
+    expect(screen.getByRole("heading", { name: /mission complete/i })).toBeVisible();
+    expect(screen.getByText(/2 workers safe/i)).toBeVisible();
     await waitFor(() =>
-      expect(useAppStore.getState().webmcp.registeredToolNames).not.toContain(
-        "rollback_checkout_release",
-      ),
+      expect(getFirebreakState().webmcp.registeredToolNames).toEqual(STATIC_TOOL_NAMES),
     );
+    expect(screen.getByText(/7 tools live/i)).toBeVisible();
   });
 });

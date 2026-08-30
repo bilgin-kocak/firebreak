@@ -1,13 +1,11 @@
-import {
-  Color3,
-  DynamicTexture,
-  MeshBuilder,
-  StandardMaterial,
-  TransformNode,
-  Vector3,
-  type AbstractMesh,
-  type Scene,
-} from "@babylonjs/core";
+import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import type { Scene } from "@babylonjs/core/scene";
 
 import type { RobotState } from "../domain/firebreakTypes";
 

@@ -1,20 +1,17 @@
-import {
-  ArcRotateCamera,
-  Color3,
-  Color4,
-  Engine,
-  GlowLayer,
-  HavokPlugin,
-  HemisphericLight,
-  MeshBuilder,
-  PhysicsAggregate,
-  PhysicsShapeType,
-  PointLight,
-  Scene,
-  StandardMaterial,
-  TransformNode,
-  Vector3,
-} from "@babylonjs/core";
+import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
+import { Engine } from "@babylonjs/core/Engines/engine";
+import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
+import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { PointLight } from "@babylonjs/core/Lights/pointLight";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { PhysicsShapeType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
+import { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
+import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
+import { Scene } from "@babylonjs/core/scene";
 
 import { createFirebreakSeed, ROBOT_IDS } from "../domain/firebreakSeed";
 import type { RobotId, WorkerId } from "../domain/firebreakTypes";

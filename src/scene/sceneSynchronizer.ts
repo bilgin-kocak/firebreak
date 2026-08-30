@@ -1,12 +1,10 @@
-import {
-  Color3,
-  MeshBuilder,
-  Vector3,
-  type Engine,
-  type Scene,
-  type TargetCamera,
-  type TransformNode,
-} from "@babylonjs/core";
+import type { TargetCamera } from "@babylonjs/core/Cameras/targetCamera";
+import type { Engine } from "@babylonjs/core/Engines/engine";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import type { Scene } from "@babylonjs/core/scene";
 
 import { ROBOT_IDS } from "../domain/firebreakSeed";
 import type {
