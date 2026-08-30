@@ -1,5 +1,5 @@
 import { isPointInPolygon } from "../control/browserSimulationDriver";
-import { ROBOT_IDS } from "./firebreakSeed";
+import { ROBOT_IDS, WAREHOUSE_OBSTACLES } from "./firebreakSeed";
 import type {
   FirebreakSnapshot,
   MissionRoute,
@@ -32,52 +32,55 @@ function createRoutes(snapshot: FirebreakSnapshot): Record<RobotId, MissionRoute
       predictedBatteryEnd: 74,
       waypoints: [
         { position: { ...starts["SCOUT-1"].position }, atMs: 0 },
-        waypoint(-9, 2.8, -3, 4_000),
-        waypoint(-7, 3.2, 2, 8_000),
-        waypoint(-1, 3.4, 6, 12_000),
-        waypoint(4, 3.1, 6, 16_000),
-        waypoint(7, 3, 5, 20_000, "scan-hazards"),
+        waypoint(-9, 2.8, -7.5, 2_000),
+        waypoint(-8, 3.2, 2.5, 8_000),
+        waypoint(-8, 3.4, 7.5, 12_000),
+        waypoint(4, 3.1, 7.5, 16_000),
+        waypoint(11, 3, 7.5, 20_000, "scan-hazards"),
       ],
     },
     "MEDIC-2": {
       robotId: "MEDIC-2",
-      durationMs: 34_000,
+      durationMs: 42_000,
       predictedBatteryEnd: 63,
       waypoints: [
         { position: { ...starts["MEDIC-2"].position }, atMs: 0 },
-        waypoint(-8, 0.45, -5, 4_000),
-        waypoint(-8, 0.45, 0, 9_000),
-        waypoint(-3, 0.45, 1, 14_000),
-        waypoint(3, 0.45, 1, 19_000),
-        waypoint(10, 0.45, -0.5, 24_000, "rescue-worker-a"),
-        waypoint(-12, 0.45, 6, 34_000, "deliver-worker-a"),
+        waypoint(-9, 0.45, -7.5, 3_000),
+        waypoint(-8, 0.45, 2.5, 10_000),
+        waypoint(3, 0.45, 2.5, 16_000),
+        waypoint(11, 0.45, 2.5, 21_000),
+        waypoint(11, 0.45, -0.5, 25_000, "rescue-worker-a"),
+        waypoint(11, 0.45, 7.5, 31_000),
+        waypoint(-12, 0.45, 7.5, 42_000, "deliver-worker-a"),
       ],
     },
     "SUPPRESS-3": {
       robotId: "SUPPRESS-3",
-      durationMs: 18_000,
+      durationMs: 24_000,
       predictedBatteryEnd: 68,
       waypoints: [
         { position: { ...starts["SUPPRESS-3"].position }, atMs: 0 },
-        waypoint(-5, 0.52, -6.5, 4_000),
-        waypoint(-6, 0.52, -1, 8_000),
-        waypoint(-2, 0.52, 3, 12_000),
-        waypoint(4.5, 0.52, 3, 17_000, "isolate-power"),
-        waypoint(4.5, 0.52, 3, 18_000, "suppress-fire"),
+        waypoint(-7.5, 0.52, -7.5, 4_000),
+        waypoint(-7.5, 0.52, 2.5, 12_000),
+        waypoint(2, 0.52, 2.5, 18_000),
+        waypoint(4.5, 0.52, 3, 23_000, "isolate-power"),
+        waypoint(4.5, 0.52, 3, 24_000, "suppress-fire"),
       ],
     },
     "HAUL-4": {
       robotId: "HAUL-4",
-      durationMs: 35_000,
+      durationMs: 43_000,
       predictedBatteryEnd: 57,
       waypoints: [
         { position: { ...starts["HAUL-4"].position }, atMs: 0 },
-        waypoint(-2, 0.48, -6.5, 5_000),
-        waypoint(1, 0.48, -0.5, 10_000),
-        waypoint(3, 0.48, 6, 15_000),
-        waypoint(10.5, 0.48, 6, 20_000, "rescue-worker-b"),
-        waypoint(8.5, 0.48, 7, 24_000, "pickup-container"),
-        waypoint(-10, 0.48, 7, 35_000, "deliver-worker-b-and-container"),
+        waypoint(-1, 0.48, -7.5, 3_000),
+        waypoint(-1, 0.48, 2.5, 11_000),
+        waypoint(3, 0.48, 7.5, 16_000),
+        waypoint(11, 0.48, 7.5, 21_000),
+        waypoint(11, 0.48, 6, 25_000, "rescue-worker-b"),
+        waypoint(8.5, 0.48, 7.5, 29_000, "pickup-container"),
+        waypoint(8.5, 0.48, 9, 30_000),
+        waypoint(-9, 0.48, 9, 43_000, "deliver-worker-b-and-container"),
       ],
     },
   };
@@ -178,8 +181,11 @@ export function simulateCoordinatedMission(snapshot: FirebreakSnapshot): Mission
   const geofenceFailure = Object.values(routes).some((route) =>
     routeIntersectsPolygon(route, snapshot.hazards.collapseZone),
   );
+  const obstacleFailure = Object.values(routes).some((route) =>
+    WAREHOUSE_OBSTACLES.some((obstacle) => routeIntersectsPolygon(route, obstacle)),
+  );
   const robotConflict = minimumSynchronizedSeparation(routes) < 1.25;
-  const feasible = !geofenceFailure && !robotConflict;
+  const feasible = !geofenceFailure && !obstacleFailure && !robotConflict;
 
   return {
     id: `SIM-${snapshot.incidentId}-R${snapshot.revision}-${stateHash}`,
@@ -188,7 +194,12 @@ export function simulateCoordinatedMission(snapshot: FirebreakSnapshot): Mission
     stateHash,
     strategy: "coordinated",
     feasible,
-    reasonCode: geofenceFailure ? "NO_SAFE_ROUTE" : robotConflict ? "ROBOT_CONFLICT" : "READY",
+    reasonCode:
+      geofenceFailure || obstacleFailure
+        ? "NO_SAFE_ROUTE"
+        : robotConflict
+          ? "ROBOT_CONFLICT"
+          : "READY",
     durationMs: Math.max(...Object.values(routes).map((route) => route.durationMs)),
     routes,
     predictions: {

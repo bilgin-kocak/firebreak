@@ -19,40 +19,47 @@ export function FirebreakToolSurface() {
   const lastChange = useFirebreakStore((state) => state.webmcp.lastToolChangeAt);
   const dynamic = names.includes("execute_rescue_mission");
   return (
-    <details className={`tool-surface ${dynamic ? "tool-surface-authorized" : ""}`}>
-      <summary>
-        <span className="tool-live-dot" aria-hidden="true" />
-        <span>
-          <strong>{names.length} tools live</strong>
-          <small>
-            {dynamic
-              ? "One-use movement authority granted"
-              : "Planning only · no movement authority"}
-          </small>
-        </span>
-        <span className="tool-mode">
-          <Radio size={13} aria-hidden="true" /> {mode === "native" ? "WebMCP" : "Local WebMCP"}
-        </span>
-        <ChevronDown className="details-chevron" size={16} aria-hidden="true" />
-      </summary>
-      <div className="tool-surface-body">
-        <p className="toolchange-note" aria-live="polite">
-          {lastChange ? "Tool surface changed visibly" : "Tool surface ready"}
-        </p>
-        <ul>
-          {names.map((name) => (
-            <li key={name} className={name === "execute_rescue_mission" ? "dynamic-tool" : ""}>
-              {name === "execute_rescue_mission" ? (
-                <Bot size={14} aria-hidden="true" />
-              ) : (
-                <ShieldCheck size={14} aria-hidden="true" />
-              )}
-              <span>{friendly[name] ?? name}</span>
-              <code>{name}</code>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </details>
+    <>
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {lastChange
+          ? `WebMCP tool surface changed. ${names.length} tools are now registered.`
+          : `WebMCP tool surface ready with ${names.length} registered tools.`}
+      </p>
+      <details className={`tool-surface ${dynamic ? "tool-surface-authorized" : ""}`}>
+        <summary>
+          <span className="tool-live-dot" aria-hidden="true" />
+          <span>
+            <strong>{names.length} tools live</strong>
+            <small>
+              {dynamic
+                ? "One-use movement authority granted"
+                : "Planning only · no movement authority"}
+            </small>
+          </span>
+          <span className="tool-mode">
+            <Radio size={13} aria-hidden="true" /> {mode === "native" ? "WebMCP" : "Local WebMCP"}
+          </span>
+          <ChevronDown className="details-chevron" size={16} aria-hidden="true" />
+        </summary>
+        <div className="tool-surface-body">
+          <p className="toolchange-note">
+            {lastChange ? "Tool surface changed visibly" : "Tool surface ready"}
+          </p>
+          <ul>
+            {names.map((name) => (
+              <li key={name} className={name === "execute_rescue_mission" ? "dynamic-tool" : ""}>
+                {name === "execute_rescue_mission" ? (
+                  <Bot size={14} aria-hidden="true" />
+                ) : (
+                  <ShieldCheck size={14} aria-hidden="true" />
+                )}
+                <span>{friendly[name] ?? name}</span>
+                <code>{name}</code>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </details>
+    </>
   );
 }

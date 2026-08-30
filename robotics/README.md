@@ -23,13 +23,15 @@ References:
 
 `src/control/ros2Driver.ts` implements the same narrow driver contract as the browser simulator. It accepts only the four built-in robot identifiers and constructs every topic and message type itself.
 
-| Direction | Message type                    | Topic suffix                      |
-| --------- | ------------------------------- | --------------------------------- |
-| Publish   | `geometry_msgs/msg/Twist`       | `/firebreak/<robot>/cmd_vel`      |
-| Publish   | `geometry_msgs/msg/PoseStamped` | `/firebreak/<robot>/goal_pose`    |
-| Subscribe | `nav_msgs/msg/Odometry`         | `/firebreak/<robot>/odom`         |
-| Subscribe | `sensor_msgs/msg/BatteryState`  | `/firebreak/<robot>/battery`      |
-| Publish   | `std_msgs/msg/Bool`             | `/firebreak/fleet/emergency_stop` |
+| Direction | Message type                    | Topic suffix                               |
+| --------- | ------------------------------- | ------------------------------------------ |
+| Publish   | `geometry_msgs/msg/Twist`       | `/firebreak/<robot>/cmd_vel`               |
+| Publish   | `geometry_msgs/msg/PoseStamped` | `/firebreak/<robot>/goal_pose`             |
+| Publish   | `std_msgs/msg/String`           | `/firebreak/<robot>/mission_action`        |
+| Subscribe | `nav_msgs/msg/Odometry`         | `/firebreak/<robot>/odom`                  |
+| Subscribe | `sensor_msgs/msg/BatteryState`  | `/firebreak/<robot>/battery`               |
+| Subscribe | `std_msgs/msg/String`           | `/firebreak/<robot>/mission_action_result` |
+| Publish   | `std_msgs/msg/Bool`             | `/firebreak/fleet/emergency_stop`          |
 
 The robot slugs are exactly `scout-1`, `medic-2`, `suppress-3`, and `haul-4`. There is no API for an agent to provide a topic name, type, or raw ROS message.
 
@@ -79,6 +81,8 @@ Expected types are `geometry_msgs/msg/Twist`, `geometry_msgs/msg/PoseStamped`, a
 - Left stick or WASD maps to bounded linear and angular velocity.
 - A velocity watchdog publishes zero after 350 ms without a fresh command.
 - Approved mission waypoints publish map-frame pose goals.
+- Every waypoint is confirmed by fresh odometry and battery telemetry before progress advances.
+- Role-limited actions publish a fixed action name and require the matching `<action>:succeeded` result before the mission may claim success. The integration node must implement these small action command/result topics; absence or negative feedback fails closed.
 - Emergency stop publishes zero velocity to all four robots, then publishes `true` on the fleet stop topic.
 - Bridge loss clears watchdogs and marks the adapter disconnected. It never silently swaps a physical run to the browser simulator.
 

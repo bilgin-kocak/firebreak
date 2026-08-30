@@ -22,6 +22,26 @@ export const COLLAPSE_ZONE: PolygonPoint[] = [
   { x: 1, z: -2 },
 ];
 
+export const WAREHOUSE_SHELVES = [
+  { x: -4, z: -5.8, length: 4.5 },
+  { x: -4, z: -0.6, length: 4.5 },
+  { x: -4, z: 5.2, length: 4.5 },
+  { x: 7.5, z: -5.8, length: 4 },
+  { x: 7.5, z: -0.6, length: 4 },
+] as const;
+
+const SHELF_CLEARANCE = 0.45;
+export const WAREHOUSE_OBSTACLES: PolygonPoint[][] = WAREHOUSE_SHELVES.map((shelf) => {
+  const halfX = shelf.length / 2 + SHELF_CLEARANCE;
+  const halfZ = 0.8 + SHELF_CLEARANCE;
+  return [
+    { x: shelf.x - halfX, z: shelf.z - halfZ },
+    { x: shelf.x + halfX, z: shelf.z - halfZ },
+    { x: shelf.x + halfX, z: shelf.z + halfZ },
+    { x: shelf.x - halfX, z: shelf.z + halfZ },
+  ];
+});
+
 export function createFirebreakSeed(): FirebreakSnapshot {
   return {
     version: 1,

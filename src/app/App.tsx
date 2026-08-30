@@ -46,6 +46,7 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
   const [runtime, setRuntime] = useState<AppRuntime | null>(null);
   const runtimeRef = useRef<AppRuntime | null>(null);
   const inputRef = useRef<InputController | null>(null);
+  const consoleRef = useRef<HTMLElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const world = useFirebreakStore((state) => state.world);
@@ -79,6 +80,31 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
   }, [installRuntime]);
 
   useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncPreference = () => useFirebreakStore.getState().setReducedEffects(preference.matches);
+    syncPreference();
+    preference.addEventListener?.("change", syncPreference);
+    return () => preference.removeEventListener?.("change", syncPreference);
+  }, []);
+
+  useEffect(() => {
+    if (!["active", "planned", "authorized", "executing"].includes(world.phase)) return;
+    let previous = performance.now();
+    const timer = window.setInterval(() => {
+      const current = performance.now();
+      const expired = useFirebreakStore.getState().advanceClock(current - previous);
+      previous = current;
+      if (expired) {
+        void runtimeRef.current?.driver.stopAll("The 90-second rescue window expired");
+        void runtimeRef.current?.dynamicTools.revoke("Mission clock expired");
+        setMessage("Time expired. The fleet stopped safely.");
+      }
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [world.phase]);
+
+  useEffect(() => {
     if (!runtime) return;
     const controller = createInputController();
     inputRef.current = controller;
@@ -90,6 +116,18 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
       frame = window.requestAnimationFrame(tick);
       const input = controller.getSnapshot();
       const state = useFirebreakStore.getState();
+      if (input.openMissionControl && !state.ui.missionControlOpen) {
+        state.setMissionControlOpen(true);
+        consoleRef.current?.focus();
+      }
+      if (input.cameraX !== 0 || input.cameraY !== 0) {
+        if (state.ui.cameraMode !== "free") state.setCameraMode("free");
+        window.dispatchEvent(
+          new CustomEvent("firebreak:camera-input", {
+            detail: { x: input.cameraX, y: input.cameraY },
+          }),
+        );
+      }
       if (input.selectRobot && input.selectRobot !== state.world.selectedRobotId) {
         state.selectRobot(input.selectRobot);
       } else if (input.selectDelta !== 0) {
@@ -97,7 +135,7 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
         const next = (current + input.selectDelta + ROBOT_IDS.length) % ROBOT_IDS.length;
         state.selectRobot(ROBOT_IDS[next]!);
       }
-      const canDrive = state.world.phase === "active" || state.world.phase === "planned";
+      const canDrive = state.world.phase === "active";
       if (canDrive && !commanding && (input.throttle !== 0 || input.turn !== 0 || input.action)) {
         commanding = true;
         const deltaMs = Math.min(80, Math.max(16, at - lastAt));
@@ -254,7 +292,12 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
           </div>
         </section>
 
-        <aside className="agent-console" aria-label="Agent mission console">
+        <aside
+          ref={consoleRef}
+          className={`agent-console ${ui.missionControlOpen ? "console-open" : ""}`}
+          aria-label="Agent mission console"
+          tabIndex={-1}
+        >
           <div className="console-heading">
             <span className="agent-orb" aria-hidden="true">
               <Bot />
@@ -401,6 +444,14 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
               <p>
                 <ShieldCheck aria-hidden="true" /> One-use tool consumed and unregistered.
               </p>
+            </div>
+          ) : null}
+
+          {world.phase === "failed" ? (
+            <div className="console-content execution-failed">
+              <CircleAlert aria-hidden="true" />
+              <strong>Rescue window expired</strong>
+              <p>The fleet stopped at 90 seconds. Reset the warehouse to try again.</p>
             </div>
           ) : null}
         </aside>

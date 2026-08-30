@@ -54,12 +54,12 @@ Without WebMCP, this would be a rescue game with a scripted automation button. W
 ## What is technically distinctive
 
 - A real-time Babylon.js warehouse with four distinct procedural robot meshes, hazards, workers, route overlays, smoke, fire, and three camera modes.
-- Keyboard, touch, and Gamepad API inputs normalized into one control contract.
+- Keyboard, complete touch controls, and Gamepad API driving/camera/selection inputs normalized into one control contract.
 - Deterministic synchronized route simulation with polygon intersection and 250 ms separation sampling.
 - Eleven execution-blocking checks over revision, fingerprint, fleet allowlist, route completeness, geofence, separation, battery, duration, robot roles, recovery snapshot, and one-use budget.
 - Full browser-state rollback on cancellation or driver failure.
 - Versioned, schema-validated recovery that never restores live authority after reload.
-- An optional ROSLIB driver with fixed ROS 2 topics/types, secure bridge URLs, a 350 ms velocity watchdog, Nav2-compatible pose goals, telemetry, and fleet emergency stop.
+- An optional ROSLIB driver with fixed ROS 2 topics/types, secure bridge URLs, a 350 ms velocity watchdog, Nav2-compatible pose goals, fresh odometry/battery confirmation, positive role-action feedback, and fleet emergency stop.
 - Responsive visual design, keyboard-complete dialogs, reduced motion, 44 px targets, and zero serious or critical axe findings across judged states.
 
 ## The “wow” moment

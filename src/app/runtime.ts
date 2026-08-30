@@ -74,7 +74,7 @@ export const bootAppRuntime = async (options: AppRuntimeOptions = {}): Promise<A
     new BrowserSimulationDriver({
       readSnapshot: () => getFirebreakState().world,
       commitSnapshot: (snapshot) => getFirebreakState().replaceWorld(snapshot),
-      playbackRate: options.accelerated ? 100_000 : 3.5,
+      playbackRate: options.accelerated ? 100_000 : 10,
       ...(options.accelerated ? { wait: async () => undefined } : {}),
     });
   await driver.connect();
@@ -127,10 +127,14 @@ export const bootAppRuntime = async (options: AppRuntimeOptions = {}): Promise<A
     async destroy() {
       if (destroyed) return;
       destroyed = true;
-      await dynamicTools.destroy();
-      rootController.abort(new Error("Firebreak runtime destroyed"));
-      await registry.settleToolChanges();
-      registry.dispose();
+      try {
+        await dynamicTools.destroy();
+        await driver.disconnect();
+      } finally {
+        rootController.abort(new Error("Firebreak runtime destroyed"));
+        await registry.settleToolChanges();
+        registry.dispose();
+      }
     },
     dispose() {
       void runtime.destroy();

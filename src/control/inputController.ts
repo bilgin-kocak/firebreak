@@ -35,6 +35,7 @@ const ZERO_CONTROL: NormalizedControl = {
   cameraY: 0,
   action: false,
   selectDelta: 0,
+  openMissionControl: false,
 };
 
 const ROBOT_KEY_MAP: Partial<Record<string, RobotId>> = {
@@ -72,6 +73,7 @@ export function normalizeGamepad(gamepad: GamepadLike, deadZone = 0.15): Normali
     cameraY: -applyDeadZone(gamepad.axes[3] ?? 0, deadZone),
     action: isPressed(gamepad, 0),
     selectDelta: leftBumper === rightBumper ? 0 : rightBumper ? 1 : -1,
+    openMissionControl: isPressed(gamepad, 9),
   };
 }
 
@@ -80,6 +82,8 @@ export function createInputController(options: InputControllerOptions = {}): Inp
   let touch: TouchControlState = { throttle: 0, turn: 0, action: false };
   let gamepad = { ...ZERO_CONTROL };
   let previousGamepadSelect: -1 | 0 | 1 = 0;
+  let previousGamepadAction = false;
+  let previousMissionControl = false;
   let running = false;
   let frameHandle: number | null = null;
 
@@ -96,6 +100,8 @@ export function createInputController(options: InputControllerOptions = {}): Inp
     touch = { throttle: 0, turn: 0, action: false };
     gamepad = { ...ZERO_CONTROL };
     previousGamepadSelect = 0;
+    previousGamepadAction = false;
+    previousMissionControl = false;
   }
 
   function poll(): void {
@@ -106,8 +112,12 @@ export function createInputController(options: InputControllerOptions = {}): Inp
     const next = active ? normalizeGamepad(active) : { ...ZERO_CONTROL };
     const selectDelta =
       next.selectDelta !== 0 && next.selectDelta === previousGamepadSelect ? 0 : next.selectDelta;
+    const openMissionControl = next.openMissionControl && !previousMissionControl;
+    const action = next.action && !previousGamepadAction;
     previousGamepadSelect = next.selectDelta;
-    gamepad = { ...next, selectDelta };
+    previousGamepadAction = next.action;
+    previousMissionControl = next.openMissionControl;
+    gamepad = { ...next, action, selectDelta, openMissionControl };
     frameHandle = requestFrame(poll);
   }
 
@@ -116,7 +126,7 @@ export function createInputController(options: InputControllerOptions = {}): Inp
       event.code.startsWith("Arrow") ||
       event.code === "Space" ||
       event.code in ROBOT_KEY_MAP ||
-      ["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE"].includes(event.code)
+      ["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE", "KeyM"].includes(event.code)
     ) {
       event.preventDefault();
       pressedKeys.add(event.code);
@@ -134,7 +144,14 @@ export function createInputController(options: InputControllerOptions = {}): Inp
     const right =
       pressedKeys.has("KeyD") || pressedKeys.has("ArrowRight") || pressedKeys.has("KeyE");
     const selectRobot = Object.entries(ROBOT_KEY_MAP).find(([code]) => pressedKeys.has(code))?.[1];
-    const active = forward || reverse || left || right || pressedKeys.has("Space") || selectRobot;
+    const active =
+      forward ||
+      reverse ||
+      left ||
+      right ||
+      pressedKeys.has("Space") ||
+      pressedKeys.has("KeyM") ||
+      selectRobot;
 
     return {
       throttle: Number(forward) - Number(reverse),
@@ -143,6 +160,7 @@ export function createInputController(options: InputControllerOptions = {}): Inp
       cameraY: 0,
       action: pressedKeys.has("Space"),
       selectDelta: 0,
+      openMissionControl: pressedKeys.has("KeyM"),
       ...(selectRobot ? { selectRobot } : {}),
       source: active ? "keyboard" : "none",
     };
@@ -195,7 +213,8 @@ export function createInputController(options: InputControllerOptions = {}): Inp
         gamepad.cameraX !== 0 ||
         gamepad.cameraY !== 0 ||
         gamepad.action ||
-        gamepad.selectDelta !== 0
+        gamepad.selectDelta !== 0 ||
+        gamepad.openMissionControl
       ) {
         return { ...gamepad, source: "gamepad" };
       }

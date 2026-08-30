@@ -26,7 +26,9 @@ export function FleetControls({
         <Gamepad2 aria-hidden="true" />
         <span>
           <strong>Drive selected robot</strong>
-          <small>WASD or left stick · 1–4 select · Space / A acts</small>
+          <small>
+            WASD or left stick · right stick camera · Space / A acts · M / Start console
+          </small>
         </span>
       </div>
       <div className="robot-fleet" role="group" aria-label="Robot fleet">
@@ -83,6 +85,16 @@ export function FleetControls({
           onPointerCancel={setNeutral}
         >
           →
+        </button>
+        <button
+          className="touch-reverse"
+          type="button"
+          aria-label="Drive backward"
+          onPointerDown={() => onTouch({ throttle: -1 })}
+          onPointerUp={setNeutral}
+          onPointerCancel={setNeutral}
+        >
+          ↓
         </button>
         <button
           className="touch-action"

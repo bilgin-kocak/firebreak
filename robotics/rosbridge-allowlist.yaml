@@ -19,6 +19,11 @@ publish:
       - /firebreak/medic-2/goal_pose
       - /firebreak/suppress-3/goal_pose
       - /firebreak/haul-4/goal_pose
+    std_msgs/msg/String:
+      - /firebreak/scout-1/mission_action
+      - /firebreak/medic-2/mission_action
+      - /firebreak/suppress-3/mission_action
+      - /firebreak/haul-4/mission_action
     std_msgs/msg/Bool:
       - /firebreak/fleet/emergency_stop
 subscribe:
@@ -33,6 +38,11 @@ subscribe:
       - /firebreak/medic-2/battery
       - /firebreak/suppress-3/battery
       - /firebreak/haul-4/battery
+    std_msgs/msg/String:
+      - /firebreak/scout-1/mission_action_result
+      - /firebreak/medic-2/mission_action_result
+      - /firebreak/suppress-3/mission_action_result
+      - /firebreak/haul-4/mission_action_result
 deny:
   arbitrary_topics: true
   arbitrary_message_types: true

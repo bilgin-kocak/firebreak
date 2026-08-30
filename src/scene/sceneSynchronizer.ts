@@ -22,6 +22,7 @@ export interface WarehouseSceneHandle {
   smokeRoot: TransformNode;
   routeRoot: TransformNode;
   renderLoop: () => void;
+  setAmbientEffectsReduced(reduced: boolean): void;
 }
 
 export interface SceneSynchronizer {
@@ -29,6 +30,7 @@ export interface SceneSynchronizer {
   setCameraMode(mode: PersistedUiState["cameraMode"]): void;
   setSelectedRobot(robotId: RobotId): void;
   setReducedEffects(reduced: boolean): void;
+  adjustCamera(x: number, y: number): void;
   resize(): void;
   dispose(): void;
 }
@@ -37,6 +39,7 @@ export function createSceneSynchronizer(handle: WarehouseSceneHandle): SceneSync
   let selectedRobot: RobotId = "SCOUT-1";
   let cameraMode: PersistedUiState["cameraMode"] = "overview";
   let reducedEffects = false;
+  let routeSignature = "";
 
   function clearRoutes(): void {
     for (const mesh of handle.routeRoot.getChildMeshes()) mesh.dispose();
@@ -80,22 +83,28 @@ export function createSceneSynchronizer(handle: WarehouseSceneHandle): SceneSync
       handle.smokeRoot.scaling.setAll(Math.max(0.1, snapshot.hazards.smoke));
       handle.smokeRoot.setEnabled(snapshot.hazards.smoke > 0.1 && !reducedEffects);
 
-      clearRoutes();
-      for (const robotId of ROBOT_IDS) {
-        const route = snapshot.routes[robotId];
-        if (route.length < 2) continue;
-        const line = MeshBuilder.CreateLines(
-          `${robotId}-approved-route`,
-          {
-            points: route.map((point) => new Vector3(point.x, point.y + 0.14, point.z)),
-            updatable: false,
-          },
-          handle.scene,
-        );
-        line.color = Color3.FromHexString(snapshot.robots[robotId].color);
-        line.alpha = 0.92;
-        line.isPickable = false;
-        line.parent = handle.routeRoot;
+      const nextRouteSignature = JSON.stringify(
+        ROBOT_IDS.map((robotId) => snapshot.routes[robotId]),
+      );
+      if (nextRouteSignature !== routeSignature) {
+        routeSignature = nextRouteSignature;
+        clearRoutes();
+        for (const robotId of ROBOT_IDS) {
+          const route = snapshot.routes[robotId];
+          if (route.length < 2) continue;
+          const line = MeshBuilder.CreateLines(
+            `${robotId}-approved-route`,
+            {
+              points: route.map((point) => new Vector3(point.x, point.y + 0.14, point.z)),
+              updatable: false,
+            },
+            handle.scene,
+          );
+          line.color = Color3.FromHexString(snapshot.robots[robotId].color);
+          line.alpha = 0.92;
+          line.isPickable = false;
+          line.parent = handle.routeRoot;
+        }
       }
       updateCamera();
     },
@@ -112,7 +121,18 @@ export function createSceneSynchronizer(handle: WarehouseSceneHandle): SceneSync
     },
     setReducedEffects(reduced) {
       reducedEffects = reduced;
+      handle.setAmbientEffectsReduced(reduced);
       if (reduced) handle.smokeRoot.setEnabled(false);
+    },
+    adjustCamera(x, y) {
+      const camera = handle.camera as TargetCamera & { alpha?: number; beta?: number };
+      if (typeof camera.alpha === "number") camera.alpha += Math.max(-1, Math.min(1, x)) * 0.045;
+      if (typeof camera.beta === "number") {
+        camera.beta = Math.max(
+          0.45,
+          Math.min(1.42, camera.beta + Math.max(-1, Math.min(1, y)) * 0.035),
+        );
+      }
     },
     resize() {
       handle.engine.resize();

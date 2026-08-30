@@ -35,6 +35,7 @@ function fakeHandle(): WarehouseSceneHandle {
     smokeRoot: new TransformNode("smoke", scene),
     routeRoot: new TransformNode("routes", scene),
     renderLoop: () => undefined,
+    setAmbientEffectsReduced: () => undefined,
   };
 }
 
@@ -60,6 +61,9 @@ describe("scene synchronizer", () => {
     expect(handle.workers.get("WORKER-A")?.isEnabled()).toBe(false);
     expect(handle.fireRoot.scaling.x).toBeCloseTo(0.2);
     expect(handle.routeRoot.getChildMeshes()).toHaveLength(1);
+    const originalRouteMesh = handle.routeRoot.getChildMeshes()[0];
+    synchronizer.applySnapshot({ ...snapshot, elapsedMs: 250 });
+    expect(handle.routeRoot.getChildMeshes()[0]).toBe(originalRouteMesh);
 
     synchronizer.dispose();
     expect(handle.scene.isDisposed).toBe(false);
@@ -73,6 +77,7 @@ describe("scene synchronizer", () => {
     synchronizer.setCameraMode("follow");
     synchronizer.setSelectedRobot("HAUL-4");
     synchronizer.setReducedEffects(true);
+    synchronizer.adjustCamera(0.5, -0.25);
 
     expect(handle.camera.lockedTarget).toBe(handle.robots.get("HAUL-4")?.root);
     synchronizer.dispose();

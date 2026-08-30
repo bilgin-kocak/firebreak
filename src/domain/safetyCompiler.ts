@@ -1,4 +1,4 @@
-import { ROBOT_IDS } from "./firebreakSeed";
+import { ROBOT_IDS, WAREHOUSE_OBSTACLES } from "./firebreakSeed";
 import type {
   FirebreakSnapshot,
   MissionAction,
@@ -45,6 +45,11 @@ export function validateSafetyEnvelope(
   const routesOutsideCollapse = ROBOT_IDS.every(
     (robotId) => !routeIntersectsPolygon(simulation.routes[robotId], snapshot.hazards.collapseZone),
   );
+  const routesOutsideObstacles = ROBOT_IDS.every((robotId) =>
+    WAREHOUSE_OBSTACLES.every(
+      (obstacle) => !routeIntersectsPolygon(simulation.routes[robotId], obstacle),
+    ),
+  );
   const rolesValid = ROBOT_IDS.every((robotId) => {
     const allowed = ROLE_ACTIONS[snapshot.robots[robotId].role];
     return simulation.routes[robotId].waypoints.every(
@@ -78,9 +83,9 @@ export function validateSafetyEnvelope(
     ),
     check(
       "geofence",
-      "Collapse zone excluded",
-      routesOutsideCollapse,
-      "No waypoint or route segment may enter the forbidden polygon.",
+      "Collapse zone and shelves excluded",
+      routesOutsideCollapse && routesOutsideObstacles,
+      "No waypoint or route segment may enter the forbidden polygon or shelf clearance.",
     ),
     check(
       "separation",

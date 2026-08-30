@@ -126,6 +126,26 @@ describe("Firebreak persistence", () => {
     });
   });
 
+  it("recovers an interrupted execution to an active emergency without authority", () => {
+    const storage = memoryStorage();
+    const state = validState();
+    state.world.phase = "executing";
+    state.mission.proposal = {
+      ...state.mission.proposal!,
+      status: "executing",
+      authorizedAt: 1_500,
+      expiresAt: 301_500,
+    };
+    saveFirebreakState(storage, state);
+
+    const loaded = loadFirebreakState(storage, 2_000);
+
+    expect(loaded.recovered).toBe(true);
+    expect(loaded.state.world.phase).toBe("active");
+    expect(loaded.state.mission.proposal).toBeNull();
+    expect(loaded.state.mission.progress).toEqual([]);
+  });
+
   it("uses the three required versioned storage keys", () => {
     const storage = memoryStorage();
     saveFirebreakState(storage, validState());

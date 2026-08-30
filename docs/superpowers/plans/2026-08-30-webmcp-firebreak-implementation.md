@@ -1,6 +1,6 @@
 # WebMCP Firebreak Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace WebMCP Airlock with a complete, playable 3D emergency-robot game in which a browser agent inspects, safely authorizes, and coordinates a four-robot warehouse rescue.
 
@@ -105,7 +105,7 @@
 - Produces identifiers `INCIDENT_ID`, `ROBOT_IDS`, `WORKER_IDS`, `SAFE_ZONE`, and `COLLAPSE_ZONE`.
 - `FirebreakSnapshot` contains `revision`, `phase`, `elapsedMs`, `robots`, `workers`, `hazards`, `objectives`, `routes`, `events`, and `receipt`.
 
-- [ ] **Step 1: Add runtime packages**
+- [x] **Step 1: Add runtime packages**
 
 Run:
 
@@ -115,7 +115,7 @@ npm install @babylonjs/core @babylonjs/havok roslib
 
 Expected: `package.json` and lockfile include all three packages without peer-dependency errors.
 
-- [ ] **Step 2: Write the failing seed tests**
+- [x] **Step 2: Write the failing seed tests**
 
 Create assertions equivalent to:
 
@@ -137,13 +137,13 @@ expect(createFirebreakSeed()).toEqual(seed);
 
 Also reject an unknown robot role, battery outside `0..100`, duplicate objective identifier, non-finite position, and extra schema property.
 
-- [ ] **Step 3: Run the test to verify failure**
+- [x] **Step 3: Run the test to verify failure**
 
 Run: `npm test -- src/domain/firebreakSeed.test.ts`
 
 Expected: FAIL because the Firebreak domain modules do not exist.
 
-- [ ] **Step 4: Implement the domain types, strict schemas, and deterministic seed**
+- [x] **Step 4: Implement the domain types, strict schemas, and deterministic seed**
 
 Use these exact unions:
 
@@ -168,13 +168,13 @@ type ObjectiveStatus = "pending" | "active" | "complete" | "failed";
 
 Give every robot a unique start position, role, color token, 100% battery, `idle` status, heading, and empty route progress. Seed both workers as trapped, the container as exposed, fire intensity as `1`, smoke as `0.35`, and the collapse zone as an explicit polygon.
 
-- [ ] **Step 5: Run the domain test**
+- [x] **Step 5: Run the domain test**
 
 Run: `npm test -- src/domain/firebreakSeed.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the domain foundation**
+- [x] **Step 6: Commit the domain foundation**
 
 ```sh
 git add package.json package-lock.json src/domain/firebreakTypes.ts src/domain/firebreakSchemas.ts src/domain/firebreakSeed.ts src/domain/firebreakSeed.test.ts
@@ -199,7 +199,7 @@ git commit -m "feat: add Firebreak emergency domain"
 - Produces: `RobotDriver` with `connect`, `disconnect`, `commandManual`, `executePlan`, and `stopAll`.
 - Produces: `BrowserSimulationDriver` implementing `RobotDriver` against injected `getSnapshot` and `commitSnapshot` callbacks.
 
-- [ ] **Step 1: Write failing control tests**
+- [x] **Step 1: Write failing control tests**
 
 Cover:
 
@@ -212,31 +212,31 @@ expect(normalizeGamepad(nextRobotPad).selectDelta).toBe(1);
 
 Dispatch keyboard events and assert `W`, arrows, `Q/E`, `Space`, and `1–4` map correctly. Blur, visibility loss, stop, and gamepad disconnect must emit an all-zero control snapshot.
 
-- [ ] **Step 2: Run the control tests to verify failure**
+- [x] **Step 2: Run the control tests to verify failure**
 
 Run: `npm test -- src/control/inputController.test.ts`
 
 Expected: FAIL because the controller is missing.
 
-- [ ] **Step 3: Implement input normalization and lifecycle**
+- [x] **Step 3: Implement input normalization and lifecycle**
 
 Poll `navigator.getGamepads()` inside `requestAnimationFrame`, normalize only the standard mapping, clamp axes to `-1..1`, apply a `0.15` dead zone, edge-detect selection and action buttons, and merge keyboard, touch, and gamepad input by greatest absolute movement value. Stop movement when focus or the active controller is lost.
 
-- [ ] **Step 4: Write failing browser-driver tests**
+- [x] **Step 4: Write failing browser-driver tests**
 
 Assert that manual commands move only the selected robot, never cross warehouse bounds or the collapse polygon, consume battery proportionally, and stop when given a zero command. Assert that a contextual action completes only when the correct role is in range.
 
-- [ ] **Step 5: Implement the browser driver**
+- [x] **Step 5: Implement the browser driver**
 
 Use fixed-step movement with bounded `deltaMs`, a project-owned `isPointAllowed` collision/geofence helper, and immutable snapshot commits. Do not read Babylon mesh positions. Return typed progress events from `executePlan` and honor the supplied `AbortSignal` before and after every step.
 
-- [ ] **Step 6: Run the control and browser-driver tests**
+- [x] **Step 6: Run the control and browser-driver tests**
 
 Run: `npm test -- src/control`
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit manual control**
+- [x] **Step 7: Commit manual control**
 
 ```sh
 git add src/control
@@ -262,41 +262,41 @@ git commit -m "feat: add playable robot controls"
 - Produces: `executeMission({ snapshot, proposal, driver, signal, onProgress }): Promise<MissionExecutionResult>`.
 - `MissionExecutionResult` is a discriminated union for `succeeded`, `cancelled`, and `failed` with a truthful `MissionReceipt`.
 
-- [ ] **Step 1: Write failing simulation tests**
+- [x] **Step 1: Write failing simulation tests**
 
 Assert the coordinated simulation returns one route for every robot, completes four objectives in at most 45 seconds, preserves at least 20% predicted battery, never intersects the collapse polygon, and has pairwise separation at synchronized route samples.
 
 Mutate the seed to block one route and assert simulation returns `feasible: false` with a stable reason code instead of fabricating success.
 
-- [ ] **Step 2: Implement fixed route simulation**
+- [x] **Step 2: Implement fixed route simulation**
 
 Use project-owned route templates keyed by robot identifier, explicit waypoint actions, deterministic duration and battery estimates, and geometry helpers for polygon containment and route separation. Bind the simulation to the exact incident revision and a stable hash of relevant world state.
 
-- [ ] **Step 3: Write failing safety compiler tests**
+- [x] **Step 3: Write failing safety compiler tests**
 
 Require passing gates for incident revision, robot allowlist, route completeness, collapse-zone exclusion, worker clearance, robot separation, battery reserve, execution duration, contextual-action role, rollback snapshot, and one-use budget. Reject a stale revision, unknown robot, reordered unsafe action, altered route, 19% battery, 46-second duration, and extra operation.
 
-- [ ] **Step 4: Implement checks and proposal compilation**
+- [x] **Step 4: Implement checks and proposal compilation**
 
 Compile only a passing simulation. The proposal must contain immutable cloned routes, exact allowed operations, `authorizedAt: null`, `expiresAt: null`, `oneUse: true`, and `status: "staged"`. The compiler must not mutate or authorize store state.
 
-- [ ] **Step 5: Write failing executor tests**
+- [x] **Step 5: Write failing executor tests**
 
 Use a fake driver to assert all four approved routes start, progress is reported, objectives complete, and the success receipt includes elapsed time, final batteries, rescued workers, contained fire, relocated container, zero violations, and the proposal identifier.
 
 Abort midway and assert stop-all runs, the browser snapshot is restored, no objective remains complete, and a cancelled receipt records partial progress. Simulate a driver error and assert the failed path behaves similarly. Start two calls and assert the second is rejected before driver movement.
 
-- [ ] **Step 6: Implement cancellable concurrent execution**
+- [x] **Step 6: Implement cancellable concurrent execution**
 
 Clone authority before execution, validate it again, capture a snapshot, and execute routes concurrently through the driver. Check cancellation between progress updates and before commit. On browser-mode failure restore the complete snapshot; on ROS mode stop movement and preserve truthful partial state. Never commit after registration authority is revoked.
 
-- [ ] **Step 7: Run mission tests**
+- [x] **Step 7: Run mission tests**
 
 Run: `npm test -- src/domain/missionSimulator.test.ts src/domain/safetyCompiler.test.ts src/domain/missionExecutor.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit the mission engine**
+- [x] **Step 8: Commit the mission engine**
 
 ```sh
 git add src/domain
@@ -325,37 +325,37 @@ git commit -m "feat: add bounded robot mission engine"
 - Produces: `createAppRuntime(adapter, options): FirebreakRuntime` with `start`, `destroy`, `runPromptA`, `authorizeMission`, `runPromptB`, `cancelExecution`, and `reset`.
 - Persistence keys are `firebreak.world.v1`, `firebreak.missions.v1`, and `firebreak.ui.v1`.
 
-- [ ] **Step 1: Write failing store tests**
+- [x] **Step 1: Write failing store tests**
 
 Test phase transitions `ready → active → planned → authorized → executing → resolved`, reject invalid transitions, keep manual movement in `active`, prevent authorization before passing checks, and make reset reproduce the exact seed while preserving reduced-effects preference.
 
-- [ ] **Step 2: Implement the focused Zustand store**
+- [x] **Step 2: Implement the focused Zustand store**
 
 Keep runtime objects outside persisted slices. Every mutation increments a monotonic revision or records why it intentionally does not. Expose selectors for selected robot, objective summary, active proposal, active receipt, and tool surface state.
 
-- [ ] **Step 3: Write failing persistence tests**
+- [x] **Step 3: Write failing persistence tests**
 
 Round-trip valid resolved state. Reject corrupt JSON, unknown version, invalid robot, non-finite positions, stale simulation hash, staged proposal bound to another revision, expired authority, completed authority, and any persisted active registration. Hydration must restore world state without registering a dynamic tool automatically unless the stored authorization is valid and unused in the same page bootstrap policy.
 
-- [ ] **Step 4: Implement persistence reconciliation**
+- [x] **Step 4: Implement persistence reconciliation**
 
 Use strict schemas and graph validation. Store only serializable domain and UI slices. Never persist the driver, ROS URL credentials, controller handles, AbortControllers, timers, Babylon objects, or in-flight promises.
 
-- [ ] **Step 5: Write failing runtime lifecycle tests**
+- [x] **Step 5: Write failing runtime lifecycle tests**
 
 Assert start registers seven static tools once; destroy aborts dynamic registration, execution, input, timers, and drivers; reset is safe during execution; and repeated start/destroy calls are idempotent.
 
-- [ ] **Step 6: Implement runtime ownership**
+- [x] **Step 6: Implement runtime ownership**
 
 Construct the input controller, selected driver, static registry, and dynamic tool manager from injected dependencies. Use one root `AbortController` and child signals. Keep native WebMCP access top-level through the adapter.
 
-- [ ] **Step 7: Run store and runtime tests**
+- [x] **Step 7: Run store and runtime tests**
 
 Run: `npm test -- src/store src/app/runtime.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit state and runtime**
+- [x] **Step 8: Commit state and runtime**
 
 ```sh
 git add src/store src/app/runtime.ts src/app/runtime.test.ts
@@ -387,11 +387,11 @@ git commit -m "feat: add Firebreak runtime and persistence"
 - Produces: `DynamicMissionToolManager` with `registerAuthorized`, `revoke`, `expire`, `consume`, and `destroy`.
 - Dynamic input is exactly `{ strategy: "coordinated" }` with `additionalProperties: false`.
 
-- [ ] **Step 1: Replace tests with the seven-tool contract**
+- [x] **Step 1: Replace tests with the seven-tool contract**
 
 Assert registration order and exact schemas. Invoke every valid handler and assert it returns visible domain changes plus bounded structured output. For each tool reject a missing required field, wrong literal, unknown identifier, and extra property without mutation.
 
-- [ ] **Step 2: Implement the static handlers**
+- [x] **Step 2: Implement the static handlers**
 
 Map the tools to runtime operations:
 
@@ -407,21 +407,21 @@ list_mission_tools -> runtime.listMissionTools
 
 Keep descriptions action-oriented and include the safety limitations an agent needs to choose correctly.
 
-- [ ] **Step 3: Write the dynamic lifecycle tests**
+- [x] **Step 3: Write the dynamic lifecycle tests**
 
 Prove the agent cannot authorize, staged state does not register, human authorization registers once, `toolchange` is visible, invalid inputs fail, simultaneous calls reject, caller abort cancels, revoke/reset/expiry abort active work, success consumes the tool, failure records a truthful receipt, and second invocation is impossible.
 
-- [ ] **Step 4: Generalize the dynamic manager**
+- [x] **Step 4: Generalize the dynamic manager**
 
 Compile the definition only from a strict, passing, current proposal. Clone the proposal before handing it to execution. Tie active execution to both invocation and registration signals. Abort the registration on every terminal authority state.
 
-- [ ] **Step 5: Run all WebMCP tests**
+- [x] **Step 5: Run all WebMCP tests**
 
 Run: `npm test -- src/webmcp`
 
 Expected: PASS with exactly seven static names and one dynamic name.
 
-- [ ] **Step 6: Commit the WebMCP pivot**
+- [x] **Step 6: Commit the WebMCP pivot**
 
 ```sh
 git add src/webmcp
@@ -446,27 +446,27 @@ git commit -m "feat: expose Firebreak WebMCP robot tools"
 - Produces: `createSceneSynchronizer(sceneHandle): SceneSynchronizer` with `applySnapshot`, `setCameraMode`, `setSelectedRobot`, `setReducedEffects`, `resize`, and `dispose`.
 - `FirebreakScene` accepts snapshot, selected robot, camera mode, reduced-effects state, and initialization callbacks.
 
-- [ ] **Step 1: Write failing pure synchronization tests**
+- [x] **Step 1: Write failing pure synchronization tests**
 
 Test position interpolation clamps, heading conversion, route-segment generation, objective-marker visibility, effect intensity mapping, and camera target selection without requiring WebGL.
 
-- [ ] **Step 2: Implement the warehouse and robot factories**
+- [x] **Step 2: Implement the warehouse and robot factories**
 
 Build floors, aisles, shelves, battery bay, safe zone, collapse grid, workers, container, doors, lights, and emergency fixtures from Babylon primitives. Build the four robot silhouettes procedurally with role colors, emissive lamps, wheels/tracks/rotors, labels, and selection rings. Initialize Havok when available and use simple fallback collision bodies when it is not.
 
-- [ ] **Step 3: Implement snapshot synchronization**
+- [x] **Step 3: Implement snapshot synchronization**
 
 Update meshes from deterministic positions, animate only visual interpolation, draw planned route ribbons, show scan rings and hazard markers, change objective props, reduce fire/smoke on success, and keep one authoritative animation loop. Dispose every observer, mesh, material, texture, particle system, engine, and resize listener.
 
-- [ ] **Step 4: Write failing component lifecycle tests**
+- [x] **Step 4: Write failing component lifecycle tests**
 
 Mock the scene factory and assert one initialization, snapshot updates without recreation, resize forwarding, fallback on initialization rejection, and complete disposal on unmount.
 
-- [ ] **Step 5: Implement the React canvas wrapper and fallback**
+- [x] **Step 5: Implement the React canvas wrapper and fallback**
 
 Use a labelled canvas with a sibling status element. Lazy initialize Babylon after mount, never block WebMCP registration, and show a semantic fallback rather than a blank region when graphics fail.
 
-- [ ] **Step 6: Run scene tests and production build**
+- [x] **Step 6: Run scene tests and production build**
 
 Run:
 
@@ -477,7 +477,7 @@ npm run build
 
 Expected: tests and build pass; no Babylon package is loaded from a remote CDN.
 
-- [ ] **Step 7: Commit the 3D scene**
+- [x] **Step 7: Commit the 3D scene**
 
 ```sh
 git add src/scene package.json package-lock.json
@@ -521,33 +521,33 @@ git commit -m "feat: render the Firebreak robot rescue"
 - `MissionProposalSheet` calls only the human event `authorizeMission` or `revokeMission`.
 - `TouchControls` emits the same normalized control shape as keyboard and gamepad.
 
-- [ ] **Step 1: Write failing application integration tests**
+- [x] **Step 1: Write failing application integration tests**
 
 Test initial copy explains the product, **Start emergency** changes the scene state, manual keyboard input moves only the selected robot, Prompt A uses all seven tools, four planned routes become visible, the proposal names all robots and safety limits, authorization registers the dynamic tool, Prompt B completes every objective, the receipt is visible, and the tool count returns to seven.
 
 Also assert no agent-facing function can call authorization and the final mission does not request extra confirmations.
 
-- [ ] **Step 2: Implement the full-screen composition**
+- [x] **Step 2: Implement the full-screen composition**
 
 Place the 3D scene as the full viewport background. Use a slim top HUD, mission objectives at upper left, robot selector at the bottom, tool activity in a collapsible right drawer, and a single proposal/progress bottom sheet. Keep the primary visual path unobstructed.
 
-- [ ] **Step 3: Implement manual and touch controls**
+- [x] **Step 3: Implement manual and touch controls**
 
 Show keyboard/gamepad hints only until the first input. Render touch controls only on coarse pointers or explicit accessibility preference. Provide visible selected-robot state and stop controls.
 
-- [ ] **Step 4: Implement the two-prompt simulator**
+- [x] **Step 4: Implement the two-prompt simulator**
 
 Show the exact Prompt A and Prompt B copy in an accessible drawer. The ordinary-browser buttons invoke the identical tool definitions through the memory adapter, expose tool-call progress, and never bypass policy or dynamic registration.
 
-- [ ] **Step 5: Implement proposal, progress, receipt, and tool surface**
+- [x] **Step 5: Implement proposal, progress, receipt, and tool surface**
 
 The proposal lists mission, robots, tasks, forbidden zone, duration, battery reserve, one-use limit, expiry, and stop conditions. Progress shows four concurrent lanes. The receipt truthfully distinguishes succeeded, failed, and cancelled. Tool surface visibly changes `7 → 8 → 7` and announces `toolchange`.
 
-- [ ] **Step 6: Implement the complete visual system**
+- [x] **Step 6: Implement the complete visual system**
 
 Use local/system typography, industrial spacing, translucent overlays with opaque fallback, cyan/orange/red status tokens, clear focus rings, reduced-motion rules, 44-pixel controls, desktop overlays, and a mobile bottom-sheet layout. Do not use a centered hero, generic card grid, or decorative gradient text.
 
-- [ ] **Step 7: Run integration, accessibility-oriented component tests, and build**
+- [x] **Step 7: Run integration, accessibility-oriented component tests, and build**
 
 Run:
 
@@ -559,11 +559,11 @@ npm run build
 
 Expected: PASS.
 
-- [ ] **Step 8: Remove obsolete Airlock implementation files**
+- [x] **Step 8: Remove obsolete Airlock implementation files**
 
 Use `rg -l "Airlock|checkout-api|INC-4821|rollback_checkout_release" src e2e evals README.md STATUS.md DEMO_SCRIPT.md SUBMISSION_DRAFT.md` to identify product-specific files. Delete obsolete source and tests only after their Firebreak replacements pass. Historical files under `docs/superpowers/` and `CivicWeave_Complete_Build_Spec.md` remain.
 
-- [ ] **Step 9: Commit the playable application**
+- [x] **Step 9: Commit the playable application**
 
 ```sh
 git add src index.html
@@ -586,21 +586,21 @@ git commit -m "feat: build the playable Firebreak experience"
 - Only trusted robot identifiers may map to `/firebreak/<robot-slug>/cmd_vel`, `/goal_pose`, `/odom`, and `/battery`.
 - Produces: `connect`, `disconnect`, `commandManual`, `executePlan`, and `stopAll` with the same behavior contract as the browser driver.
 
-- [ ] **Step 1: Write failing ROS adapter tests with a fake ROSLIB factory**
+- [x] **Step 1: Write failing ROS adapter tests with a fake ROSLIB factory**
 
 Assert connection state, exact topic names, exact ROS 2 message types, velocity clamping, zero-velocity timeout, navigation goal shape, odometry and battery subscription cleanup, stop-all publication for all four robots, and disconnection cleanup.
 
 Attempt an unknown robot, topic override, message-type override, raw message, `javascript:` URL, insecure remote `ws:` URL outside localhost, and extra command property; assert rejection before publication.
 
-- [ ] **Step 2: Implement the allowlisted adapter**
+- [x] **Step 2: Implement the allowlisted adapter**
 
 Use `roslibjs` only behind an injected factory so tests do not need ROS. Accept `ws://localhost`, `ws://127.0.0.1`, or secure `wss://` URLs. Build topics from a frozen map. Clamp numeric fields, publish zero velocity on stop and timeout, and remove every listener on disconnect.
 
-- [ ] **Step 3: Document the reference ROS environment**
+- [x] **Step 3: Document the reference ROS environment**
 
 Document ROS 2 Jazzy, Gazebo Harmonic, Nav2, `rosbridge_suite`, namespaced topics, controller mapping, TLS guidance, network isolation, emergency stop, and the distinction between browser snapshot rollback and physical stop-only behavior. Include a concrete launch/check sequence using the official AWS small warehouse world without claiming it is required for the hosted demo.
 
-- [ ] **Step 4: Run ROS adapter tests and full unit suite**
+- [x] **Step 4: Run ROS adapter tests and full unit suite**
 
 Run:
 
@@ -611,7 +611,7 @@ npm test
 
 Expected: PASS with no live ROS connection.
 
-- [ ] **Step 5: Commit the robotics bridge**
+- [x] **Step 5: Commit the robotics bridge**
 
 ```sh
 git add src/control/ros2Driver.ts src/control/ros2Driver.test.ts src/control/roslib.d.ts robotics
@@ -635,7 +635,7 @@ git commit -m "feat: add allowlisted ROS 2 robot control"
 - Native-like bootstrap records static and dynamic tool definitions, `toolchange` events, tool invocations, page errors, and console errors.
 - Screenshots are written under Playwright output and inspected at original resolution.
 
-- [ ] **Step 1: Rewrite the canonical E2E test and verify it fails**
+- [x] **Step 1: Rewrite the canonical E2E test and verify it fails**
 
 From fresh storage, assert:
 
@@ -653,29 +653,29 @@ Run: `npm run test:e2e -- e2e/canonical-flow.spec.ts`
 
 Expected before UI completion: FAIL at the first missing Firebreak assertion.
 
-- [ ] **Step 2: Add manual keyboard and mocked gamepad E2E coverage**
+- [x] **Step 2: Add manual keyboard and mocked gamepad E2E coverage**
 
 Press `2`, hold `W`, and assert `MEDIC-2` coordinates change while other robots remain fixed. Install a deterministic `navigator.getGamepads` mock before page load, drive with the left stick, press the bumper, and assert robot selection changes. Dispatch blur and assert movement stops.
 
-- [ ] **Step 3: Add lifecycle and persistence coverage**
+- [x] **Step 3: Add lifecycle and persistence coverage**
 
 Cover refresh of active world state, invalid stored state fallback, staged proposal hydration, unused authorization policy, expiry, revoke, cancellation, reset during execution, completion, and no restoration of consumed authority.
 
-- [ ] **Step 4: Add accessibility and responsive checks**
+- [x] **Step 4: Add accessibility and responsive checks**
 
 Run axe in ready, active, planned, authorized, executing, and resolved states. Assert focus trap/restore, visible focus, live announcements, semantic summary, 44×44 controls, reduced-motion behavior, keyboard-only journey, and no horizontal overflow at desktop and mobile sizes.
 
-- [ ] **Step 5: Run Playwright and capture canonical screenshots**
+- [x] **Step 5: Run Playwright and capture canonical screenshots**
 
 Run: `npm run test:e2e`
 
 Expected: all tests pass and screenshots exist for desktop ready, ignition, plan reveal, authorized tool, fleet execution, resolved receipt, plus mobile ignition, proposal, execution, and resolved states.
 
-- [ ] **Step 6: Inspect screenshots and fix presentation**
+- [x] **Step 6: Inspect screenshots and fix presentation**
 
 Open every screenshot at original resolution. Correct unreadable hierarchy, blocked scene content, excessive panel coverage, clipped controls, indistinct robots, poor route visibility, weak fire/smoke drama, mobile overflow, and low contrast. Re-run affected screenshots after each correction.
 
-- [ ] **Step 7: Commit end-to-end quality**
+- [x] **Step 7: Commit end-to-end quality**
 
 ```sh
 git add e2e playwright.config.ts src
@@ -702,27 +702,27 @@ git commit -m "test: verify the Firebreak rescue journey"
 - Demo script completes in 2:30–3:00 from fresh storage and includes manual play, both prompts, one authorization, fleet execution, receipt, and ROS credibility note.
 - Eval fixtures use only the seven static tools and one dynamic tool with strict expected arguments and safe rejections.
 
-- [ ] **Step 1: Rename package and page metadata**
+- [x] **Step 1: Rename package and page metadata**
 
 Set package name to `webmcp-firebreak`, document title to `WebMCP Firebreak — Emergency Robot Fleet`, description to the one-sentence product value, and theme color to the visual-system navy.
 
-- [ ] **Step 2: Rewrite the README**
+- [x] **Step 2: Rewrite the README**
 
 Explain the problem in plain language, playable controls, two-prompt journey, WebMCP value, exact tool contracts, one-boundary autonomy model, browser architecture, optional ROS mode, setup, tests, deployment, accessibility, and honest limits. Do not claim certification, real emergency readiness, or successful physical-robot testing unless performed.
 
-- [ ] **Step 3: Rewrite the demo and submission**
+- [x] **Step 3: Rewrite the demo and submission**
 
 Make the first ten seconds visual and understandable. Include a shot-by-shot script, controller actions, prompt text, narration, expected tool changes, cinematic camera moments, and final score. Align the submission narrative with usefulness, originality, execution, thoughtful WebMCP use, and human-agent collaboration.
 
-- [ ] **Step 4: Replace eval fixtures**
+- [x] **Step 4: Replace eval fixtures**
 
 Include at least 18 cases: canonical selection, valid alternative ordering, schema errors, unsafe route, stale simulation, collapse-zone violation, low battery, unknown robot, expiry, agent authorization attempt, simultaneous invocation, cancellation, replay, ROS topic injection, and successful receipt.
 
-- [ ] **Step 5: Rewrite STATUS from fresh evidence only**
+- [x] **Step 5: Rewrite STATUS from fresh evidence only**
 
 Record final command outputs, test counts, build status, browser sizes, screenshot states, accessibility results, console-error results, controller automation, and any unperformed hardware or ROS manual checks explicitly.
 
-- [ ] **Step 6: Scan for stale product copy and placeholders**
+- [x] **Step 6: Scan for stale product copy and placeholders**
 
 Run:
 
@@ -732,7 +732,7 @@ rg -n "WebMCP Airlock|INC-4821|checkout-api|rollback_checkout_release|Northstar 
 
 Expected: no shipped product matches. Historical design references remain only in excluded paths.
 
-- [ ] **Step 7: Commit submission materials**
+- [x] **Step 7: Commit submission materials**
 
 ```sh
 git add README.md DEMO_SCRIPT.md SUBMISSION_DRAFT.md STATUS.md evals package.json package-lock.json index.html LICENSE
@@ -749,7 +749,7 @@ git commit -m "docs: prepare Firebreak hackathon submission"
 **Interfaces:**
 - `npm run check` remains the single authoritative local release command.
 
-- [ ] **Step 1: Run formatting and lint**
+- [x] **Step 1: Run formatting and lint**
 
 Run:
 
@@ -761,7 +761,7 @@ npm run format:check
 
 Expected: zero warnings and clean formatting check.
 
-- [ ] **Step 2: Run strict types and all unit/integration tests**
+- [x] **Step 2: Run strict types and all unit/integration tests**
 
 Run:
 
@@ -772,7 +772,7 @@ npm test
 
 Expected: zero type errors and all tests pass.
 
-- [ ] **Step 3: Run production build and Playwright**
+- [x] **Step 3: Run production build and Playwright**
 
 Run:
 
@@ -783,21 +783,21 @@ npm run test:e2e
 
 Expected: production assets build and every browser test passes with no console or page errors.
 
-- [ ] **Step 4: Run the authoritative aggregate gate**
+- [x] **Step 4: Run the authoritative aggregate gate**
 
 Run: `npm run check`
 
 Expected: lint, formatting, strict typecheck, unit/integration, build, and Playwright all pass in one fresh sequence.
 
-- [ ] **Step 5: Request an independent code review**
+- [x] **Step 5: Request an independent code review**
 
 Review the full branch diff against the spec with special attention to unsafe ROS publication, stale authority, cancellation races, Babylon disposal, manual control stop behavior, accessibility, deterministic tests, and overengineering. Fix every confirmed P0/P1 issue and rerun the affected tests.
 
-- [ ] **Step 6: Inspect final desktop and mobile screenshots**
+- [x] **Step 6: Inspect final desktop and mobile screenshots**
 
 Verify at original resolution that the product reads as a game within ten seconds, the robots and emergency are unmistakable, the scene dominates the interface, controls do not obscure mission action, copy is concise, and resolved state is visually satisfying.
 
-- [ ] **Step 7: Check repository status and commit final fixes**
+- [x] **Step 7: Check repository status and commit final fixes**
 
 Run:
 
@@ -816,6 +816,6 @@ git commit -m "fix: harden Firebreak release"
 
 If there are no final changes, do not create an empty commit.
 
-- [ ] **Step 8: Report completion with evidence**
+- [x] **Step 8: Report completion with evidence**
 
 Report branch name, commits, exact release-gate results, screenshot inspection, runtime error result, deployment command, optional ROS status, and honest remaining limitations. Do not call the project complete if any acceptance criterion or required check is failing.

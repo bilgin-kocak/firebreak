@@ -55,6 +55,8 @@ function combineAbortSignals(signals: Array<AbortSignal | undefined>): {
 
 export class DynamicMissionToolManager {
   private controller: AbortController | null = null;
+  private expiryTimer: number | null = null;
+  private activeExecution: Promise<unknown> | null = null;
   private executing = false;
   private readonly now: () => number;
 
@@ -83,7 +85,9 @@ export class DynamicMissionToolManager {
         signal: controller.signal,
       });
       this.controller = controller;
-      return getFirebreakState().markProposalRegistered(authorized.id);
+      const registered = getFirebreakState().markProposalRegistered(authorized.id);
+      this.scheduleExpiry(registered);
+      return registered;
     } catch (error) {
       controller.abort(error);
       getFirebreakState().revokeMission("Mission registration failed safely.");
@@ -92,6 +96,7 @@ export class DynamicMissionToolManager {
   }
 
   public revoke(reason = "Mission authority revoked by operator"): void {
+    this.clearExpiryTimer();
     this.controller?.abort(new Error(reason));
     this.controller = null;
     const proposal = getFirebreakState().mission.proposal;
@@ -101,9 +106,31 @@ export class DynamicMissionToolManager {
   }
 
   public async destroy(): Promise<void> {
+    this.clearExpiryTimer();
     this.controller?.abort(new Error("Firebreak runtime stopped"));
     this.controller = null;
+    await this.activeExecution?.catch(() => undefined);
     await this.registry.settleToolChanges();
+  }
+
+  private clearExpiryTimer(): void {
+    if (this.expiryTimer !== null) window.clearTimeout(this.expiryTimer);
+    this.expiryTimer = null;
+  }
+
+  private scheduleExpiry(proposal: MissionProposal): void {
+    this.clearExpiryTimer();
+    if (proposal.expiresAt === null) return;
+    const expire = () => {
+      const remaining = proposal.expiresAt! - this.now();
+      if (remaining > 0) {
+        this.expiryTimer = window.setTimeout(expire, remaining);
+        return;
+      }
+      this.expiryTimer = null;
+      this.revoke("Mission authority expired after five minutes");
+    };
+    this.expiryTimer = window.setTimeout(expire, Math.max(0, proposal.expiresAt - this.now()));
   }
 
   private assertCurrent(proposal: MissionProposal): void {
@@ -136,6 +163,78 @@ export class DynamicMissionToolManager {
     }
   }
 
+  private async executeAuthorized(proposalId: string, callSignal?: AbortSignal): Promise<unknown> {
+    const state = getFirebreakState();
+    const live = state.mission.proposal;
+    if (!live || live.id !== proposalId || live.status !== "registered") {
+      throw new FirebreakError(
+        "HUMAN_AUTHORIZATION_REQUIRED",
+        "The mission tool does not have current human authority.",
+      );
+    }
+    if (live.consumedAt !== null) {
+      throw new FirebreakError("AUTHORITY_USED", "The mission authority was already used.");
+    }
+    if (live.expiresAt === null || live.expiresAt <= this.now()) {
+      this.revoke("Mission authority expired after five minutes");
+      throw new FirebreakError("AUTHORITY_EXPIRED", "The mission authority expired.");
+    }
+    this.assertCurrent(live);
+
+    const before = structuredClone(state.world);
+    const authority: MissionProposal = { ...structuredClone(live), status: "authorized" };
+    state.beginExecution(live.id);
+    const combined = combineAbortSignals([callSignal, this.controller?.signal]);
+    try {
+      const result = await executeMission({
+        snapshot: before,
+        proposal: authority,
+        driver: this.dependencies.driver,
+        signal: combined.signal,
+        now: this.now,
+        onProgress: (event) => getFirebreakState().applyProgress(event),
+      });
+      if (result.outcome !== "succeeded") {
+        result.snapshot.phase = getFirebreakState().world.phase === "failed" ? "failed" : "active";
+      }
+      getFirebreakState().finishExecution(result);
+
+      this.clearExpiryTimer();
+      this.controller?.abort(
+        new Error(
+          result.outcome === "succeeded"
+            ? "One-use mission completed"
+            : (result.receipt.reason ?? "Mission ended"),
+        ),
+      );
+      this.controller = null;
+      await this.registry.settleToolChanges();
+
+      if (result.outcome === "cancelled") {
+        throw new FirebreakError(
+          "EXECUTION_CANCELLED",
+          result.receipt.reason ?? "Mission execution was cancelled.",
+        );
+      }
+      if (result.outcome === "failed") {
+        throw new FirebreakError(
+          "OPERATION_FAILED",
+          result.receipt.reason ?? "A robot driver failed safely.",
+        );
+      }
+      return successResult("MISSION_EXECUTED", "Workers rescued and Battery Bay B secured.", {
+        receiptId: result.receipt.id,
+        rescuedWorkers: result.receipt.rescuedWorkers,
+        fireContained: result.receipt.fireContained,
+        containerSafe: result.receipt.containerSafe,
+        safetyViolations: result.receipt.safetyViolations,
+        durationMs: result.receipt.durationMs,
+      });
+    } finally {
+      combined.cleanup();
+    }
+  }
+
   private createDefinition(
     proposalId: string,
   ): RegistryToolDefinition<z.infer<typeof inputValidator>> {
@@ -151,71 +250,13 @@ export class DynamicMissionToolManager {
         if (this.executing) {
           throw new FirebreakError("AUTHORITY_USED", "The one-use mission is already executing.");
         }
-        const state = getFirebreakState();
-        const live = state.mission.proposal;
-        if (!live || live.id !== proposalId || live.status !== "registered") {
-          throw new FirebreakError(
-            "HUMAN_AUTHORIZATION_REQUIRED",
-            "The mission tool does not have current human authority.",
-          );
-        }
-        if (live.consumedAt !== null) {
-          throw new FirebreakError("AUTHORITY_USED", "The mission authority was already used.");
-        }
-        if (live.expiresAt === null || live.expiresAt <= this.now()) {
-          throw new FirebreakError("AUTHORITY_EXPIRED", "The mission authority expired.");
-        }
-        this.assertCurrent(live);
-
         this.executing = true;
-        const before = structuredClone(state.world);
-        const authority: MissionProposal = { ...structuredClone(live), status: "authorized" };
-        state.beginExecution(live.id);
-        const combined = combineAbortSignals([callSignal, this.controller?.signal]);
+        const execution = this.executeAuthorized(proposalId, callSignal);
+        this.activeExecution = execution;
         try {
-          const result = await executeMission({
-            snapshot: before,
-            proposal: authority,
-            driver: this.dependencies.driver,
-            signal: combined.signal,
-            now: this.now,
-            onProgress: (event) => getFirebreakState().applyProgress(event),
-          });
-          if (result.outcome !== "succeeded") result.snapshot.phase = "active";
-          getFirebreakState().finishExecution(result);
-
-          this.controller?.abort(
-            new Error(
-              result.outcome === "succeeded"
-                ? "One-use mission completed"
-                : (result.receipt.reason ?? "Mission ended"),
-            ),
-          );
-          this.controller = null;
-          await this.registry.settleToolChanges();
-
-          if (result.outcome === "cancelled") {
-            throw new FirebreakError(
-              "EXECUTION_CANCELLED",
-              result.receipt.reason ?? "Mission execution was cancelled.",
-            );
-          }
-          if (result.outcome === "failed") {
-            throw new FirebreakError(
-              "OPERATION_FAILED",
-              result.receipt.reason ?? "A robot driver failed safely.",
-            );
-          }
-          return successResult("MISSION_EXECUTED", "Workers rescued and Battery Bay B secured.", {
-            receiptId: result.receipt.id,
-            rescuedWorkers: result.receipt.rescuedWorkers,
-            fireContained: result.receipt.fireContained,
-            containerSafe: result.receipt.containerSafe,
-            safetyViolations: result.receipt.safetyViolations,
-            durationMs: result.receipt.durationMs,
-          });
+          return await execution;
         } finally {
-          combined.cleanup();
+          if (this.activeExecution === execution) this.activeExecution = null;
           this.executing = false;
         }
       },

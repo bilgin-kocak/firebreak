@@ -51,6 +51,17 @@ function requireActive(state: FirebreakState): FirebreakSnapshot {
   return state.world;
 }
 
+function requirePlanningOpen(state: FirebreakState): FirebreakSnapshot {
+  const world = requireActive(state);
+  if (world.phase !== "active") {
+    throw new FirebreakError(
+      "OPERATION_FAILED",
+      "Planning is locked while a reviewed or executing mission authority exists.",
+    );
+  }
+  return world;
+}
+
 function markHazardsScanned(world: FirebreakSnapshot, now: number): FirebreakSnapshot {
   const next = structuredClone(world);
   next.hazards.scanned = true;
@@ -118,7 +129,7 @@ export const createStaticToolDefinitions = (
       origin: "built_in",
       async execute() {
         const state = getState();
-        const scanned = markHazardsScanned(requireActive(state), now());
+        const scanned = markHazardsScanned(requirePlanningOpen(state), now());
         state.replaceWorld(scanned);
         return successResult("HAZARDS_SCANNED", "Thermal hazard map is current.", {
           revision: scanned.revision,
@@ -171,7 +182,7 @@ export const createStaticToolDefinitions = (
       origin: "built_in",
       async execute() {
         const state = getState();
-        const world = requireActive(state);
+        const world = requirePlanningOpen(state);
         if (!world.hazards.scanned) {
           throw new FirebreakError(
             "HAZARD_SCAN_REQUIRED",
@@ -202,6 +213,7 @@ export const createStaticToolDefinitions = (
       origin: "built_in",
       async execute(input) {
         const state = getState();
+        requirePlanningOpen(state);
         const simulation = state.mission.simulation;
         if (!simulation || simulation.id !== input.simulationId) {
           throw new FirebreakError(
@@ -244,6 +256,7 @@ export const createStaticToolDefinitions = (
       origin: "built_in",
       async execute(input) {
         const state = getState();
+        requirePlanningOpen(state);
         const simulation = state.mission.simulation;
         if (!simulation || simulation.id !== input.simulationId) {
           throw new FirebreakError(

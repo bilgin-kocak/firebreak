@@ -75,7 +75,7 @@ describe("seven static Firebreak tools", () => {
     expect(simulation).toMatchObject({
       ok: true,
       code: "MISSION_SIMULATED",
-      data: { feasible: true, predictedDurationMs: 35_000 },
+      data: { feasible: true, predictedDurationMs: 43_000 },
     });
 
     await expect(
@@ -124,5 +124,46 @@ describe("seven static Firebreak tools", () => {
         toolName: "execute_rescue_mission",
       }),
     ).resolves.toMatchObject({ ok: false, code: "SIMULATION_NOT_FOUND" });
+  });
+
+  it("locks planning mutations once human-reviewed authority is active", async () => {
+    const { adapter } = await setup();
+    await adapter.executeTool("scan_hazards", {
+      incidentId: "WH-01",
+      sensorMode: "thermal",
+    });
+    const simulation = (await adapter.executeTool("simulate_mission", {
+      incidentId: "WH-01",
+      strategy: "coordinated",
+    })) as { ok: true; data: { simulationId: string } };
+    await adapter.executeTool("validate_safety_envelope", {
+      simulationId: simulation.data.simulationId,
+    });
+    await adapter.executeTool("stage_mission_tool", {
+      simulationId: simulation.data.simulationId,
+      toolName: "execute_rescue_mission",
+    });
+    getFirebreakState().authorizeProposal(getFirebreakState().mission.proposal!.id, 2_000);
+    const before = structuredClone(getFirebreakState().world);
+
+    await expect(
+      adapter.executeTool("scan_hazards", {
+        incidentId: "WH-01",
+        sensorMode: "thermal",
+      }),
+    ).resolves.toMatchObject({ ok: false, code: "OPERATION_FAILED" });
+    await expect(
+      adapter.executeTool("simulate_mission", {
+        incidentId: "WH-01",
+        strategy: "coordinated",
+      }),
+    ).resolves.toMatchObject({ ok: false, code: "OPERATION_FAILED" });
+    await expect(
+      adapter.executeTool("stage_mission_tool", {
+        simulationId: simulation.data.simulationId,
+        toolName: "execute_rescue_mission",
+      }),
+    ).resolves.toMatchObject({ ok: false, code: "OPERATION_FAILED" });
+    expect(getFirebreakState().world).toEqual(before);
   });
 });

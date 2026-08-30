@@ -42,6 +42,7 @@ export const boot = async (page: Page) => {
   await expect(
     page.getByRole("img", { name: /interactive warehouse rescue scene/i }),
   ).toBeVisible();
+  await expect(page.locator("canvas[data-scene-ready='true']")).toBeVisible();
 };
 
 export const startEmergency = async (page: Page) => {

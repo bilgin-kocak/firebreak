@@ -14,7 +14,7 @@ import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { Scene } from "@babylonjs/core/scene";
 import havokWasmUrl from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 
-import { createFirebreakSeed, ROBOT_IDS } from "../domain/firebreakSeed";
+import { createFirebreakSeed, ROBOT_IDS, WAREHOUSE_SHELVES } from "../domain/firebreakSeed";
 import type { RobotId, WorkerId } from "../domain/firebreakTypes";
 import { createRobotMesh } from "./createRobotMesh";
 import type { WarehouseSceneHandle } from "./sceneSynchronizer";
@@ -188,11 +188,8 @@ export async function createWarehouseScene(
   collapseZone.position.set(4.5, 0.035, -4);
   collapseZone.material = danger;
 
-  for (const z of [-5.8, -0.6, 5.2]) {
-    createShelf(scene, -4, z, 4.5, steel, crate);
-  }
-  for (const z of [-5.8, -0.6]) {
-    createShelf(scene, 7.5, z, 4, steel, crate);
+  for (const shelf of WAREHOUSE_SHELVES) {
+    createShelf(scene, shelf.x, shelf.z, shelf.length, steel, crate);
   }
   for (const [x, z, width, depth] of [
     [0, -10.25, 29, 0.25],
@@ -284,13 +281,15 @@ export async function createWarehouseScene(
   const routeRoot = new TransformNode("approved-routes", scene);
 
   let renderTime = 0;
+  let reducedEffects = false;
   const renderLoop = () => {
     renderTime += engine.getDeltaTime();
-    const pulse = 0.86 + Math.sin(renderTime * 0.007) * 0.14;
+    const pulse = reducedEffects ? 1 : 0.86 + Math.sin(renderTime * 0.007) * 0.14;
     fireLight.intensity = 7 * pulse;
-    blueLight.intensity = 3.8 + Math.sin(renderTime * 0.012) * 1.2;
+    blueLight.intensity = reducedEffects ? 3.8 : 3.8 + Math.sin(renderTime * 0.012) * 1.2;
     scene.render();
   };
+  renderLoop();
   engine.runRenderLoop(renderLoop);
   void enableOptionalHavok(scene, ground);
 
@@ -305,5 +304,8 @@ export async function createWarehouseScene(
     smokeRoot,
     routeRoot,
     renderLoop,
+    setAmbientEffectsReduced(reduced) {
+      reducedEffects = reduced;
+    },
   };
 }

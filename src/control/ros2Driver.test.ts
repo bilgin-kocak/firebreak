@@ -29,6 +29,9 @@ class FakeRos implements RosConnectionLike {
   close() {
     this.closed = true;
   }
+  emit(event: string, ...args: unknown[]) {
+    this.listeners.get(event)?.forEach((listener) => listener(...args));
+  }
 }
 
 class FakeTopic implements RosTopicLike {
@@ -37,9 +40,11 @@ class FakeTopic implements RosTopicLike {
   constructor(
     readonly name: string,
     readonly messageType: string,
+    private readonly onPublish?: (topic: FakeTopic, message: unknown) => void,
   ) {}
   publish(message: unknown) {
     this.publications.push(structuredClone(message));
+    this.onPublish?.(this, message);
   }
   subscribe(listener: (message: unknown) => void) {
     this.subscribers.add(listener);
@@ -50,13 +55,48 @@ class FakeTopic implements RosTopicLike {
   }
 }
 
-function setup() {
+function setup(
+  setupOptions: {
+    echoGoalTelemetry?: boolean;
+    echoBatteryTelemetry?: boolean;
+    echoActionResult?: boolean;
+    disconnectDuringWait?: boolean;
+  } = {},
+) {
   const ros = new FakeRos();
   const topics: FakeTopic[] = [];
   const factory: RoslibFactory = {
     createRos: () => ros,
     createTopic: (_ros, options) => {
-      const topic = new FakeTopic(options.name, options.messageType);
+      const topic = new FakeTopic(options.name, options.messageType, (publishedTopic, message) => {
+        const robot = Object.values(ROS_TOPIC_MAP).find(
+          (candidate) =>
+            candidate.goalPose === publishedTopic.name ||
+            candidate.actionCommand === publishedTopic.name,
+        );
+        if (!robot) return;
+        if (setupOptions.echoGoalTelemetry && publishedTopic.name === robot.goalPose) {
+          const position = (message as { pose: { position: { x: number; y: number; z: number } } })
+            .pose.position;
+          topics
+            .find((candidate) => candidate.name === robot.odom)
+            ?.subscribers.forEach((listener) =>
+              listener({ pose: { pose: { position: { ...position } } } }),
+            );
+          if (setupOptions.echoBatteryTelemetry !== false) {
+            topics
+              .find((candidate) => candidate.name === robot.battery)
+              ?.subscribers.forEach((listener) => listener({ percentage: 0.75 }));
+          }
+        }
+        const echoAction = setupOptions.echoActionResult ?? setupOptions.echoGoalTelemetry;
+        if (echoAction && publishedTopic.name === robot.actionCommand) {
+          const action = (message as { data: string }).data;
+          topics
+            .find((candidate) => candidate.name === robot.actionResult)
+            ?.subscribers.forEach((listener) => listener({ data: `${action}:succeeded` }));
+        }
+      });
       topics.push(topic);
       return topic;
     },
@@ -67,7 +107,9 @@ function setup() {
     rosFactory: factory,
     commandTimeoutMs: 250,
     now: () => 1_700_000_000_250,
-    wait: async () => undefined,
+    wait: async () => {
+      if (setupOptions.disconnectDuringWait) ros.emit("close");
+    },
   });
   const topic = (name: string) => topics.find((candidate) => candidate.name === name)!;
   return { ros, topics, driver, topic };
@@ -91,7 +133,7 @@ describe("allowlisted ROS 2 driver", () => {
     await driver.connect();
     expect(driver.connectionState).toBe("connected");
     expect(ros.connectedUrl).toBe("ws://127.0.0.1:9090/");
-    expect(topics).toHaveLength(17);
+    expect(topics).toHaveLength(25);
     expect(topics.map(({ name, messageType }) => ({ name, messageType }))).toEqual(
       expect.arrayContaining([
         {
@@ -107,20 +149,28 @@ describe("allowlisted ROS 2 driver", () => {
           name: ROS_TOPIC_MAP["SUPPRESS-3"].battery,
           messageType: "sensor_msgs/msg/BatteryState",
         },
+        {
+          name: ROS_TOPIC_MAP["HAUL-4"].actionCommand,
+          messageType: "std_msgs/msg/String",
+        },
+        {
+          name: ROS_TOPIC_MAP["HAUL-4"].actionResult,
+          messageType: "std_msgs/msg/String",
+        },
         { name: "/firebreak/fleet/emergency_stop", messageType: "std_msgs/msg/Bool" },
       ]),
     );
   });
 
   it("clamps manual velocity and publishes zero velocity after the watchdog timeout", async () => {
-    const { driver, topic } = setup();
+    const { driver, topic } = setup({ echoGoalTelemetry: true });
     await driver.connect();
 
     await driver.commandManual({
       robotId: "MEDIC-2",
       throttle: 9,
       turn: -4,
-      action: false,
+      action: true,
       deltaMs: 16,
     });
     const cmd = topic(ROS_TOPIC_MAP["MEDIC-2"].cmdVel);
@@ -128,6 +178,9 @@ describe("allowlisted ROS 2 driver", () => {
       linear: { x: 1.2, y: 0, z: 0 },
       angular: { x: 0, y: 0, z: -1.8 },
     });
+    expect(topic(ROS_TOPIC_MAP["MEDIC-2"].actionCommand).publications).toEqual([
+      { data: "manual-context-action" },
+    ]);
 
     await vi.advanceTimersByTimeAsync(250);
     expect(cmd.publications.at(-1)).toEqual({
@@ -164,7 +217,7 @@ describe("allowlisted ROS 2 driver", () => {
   });
 
   it("publishes bounded map-frame navigation goals and progress for an approved route", async () => {
-    const { driver, topic } = setup();
+    const { driver, topic } = setup({ echoGoalTelemetry: true });
     await driver.connect();
     const route = simulateCoordinatedMission(createFirebreakSeed()).routes["HAUL-4"];
     const progress = vi.fn();
@@ -184,12 +237,69 @@ describe("allowlisted ROS 2 driver", () => {
     });
     expect(goals.at(-1)?.pose.orientation.w).toBe(1);
     expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({ progress: 1 }));
+    expect(topic(ROS_TOPIC_MAP["HAUL-4"].actionCommand).publications).toEqual([
+      { data: "rescue-worker-b" },
+      { data: "pickup-container" },
+      { data: "deliver-worker-b-and-container" },
+    ]);
+  });
+
+  it("refuses to claim success without positive feedback for fixed mission actions", async () => {
+    const { driver } = setup({ echoGoalTelemetry: true, echoActionResult: false });
+    await driver.connect();
+    const route = simulateCoordinatedMission(createFirebreakSeed()).routes["SCOUT-1"];
+
+    await expect(
+      driver.executeRoute(route, {
+        signal: new AbortController().signal,
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toThrow(/did not confirm mission action/i);
+  });
+
+  it("fails closed when odometry and battery do not confirm arrival", async () => {
+    const { driver } = setup();
+    await driver.connect();
+    const route = simulateCoordinatedMission(createFirebreakSeed()).routes["HAUL-4"];
+
+    await expect(
+      driver.executeRoute(route, {
+        signal: new AbortController().signal,
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toThrow(/telemetry|arrival/i);
+  });
+
+  it("requires fresh battery telemetry for every approved waypoint", async () => {
+    const { driver } = setup({ echoGoalTelemetry: true, echoBatteryTelemetry: false });
+    await driver.connect();
+    const route = simulateCoordinatedMission(createFirebreakSeed()).routes["SCOUT-1"];
+
+    await expect(
+      driver.executeRoute(route, {
+        signal: new AbortController().signal,
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toThrow(/telemetry|arrival/i);
+  });
+
+  it("does not report route success after rosbridge disconnects mid-run", async () => {
+    const { driver } = setup({ echoGoalTelemetry: true, disconnectDuringWait: true });
+    await driver.connect();
+    const route = simulateCoordinatedMission(createFirebreakSeed()).routes["MEDIC-2"];
+
+    await expect(
+      driver.executeRoute(route, {
+        signal: new AbortController().signal,
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toMatchObject({ code: "DRIVER_DISCONNECTED" });
   });
 
   it("stops every robot, unsubscribes telemetry, and closes the bridge", async () => {
     const { driver, ros, topics, topic } = setup();
     await driver.connect();
-    expect(topics.filter((candidate) => candidate.subscribers.size > 0)).toHaveLength(8);
+    expect(topics.filter((candidate) => candidate.subscribers.size > 0)).toHaveLength(12);
 
     await driver.stopAll("Operator stop");
     for (const map of Object.values(ROS_TOPIC_MAP)) {

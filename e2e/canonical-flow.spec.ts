@@ -22,10 +22,9 @@ test("canonical two-prompt rescue plans, authorizes, moves the fleet, and unregi
   await screenshot(page, testInfo, "firebreak-01-initial-desktop.png");
 
   await startEmergency(page);
-  await page.getByRole("button", { name: /MEDIC-2/i }).click();
   const before = await page.evaluate(() => {
     const envelope = JSON.parse(localStorage.getItem("firebreak.world.v1")!);
-    return envelope.data.robots["MEDIC-2"].position;
+    return envelope.data.robots["SCOUT-1"].position;
   });
   await page.keyboard.down("w");
   await page.waitForTimeout(260);
@@ -34,7 +33,7 @@ test("canonical two-prompt rescue plans, authorizes, moves the fleet, and unregi
     .poll(async () =>
       page.evaluate(() => {
         const envelope = JSON.parse(localStorage.getItem("firebreak.world.v1")!);
-        return envelope.data.robots["MEDIC-2"].position;
+        return envelope.data.robots["SCOUT-1"].position;
       }),
     )
     .not.toEqual(before);

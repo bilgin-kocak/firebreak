@@ -12,6 +12,7 @@ export interface NormalizedControl {
   cameraY: number;
   action: boolean;
   selectDelta: -1 | 0 | 1;
+  openMissionControl: boolean;
 }
 
 export interface InputSnapshot extends NormalizedControl {

@@ -23,6 +23,7 @@ export function FirebreakScene({ factory = defaultFactory }: { factory?: Firebre
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const synchronizerRef = useRef<SceneSynchronizer | null>(null);
   const [graphicsError, setGraphicsError] = useState(false);
+  const [sceneReady, setSceneReady] = useState(false);
   const world = useFirebreakStore((state) => state.world);
   const cameraMode = useFirebreakStore((state) => state.ui.cameraMode);
   const reducedEffects = useFirebreakStore((state) => state.ui.reducedEffects);
@@ -43,15 +44,22 @@ export function FirebreakScene({ factory = defaultFactory }: { factory?: Firebre
         synchronizer.applySnapshot(useFirebreakStore.getState().world);
         synchronizer.setCameraMode(useFirebreakStore.getState().ui.cameraMode);
         synchronizer.setReducedEffects(useFirebreakStore.getState().ui.reducedEffects);
+        setSceneReady(true);
       })
       .catch(() => {
         if (active) setGraphicsError(true);
       });
     const onResize = () => synchronizerRef.current?.resize();
+    const onCameraInput = (event: Event) => {
+      const detail = (event as CustomEvent<{ x?: number; y?: number }>).detail;
+      synchronizerRef.current?.adjustCamera(Number(detail?.x ?? 0), Number(detail?.y ?? 0));
+    };
     window.addEventListener("resize", onResize);
+    window.addEventListener("firebreak:camera-input", onCameraInput);
     return () => {
       active = false;
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("firebreak:camera-input", onCameraInput);
       created?.dispose();
       synchronizerRef.current = null;
     };
@@ -71,6 +79,10 @@ export function FirebreakScene({ factory = defaultFactory }: { factory?: Firebre
   }, [reducedEffects]);
 
   const trapped = Object.values(world.workers).filter((worker) => worker.status !== "safe").length;
+  const remainingSeconds = Math.max(
+    0,
+    Math.ceil((world.durationLimitMs - world.elapsedMs) / 1_000),
+  );
   return (
     <section className="firebreak-scene" aria-label="Warehouse rescue simulation">
       <canvas
@@ -78,6 +90,7 @@ export function FirebreakScene({ factory = defaultFactory }: { factory?: Firebre
         className="firebreak-canvas"
         role="img"
         aria-label="Interactive warehouse rescue scene with four emergency robots"
+        data-scene-ready={sceneReady || graphicsError}
       />
       {graphicsError ? (
         <p className="graphics-fallback">
@@ -91,6 +104,13 @@ export function FirebreakScene({ factory = defaultFactory }: { factory?: Firebre
           {world.hazards.fire.contained ? "contained" : "active"}.
         </p>
         <ul>
+          {Object.values(world.robots).map((robot) => (
+            <li key={robot.id}>
+              {robot.id}, {robot.role}, battery {Math.round(robot.battery)} percent, status{" "}
+              {robot.status}, position {robot.position.x.toFixed(1)}, {robot.position.z.toFixed(1)},
+              route {Math.round(robot.routeProgress * 100)} percent.
+            </li>
+          ))}
           {Object.values(world.workers).map((worker) => (
             <li key={worker.id}>
               {worker.label} — {worker.status}
@@ -98,8 +118,19 @@ export function FirebreakScene({ factory = defaultFactory }: { factory?: Firebre
           ))}
         </ul>
         <p>
-          Selected robot: {world.selectedRobotId}. Emergency phase: {world.phase}.
+          Selected robot: {world.selectedRobotId}. Emergency phase: {world.phase}. Mission time{" "}
+          remaining: {remainingSeconds} seconds. Hazardous container:{" "}
+          {world.hazards.container.status}. Power:{" "}
+          {world.hazards.powerIsolated ? "isolated" : "live"}. Approved routes:{" "}
+          {Object.values(world.routes).filter((route) => route.length > 1).length} of 4.
         </p>
+        <ul>
+          {world.objectives.map((objective) => (
+            <li key={objective.id}>
+              Objective {objective.label}: {objective.status}.
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );

@@ -1510,7 +1510,7 @@ button:disabled {
 
   .touch-pad {
     display: grid;
-    grid-template-columns: repeat(2, 44px);
+    grid-template-columns: repeat(3, 44px);
     grid-template-rows: repeat(2, 44px);
     border-left: 1px solid var(--steel);
   }
@@ -1525,6 +1525,7 @@ button:disabled {
   }
 
   .touch-pad .touch-action {
+    grid-column: span 2;
     color: var(--soot);
     background: var(--safe);
   }

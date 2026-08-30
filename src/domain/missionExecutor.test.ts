@@ -121,6 +121,38 @@ describe("executeMission", () => {
     expect(result.receipt.reason).toContain("Pump offline");
   });
 
+  it("aborts and awaits sibling routes before finalizing a driver failure", async () => {
+    const { snapshot, proposal } = authorizedProposal();
+    const driver = successfulDriver();
+    const stoppedRoutes: string[] = [];
+    driver.executeRoute = vi.fn(async (route, options) => {
+      if (route.robotId === "SUPPRESS-3") throw new Error("Pump offline");
+      await new Promise<void>((_resolve, reject) => {
+        options.signal.addEventListener(
+          "abort",
+          () => {
+            stoppedRoutes.push(route.robotId);
+            reject(options.signal.reason);
+          },
+          { once: true },
+        );
+      });
+    });
+
+    const result = await executeMission({
+      snapshot,
+      proposal,
+      driver,
+      signal: new AbortController().signal,
+      now: () => 5_000,
+      onProgress: () => undefined,
+    });
+
+    expect(result.outcome).toBe("failed");
+    expect(new Set(stoppedRoutes)).toEqual(new Set(["SCOUT-1", "MEDIC-2", "HAUL-4"]));
+    expect(driver.stopAll).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects simultaneous use of the same one-use proposal", async () => {
     const { snapshot, proposal } = authorizedProposal();
     let release: (() => void) | undefined;
@@ -151,5 +183,39 @@ describe("executeMission", () => {
 
     release?.();
     await first;
+  });
+
+  it("stops a mission that exceeds the 45-second execution deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      const { snapshot, proposal } = authorizedProposal();
+      const driver = successfulDriver();
+      driver.executeRoute = vi.fn(
+        async (_route, options) =>
+          new Promise<void>((_resolve, reject) => {
+            options.signal.addEventListener("abort", () => reject(options.signal.reason), {
+              once: true,
+            });
+          }),
+      );
+      const execution = executeMission({
+        snapshot,
+        proposal,
+        driver,
+        signal: new AbortController().signal,
+        now: () => 5_000,
+        onProgress: () => undefined,
+        executionLimitMs: 45_000,
+      });
+
+      await vi.advanceTimersByTimeAsync(45_001);
+      const result = await execution;
+
+      expect(result.outcome).toBe("cancelled");
+      expect(result.receipt.reason).toContain("45-second execution limit");
+      expect(driver.stopAll).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

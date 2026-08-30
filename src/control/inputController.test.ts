@@ -36,6 +36,7 @@ describe("manual input normalization", () => {
     const buttons = Array.from({ length: 16 }, () => button());
     buttons[0] = button(true);
     buttons[5] = button(true);
+    buttons[9] = button(true);
     const control = normalizeGamepad(gamepad({ axes: [-0.5, -0.75, 0.25, -0.2], buttons }));
 
     expect(control).toEqual({
@@ -45,6 +46,7 @@ describe("manual input normalization", () => {
       cameraY: 0.2,
       action: true,
       selectDelta: 1,
+      openMissionControl: true,
     });
   });
 
@@ -56,6 +58,7 @@ describe("manual input normalization", () => {
       cameraY: 0,
       action: false,
       selectDelta: 0,
+      openMissionControl: false,
     });
     expect(normalizeGamepad(gamepad({ connected: false }))).toEqual({
       throttle: 0,
@@ -64,6 +67,7 @@ describe("manual input normalization", () => {
       cameraY: 0,
       action: false,
       selectDelta: 0,
+      openMissionControl: false,
     });
   });
 

@@ -1,5 +1,10 @@
 import { ROBOT_IDS } from "../domain/firebreakSeed";
-import type { MissionProgressEvent, MissionRoute, RobotId } from "../domain/firebreakTypes";
+import type {
+  MissionAction,
+  MissionProgressEvent,
+  MissionRoute,
+  RobotId,
+} from "../domain/firebreakTypes";
 import { FirebreakError } from "../domain/firebreakTypes";
 import type { ManualRobotCommand, MissionRobotDriver } from "./controlTypes";
 
@@ -28,29 +33,50 @@ export const ROS_TOPIC_MAP = Object.freeze({
     goalPose: "/firebreak/scout-1/goal_pose",
     odom: "/firebreak/scout-1/odom",
     battery: "/firebreak/scout-1/battery",
+    actionCommand: "/firebreak/scout-1/mission_action",
+    actionResult: "/firebreak/scout-1/mission_action_result",
   }),
   "MEDIC-2": Object.freeze({
     cmdVel: "/firebreak/medic-2/cmd_vel",
     goalPose: "/firebreak/medic-2/goal_pose",
     odom: "/firebreak/medic-2/odom",
     battery: "/firebreak/medic-2/battery",
+    actionCommand: "/firebreak/medic-2/mission_action",
+    actionResult: "/firebreak/medic-2/mission_action_result",
   }),
   "SUPPRESS-3": Object.freeze({
     cmdVel: "/firebreak/suppress-3/cmd_vel",
     goalPose: "/firebreak/suppress-3/goal_pose",
     odom: "/firebreak/suppress-3/odom",
     battery: "/firebreak/suppress-3/battery",
+    actionCommand: "/firebreak/suppress-3/mission_action",
+    actionResult: "/firebreak/suppress-3/mission_action_result",
   }),
   "HAUL-4": Object.freeze({
     cmdVel: "/firebreak/haul-4/cmd_vel",
     goalPose: "/firebreak/haul-4/goal_pose",
     odom: "/firebreak/haul-4/odom",
     battery: "/firebreak/haul-4/battery",
+    actionCommand: "/firebreak/haul-4/mission_action",
+    actionResult: "/firebreak/haul-4/mission_action_result",
   }),
-} satisfies Record<RobotId, Record<"cmdVel" | "goalPose" | "odom" | "battery", string>>);
+} satisfies Record<
+  RobotId,
+  Record<"cmdVel" | "goalPose" | "odom" | "battery" | "actionCommand" | "actionResult", string>
+>);
 
 const ESTOP_TOPIC = "/firebreak/fleet/emergency_stop";
 const COMMAND_KEYS = ["action", "deltaMs", "robotId", "throttle", "turn"] as const;
+const ARRIVAL_TOLERANCE_METERS = 0.8;
+const MINIMUM_BATTERY_FRACTION = 0.2;
+const TELEMETRY_POLL_MS = 250;
+const ACTION_TIMEOUT_MS = 5_000;
+const MISSION_ACTIONS_BY_ROBOT = Object.freeze({
+  "SCOUT-1": ["scan-hazards"],
+  "MEDIC-2": ["rescue-worker-a", "deliver-worker-a"],
+  "SUPPRESS-3": ["isolate-power", "suppress-fire"],
+  "HAUL-4": ["rescue-worker-b", "pickup-container", "deliver-worker-b-and-container"],
+} satisfies Record<RobotId, readonly MissionAction[]>);
 
 export interface Ros2DriverOptions {
   url: string;
@@ -65,8 +91,11 @@ interface RobotTopics {
   goalPose: RosTopicLike;
   odom: RosTopicLike;
   battery: RosTopicLike;
+  actionCommand: RosTopicLike;
+  actionResult: RosTopicLike;
   odomListener: (message: unknown) => void;
   batteryListener: (message: unknown) => void;
+  actionResultListener: (message: unknown) => void;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -102,13 +131,41 @@ function zeroTwist(): Record<string, unknown> {
   };
 }
 
+function readOdomPosition(message: unknown): { x: number; y: number; z: number } | null {
+  if (typeof message !== "object" || message === null) return null;
+  const pose = (message as { pose?: unknown }).pose;
+  if (typeof pose !== "object" || pose === null) return null;
+  const nestedPose = (pose as { pose?: unknown }).pose;
+  if (typeof nestedPose !== "object" || nestedPose === null) return null;
+  const position = (nestedPose as { position?: unknown }).position;
+  if (typeof position !== "object" || position === null) return null;
+  const { x, y, z } = position as { x?: unknown; y?: unknown; z?: unknown };
+  return typeof x === "number" && typeof y === "number" && typeof z === "number"
+    ? { x, y, z }
+    : null;
+}
+
+function readBatteryFraction(message: unknown): number | null {
+  if (typeof message !== "object" || message === null) return null;
+  const percentage = (message as { percentage?: unknown }).percentage;
+  return typeof percentage === "number" && Number.isFinite(percentage) && percentage >= 0
+    ? percentage
+    : null;
+}
+
+function readActionResult(message: unknown): string | null {
+  if (typeof message !== "object" || message === null) return null;
+  const data = (message as { data?: unknown }).data;
+  return typeof data === "string" ? data : null;
+}
+
 function defaultWait(milliseconds: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
       reject(signal.reason);
       return;
     }
-    const timeout = window.setTimeout(resolve, Math.min(milliseconds, 2_000));
+    const timeout = window.setTimeout(resolve, milliseconds);
     signal.addEventListener(
       "abort",
       () => {
@@ -149,7 +206,18 @@ export class Ros2Driver implements MissionRobotDriver {
   private readonly now: () => number;
   private readonly wait: (milliseconds: number, signal: AbortSignal) => Promise<void>;
   private readonly commandTimeoutMs: number;
-  private readonly telemetry = new Map<RobotId, { odom?: unknown; battery?: unknown }>();
+  private readonly telemetry = new Map<
+    RobotId,
+    {
+      odom?: unknown;
+      battery?: unknown;
+      actionResult?: unknown;
+      odomSequence?: number;
+      batterySequence?: number;
+      actionSequence?: number;
+    }
+  >();
+  private telemetrySequence = 0;
 
   public constructor(options: Ros2DriverOptions) {
     this.url = validatedUrl(options.url);
@@ -204,8 +272,10 @@ export class Ros2Driver implements MissionRobotDriver {
     for (const topics of this.topics.values()) {
       topics.odom.unsubscribe(topics.odomListener);
       topics.battery.unsubscribe(topics.batteryListener);
+      topics.actionResult.unsubscribe(topics.actionResultListener);
     }
     this.topics.clear();
+    this.telemetry.clear();
     if (this.connectionListener) this.ros.off("connection", this.connectionListener);
     if (this.errorListener) this.ros.off("error", this.errorListener);
     if (this.closeListener) this.ros.off("close", this.closeListener);
@@ -234,6 +304,11 @@ export class Ros2Driver implements MissionRobotDriver {
         angular: { x: 0, y: 0, z: clamp(command.turn, -1, 1) * 1.8 },
       }),
     );
+    if (command.action) {
+      this.topics
+        .get(command.robotId)!
+        .actionCommand.publish(this.factory!.createMessage({ data: "manual-context-action" }));
+    }
     const existing = this.watchdogs.get(command.robotId);
     if (existing !== undefined) window.clearTimeout(existing);
     this.watchdogs.set(
@@ -261,8 +336,11 @@ export class Ros2Driver implements MissionRobotDriver {
     const goalTopic = this.topics.get(route.robotId)!.goalPose;
     for (let index = 1; index < route.waypoints.length; index += 1) {
       if (options.signal.aborted) throw options.signal.reason;
+      this.assertConnected();
       const previous = route.waypoints[index - 1]!;
       const waypoint = route.waypoints[index]!;
+      const odomSequence = this.telemetry.get(route.robotId)?.odomSequence ?? 0;
+      const batterySequence = this.telemetry.get(route.robotId)?.batterySequence ?? 0;
       const timestamp = this.now();
       goalTopic.publish(
         this.factory!.createMessage({
@@ -279,8 +357,17 @@ export class Ros2Driver implements MissionRobotDriver {
           },
         }),
       );
-      await this.wait(waypoint.atMs - previous.atMs, options.signal);
-      if (options.signal.aborted) throw options.signal.reason;
+      await this.awaitArrival(
+        route.robotId,
+        waypoint.position,
+        odomSequence,
+        batterySequence,
+        waypoint.atMs - previous.atMs,
+        options.signal,
+      );
+      if (waypoint.action) {
+        await this.executeMissionAction(route.robotId, waypoint.action, options.signal);
+      }
       const progress = index / (route.waypoints.length - 1);
       options.onProgress({
         robotId: route.robotId,
@@ -325,14 +412,34 @@ export class Ros2Driver implements MissionRobotDriver {
         name: names.battery,
         messageType: "sensor_msgs/msg/BatteryState",
       });
+      const actionResult = factory.createTopic(ros, {
+        name: names.actionResult,
+        messageType: "std_msgs/msg/String",
+      });
       const odomListener = (message: unknown) => {
-        this.telemetry.set(robotId, { ...this.telemetry.get(robotId), odom: message });
+        this.telemetry.set(robotId, {
+          ...this.telemetry.get(robotId),
+          odom: message,
+          odomSequence: ++this.telemetrySequence,
+        });
       };
       const batteryListener = (message: unknown) => {
-        this.telemetry.set(robotId, { ...this.telemetry.get(robotId), battery: message });
+        this.telemetry.set(robotId, {
+          ...this.telemetry.get(robotId),
+          battery: message,
+          batterySequence: ++this.telemetrySequence,
+        });
+      };
+      const actionResultListener = (message: unknown) => {
+        this.telemetry.set(robotId, {
+          ...this.telemetry.get(robotId),
+          actionResult: message,
+          actionSequence: ++this.telemetrySequence,
+        });
       };
       odom.subscribe(odomListener);
       battery.subscribe(batteryListener);
+      actionResult.subscribe(actionResultListener);
       this.topics.set(robotId, {
         cmdVel: factory.createTopic(ros, {
           name: names.cmdVel,
@@ -344,8 +451,14 @@ export class Ros2Driver implements MissionRobotDriver {
         }),
         odom,
         battery,
+        actionCommand: factory.createTopic(ros, {
+          name: names.actionCommand,
+          messageType: "std_msgs/msg/String",
+        }),
+        actionResult,
         odomListener,
         batteryListener,
+        actionResultListener,
       });
     }
     this.estop = factory.createTopic(ros, {
@@ -357,6 +470,76 @@ export class Ros2Driver implements MissionRobotDriver {
   private clearWatchdogs(): void {
     for (const timeout of this.watchdogs.values()) window.clearTimeout(timeout);
     this.watchdogs.clear();
+  }
+
+  private async awaitArrival(
+    robotId: RobotId,
+    target: { x: number; y: number; z: number },
+    previousOdomSequence: number,
+    previousBatterySequence: number,
+    segmentBudgetMs: number,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const attempts = Math.max(1, Math.ceil((segmentBudgetMs + 2_000) / TELEMETRY_POLL_MS));
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      await this.wait(TELEMETRY_POLL_MS, signal);
+      if (signal.aborted) throw signal.reason;
+      this.assertConnected();
+      const telemetry = this.telemetry.get(robotId);
+      if (
+        (telemetry?.odomSequence ?? 0) <= previousOdomSequence ||
+        (telemetry?.batterySequence ?? 0) <= previousBatterySequence
+      ) {
+        continue;
+      }
+      const position = readOdomPosition(telemetry?.odom);
+      const battery = readBatteryFraction(telemetry?.battery);
+      if (!position || battery === null) continue;
+      if (battery < MINIMUM_BATTERY_FRACTION) {
+        throw new FirebreakError(
+          "OPERATION_FAILED",
+          `${robotId} stopped below the 20% battery reserve.`,
+        );
+      }
+      const error = Math.hypot(position.x - target.x, position.y - target.y, position.z - target.z);
+      if (error <= ARRIVAL_TOLERANCE_METERS) return;
+    }
+    throw new FirebreakError(
+      "OPERATION_FAILED",
+      `${robotId} telemetry did not confirm waypoint arrival before its route deadline.`,
+    );
+  }
+
+  private async executeMissionAction(
+    robotId: RobotId,
+    action: MissionAction,
+    signal: AbortSignal,
+  ): Promise<void> {
+    if (!(MISSION_ACTIONS_BY_ROBOT[robotId] as readonly string[]).includes(action)) {
+      throw new FirebreakError(
+        "OPERATION_FAILED",
+        `${robotId} is not allowlisted for the requested mission action.`,
+      );
+    }
+    const before = this.telemetry.get(robotId)?.actionSequence ?? 0;
+    this.topics.get(robotId)!.actionCommand.publish(this.factory!.createMessage({ data: action }));
+    const attempts = Math.ceil(ACTION_TIMEOUT_MS / TELEMETRY_POLL_MS);
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      await this.wait(TELEMETRY_POLL_MS, signal);
+      if (signal.aborted) throw signal.reason;
+      this.assertConnected();
+      const telemetry = this.telemetry.get(robotId);
+      if (
+        (telemetry?.actionSequence ?? 0) > before &&
+        readActionResult(telemetry?.actionResult) === `${action}:succeeded`
+      ) {
+        return;
+      }
+    }
+    throw new FirebreakError(
+      "OPERATION_FAILED",
+      `${robotId} did not confirm mission action ${action}.`,
+    );
   }
 
   private assertConnected(): void {

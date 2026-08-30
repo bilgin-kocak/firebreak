@@ -21,18 +21,18 @@ describe("BrowserSimulationDriver", () => {
     });
 
     await driver.commandManual({
-      robotId: "MEDIC-2",
+      robotId: "SCOUT-1",
       throttle: 1,
       turn: 0,
       action: false,
       deltaMs: 1_000,
     });
 
-    expect(snapshot.robots["MEDIC-2"].position.z).toBeGreaterThan(
-      before.robots["MEDIC-2"].position.z,
+    expect(snapshot.robots["SCOUT-1"].position.z).toBeGreaterThan(
+      before.robots["SCOUT-1"].position.z,
     );
-    expect(snapshot.robots["MEDIC-2"].battery).toBeLessThan(100);
-    expect(snapshot.robots["SCOUT-1"]).toEqual(before.robots["SCOUT-1"]);
+    expect(snapshot.robots["SCOUT-1"].battery).toBeLessThan(100);
+    expect(snapshot.robots["MEDIC-2"]).toEqual(before.robots["MEDIC-2"]);
     expect(snapshot.robots["SUPPRESS-3"]).toEqual(before.robots["SUPPRESS-3"]);
     expect(snapshot.robots["HAUL-4"]).toEqual(before.robots["HAUL-4"]);
   });
@@ -69,6 +69,33 @@ describe("BrowserSimulationDriver", () => {
     expect(snapshot.robots["MEDIC-2"].position).toEqual(before);
     expect(snapshot.robots["MEDIC-2"].status).toBe("stopped");
     expect(snapshot.events.at(-1)?.message).toContain("collapse zone");
+  });
+
+  it("refuses movement through a warehouse shelf", async () => {
+    let snapshot = activeSeed();
+    snapshot.robots["MEDIC-2"] = {
+      ...snapshot.robots["MEDIC-2"],
+      position: { x: -4, y: 0.45, z: -8 },
+      heading: 0,
+    };
+    const before = structuredClone(snapshot.robots["MEDIC-2"].position);
+    const driver = new BrowserSimulationDriver({
+      readSnapshot: () => snapshot,
+      commitSnapshot: (next) => {
+        snapshot = next;
+      },
+    });
+
+    await driver.commandManual({
+      robotId: "MEDIC-2",
+      throttle: 1,
+      turn: 0,
+      action: false,
+      deltaMs: 1_000,
+    });
+
+    expect(snapshot.robots["MEDIC-2"].position).toEqual(before);
+    expect(snapshot.events.at(-1)?.message).toContain("warehouse obstacle");
   });
 
   it("allows only the correct nearby robot to scan hazards", async () => {
@@ -116,6 +143,52 @@ describe("BrowserSimulationDriver", () => {
     );
   });
 
+  it("lets medic and haul robots secure real payloads through contextual manual actions", async () => {
+    let snapshot = activeSeed();
+    snapshot.robots["MEDIC-2"] = {
+      ...snapshot.robots["MEDIC-2"],
+      position: { x: 10, y: 0.45, z: -0.5 },
+    };
+    snapshot.robots["HAUL-4"] = {
+      ...snapshot.robots["HAUL-4"],
+      position: { x: 8.5, y: 0.48, z: 7 },
+    };
+    const driver = new BrowserSimulationDriver({
+      readSnapshot: () => snapshot,
+      commitSnapshot: (next) => {
+        snapshot = next;
+      },
+    });
+
+    await driver.commandManual({
+      robotId: "MEDIC-2",
+      throttle: 0,
+      turn: 0,
+      action: true,
+      deltaMs: 16,
+    });
+    await driver.commandManual({
+      robotId: "HAUL-4",
+      throttle: 0,
+      turn: 0,
+      action: true,
+      deltaMs: 16,
+    });
+    await driver.commandManual({
+      robotId: "HAUL-4",
+      throttle: 0,
+      turn: 0,
+      action: true,
+      deltaMs: 16,
+    });
+
+    expect(snapshot.workers["WORKER-A"]).toMatchObject({
+      status: "rescuing",
+      assignedRobot: "MEDIC-2",
+    });
+    expect(snapshot.hazards.container.status).toBe("moving");
+  });
+
   it("stops all robot movement", async () => {
     let snapshot = activeSeed();
     snapshot = {
@@ -141,10 +214,12 @@ describe("BrowserSimulationDriver", () => {
     let snapshot = activeSeed();
     const route = simulateCoordinatedMission(snapshot).routes["SCOUT-1"];
     const progress: number[] = [];
+    const positions: number[] = [];
     const driver = new BrowserSimulationDriver({
       readSnapshot: () => snapshot,
       commitSnapshot: (next) => {
         snapshot = next;
+        positions.push(next.robots["SCOUT-1"].position.z);
       },
       wait: async () => undefined,
       playbackRate: 4,
@@ -156,6 +231,8 @@ describe("BrowserSimulationDriver", () => {
     });
 
     expect(progress.at(-1)).toBe(1);
+    expect(progress.length).toBeGreaterThan(route.waypoints.length);
+    expect(new Set(positions.map((position) => position.toFixed(2))).size).toBeGreaterThan(5);
     expect(snapshot.robots["SCOUT-1"].position).toEqual(route.waypoints.at(-1)?.position);
     expect(snapshot.robots["SCOUT-1"].battery).toBe(route.predictedBatteryEnd);
     expect(snapshot.hazards.scanned).toBe(true);

@@ -15,6 +15,7 @@ export interface ExecuteMissionOptions {
   signal: AbortSignal;
   now: () => number;
   onProgress: (event: MissionProgressEvent) => void;
+  executionLimitMs?: number;
 }
 
 export interface MissionExecutionResult {
@@ -113,6 +114,10 @@ function applySuccessfulOutcome(
     status: "complete",
   }));
   next.safeZone = SAFE_ZONE.map((point) => ({ ...point }));
+  next.elapsedMs = Math.min(
+    next.durationLimitMs,
+    next.elapsedMs + Math.max(...ROBOT_IDS.map((robotId) => proposal.routes[robotId].durationMs)),
+  );
   next.phase = "resolved";
   next.revision += 1;
   return next;
@@ -141,13 +146,25 @@ export async function executeMission(
   const startedAt = now();
   const working = structuredClone(original);
   working.phase = "executing";
+  const executionController = new AbortController();
+  const abortFromCaller = () => executionController.abort(signal.reason);
+  if (signal.aborted) abortFromCaller();
+  else signal.addEventListener("abort", abortFromCaller, { once: true });
+  const executionLimitMs = Math.max(1, Math.min(45_000, options.executionLimitMs ?? 45_000));
+  let deadlineExceeded = false;
+  const deadline = globalThis.setTimeout(() => {
+    deadlineExceeded = true;
+    executionController.abort(new Error("Mission exceeded the 45-second execution limit"));
+  }, executionLimitMs);
+  const executionSignal = executionController.signal;
 
   try {
-    if (signal.aborted) throw signal.reason;
-    await Promise.all(
-      ROBOT_IDS.map((robotId) =>
-        driver.executeRoute(authority.routes[robotId], {
-          signal,
+    if (executionSignal.aborted) throw executionSignal.reason;
+    let routeFailure: unknown;
+    const routes = ROBOT_IDS.map((robotId) =>
+      driver
+        .executeRoute(authority.routes[robotId], {
+          signal: executionSignal,
           onProgress(event) {
             working.robots[event.robotId] = {
               ...working.robots[event.robotId],
@@ -156,19 +173,25 @@ export async function executeMission(
             };
             onProgress(event);
           },
+        })
+        .catch((error: unknown) => {
+          routeFailure ??= error;
+          executionController.abort(error);
+          throw error;
         }),
-      ),
     );
-    if (signal.aborted) throw signal.reason;
+    await Promise.allSettled(routes);
+    if (routeFailure) throw routeFailure;
+    if (executionSignal.aborted) throw executionSignal.reason;
 
     const snapshot = applySuccessfulOutcome(working, authority);
     const receipt = createReceipt(authority, "succeeded", startedAt, now(), snapshot, null);
     snapshot.receipt = receipt;
     return { outcome: "succeeded", snapshot, receipt };
   } catch (error) {
-    const cancelled = signal.aborted;
+    const cancelled = signal.aborted || deadlineExceeded;
     const reason = reasonText(
-      cancelled ? signal.reason : error,
+      cancelled ? executionSignal.reason : error,
       cancelled ? "Mission cancelled" : "Robot driver failed",
     );
     await driver.stopAll(reason);
@@ -184,6 +207,8 @@ export async function executeMission(
     snapshot.receipt = receipt;
     return { outcome: receipt.outcome, snapshot, receipt };
   } finally {
+    globalThis.clearTimeout(deadline);
+    signal.removeEventListener("abort", abortFromCaller);
     activeProposals.delete(proposal.id);
   }
 }

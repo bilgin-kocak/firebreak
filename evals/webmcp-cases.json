@@ -76,7 +76,7 @@
       "ok": true,
       "code": "MISSION_SIMULATED",
       "feasible": true,
-      "predictedDurationMs": 35000,
+      "predictedDurationMs": 43000,
       "rescuedWorkers": 2
     }
   },

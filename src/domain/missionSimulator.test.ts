@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createFirebreakSeed, ROBOT_IDS } from "./firebreakSeed";
+import { createFirebreakSeed, ROBOT_IDS, WAREHOUSE_OBSTACLES } from "./firebreakSeed";
 import {
   minimumSynchronizedSeparation,
   missionStateHash,
@@ -17,7 +17,6 @@ describe("simulateCoordinatedMission", () => {
     };
 
     const simulation = simulateCoordinatedMission(snapshot);
-
     expect(simulation.feasible).toBe(true);
     expect(Object.keys(simulation.routes)).toEqual(ROBOT_IDS);
     expect(simulation.durationMs).toBeLessThanOrEqual(45_000);
@@ -27,6 +26,11 @@ describe("simulateCoordinatedMission", () => {
     expect(
       Object.values(simulation.routes).every(
         (route) => !routeIntersectsPolygon(route, snapshot.hazards.collapseZone),
+      ),
+    ).toBe(true);
+    expect(
+      Object.values(simulation.routes).every((route) =>
+        WAREHOUSE_OBSTACLES.every((obstacle) => !routeIntersectsPolygon(route, obstacle)),
       ),
     ).toBe(true);
     expect(minimumSynchronizedSeparation(simulation.routes)).toBeGreaterThanOrEqual(1.25);

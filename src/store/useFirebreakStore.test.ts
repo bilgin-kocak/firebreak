@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createFirebreakSeed } from "../domain/firebreakSeed";
 import { simulateCoordinatedMission } from "../domain/missionSimulator";
 import { compileMissionProposal, validateSafetyEnvelope } from "../domain/safetyCompiler";
 import { useFirebreakStore } from "./useFirebreakStore";
+import type { PersistenceStorage } from "./firebreakPersistence";
 
 function plannedMission(now = 1_000) {
   const snapshot = useFirebreakStore.getState().world;
@@ -72,5 +73,62 @@ describe("useFirebreakStore", () => {
 
     expect(useFirebreakStore.getState().world).toEqual(createFirebreakSeed());
     expect(useFirebreakStore.getState().ui.reducedEffects).toBe(true);
+  });
+
+  it("keeps partial execution transient so reload recovers the pre-run authority boundary", () => {
+    const values = new Map<string, string>();
+    const storage: PersistenceStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      setItem: vi.fn((key, value) => values.set(key, value)),
+      removeItem: vi.fn((key) => values.delete(key)),
+    };
+    const store = useFirebreakStore.getState();
+    store.setPersistenceStorage(storage);
+    store.resetDemo();
+    store.startEmergency();
+    const { simulation, checks, proposal } = plannedMission();
+    store.setSimulation(simulation);
+    store.setChecks(checks);
+    store.stageProposal(proposal);
+    store.authorizeProposal(proposal.id, 2_000);
+    store.markProposalRegistered(proposal.id);
+    const writesBeforeExecution = vi.mocked(storage.setItem).mock.calls.length;
+
+    store.beginExecution(proposal.id);
+    store.applyProgress({
+      robotId: "MEDIC-2",
+      progress: 0.5,
+      status: "enroute",
+      message: "MEDIC-2 halfway",
+    });
+    const partial = structuredClone(useFirebreakStore.getState().world);
+    partial.robots["MEDIC-2"].position.z = 0;
+    partial.revision += 1;
+    store.replaceWorld(partial);
+    store.advanceClock(250);
+
+    expect(vi.mocked(storage.setItem)).toHaveBeenCalledTimes(writesBeforeExecution);
+    expect(JSON.parse(values.get("firebreak.world.v1")!)).toMatchObject({
+      data: { phase: "authorized", robots: { "MEDIC-2": { position: { z: -8 } } } },
+    });
+  });
+
+  it("advances the emergency clock independently and fails closed at 90 seconds", () => {
+    const store = useFirebreakStore.getState();
+    store.startEmergency();
+
+    expect(store.advanceClock(89_500)).toBe(false);
+    expect(useFirebreakStore.getState().world.elapsedMs).toBe(1_000);
+    for (let index = 0; index < 89; index += 1) {
+      useFirebreakStore.getState().advanceClock(1_000);
+    }
+
+    const failed = useFirebreakStore.getState();
+    expect(failed.world.elapsedMs).toBe(90_000);
+    expect(failed.world.phase).toBe("failed");
+    expect(Object.values(failed.world.robots).every((robot) => robot.status === "stopped")).toBe(
+      true,
+    );
+    expect(failed.world.events.at(-1)?.message).toMatch(/90-second rescue window expired/i);
   });
 });

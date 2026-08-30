@@ -40,6 +40,7 @@ export interface FirebreakState {
   setPersistenceStorage(storage: PersistenceStorage | undefined): void;
   hydrate(now?: number): void;
   startEmergency(): void;
+  advanceClock(deltaMs: number): boolean;
   replaceWorld(snapshot: FirebreakSnapshot): void;
   selectRobot(robotId: RobotId): void;
   setSimulation(simulation: MissionSimulation): void;
@@ -138,9 +139,46 @@ export const useFirebreakStore = create<FirebreakState>((set, get) => {
         ),
       }));
     },
+    advanceClock(deltaMs) {
+      const world = get().world;
+      if (!["active", "planned", "authorized", "executing"].includes(world.phase)) return false;
+      const elapsedMs = Math.min(
+        world.durationLimitMs,
+        world.elapsedMs + Math.max(0, Math.min(1_000, Number.isFinite(deltaMs) ? deltaMs : 0)),
+      );
+      const expired = elapsedMs >= world.durationLimitMs;
+      const advance = (state: FirebreakState): Partial<FirebreakState> => ({
+        world: expired
+          ? appendEvent(
+              {
+                ...state.world,
+                elapsedMs,
+                phase: "failed",
+                robots: Object.fromEntries(
+                  Object.entries(state.world.robots).map(([id, robot]) => [
+                    id,
+                    { ...robot, status: "stopped" },
+                  ]),
+                ) as FirebreakSnapshot["robots"],
+                objectives: state.world.objectives.map((objective) =>
+                  objective.status === "complete"
+                    ? objective
+                    : { ...objective, status: "failed" as const },
+                ),
+              },
+              "warning",
+              "The 90-second rescue window expired. Fleet stopped.",
+            )
+          : { ...state.world, elapsedMs },
+      });
+      if (world.phase === "executing") set((state) => advance(state));
+      else update((state) => advance(state));
+      return expired;
+    },
     replaceWorld(snapshot) {
       const parsed = FirebreakSnapshotSchema.parse(snapshot) as FirebreakSnapshot;
-      update(() => ({ world: parsed }));
+      if (parsed.phase === "executing") set({ world: parsed });
+      else update(() => ({ world: parsed }));
     },
     selectRobot(robotId) {
       update((state) => ({
@@ -237,7 +275,7 @@ export const useFirebreakStore = create<FirebreakState>((set, get) => {
       ) {
         throw new Error("Mission is not authorized");
       }
-      update((state) => ({
+      set((state) => ({
         mission: {
           ...state.mission,
           progress: [],
@@ -247,7 +285,7 @@ export const useFirebreakStore = create<FirebreakState>((set, get) => {
       }));
     },
     applyProgress(event) {
-      update((state) => ({
+      set((state) => ({
         mission: {
           ...state.mission,
           progress: [...state.mission.progress, event].slice(-200),
@@ -297,7 +335,9 @@ export const useFirebreakStore = create<FirebreakState>((set, get) => {
         world: appendEvent(
           {
             ...state.world,
-            phase: state.world.phase === "resolved" ? "resolved" : "active",
+            phase: ["resolved", "failed"].includes(state.world.phase)
+              ? state.world.phase
+              : "active",
           },
           "warning",
           reason,

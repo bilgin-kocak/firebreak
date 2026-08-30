@@ -16,6 +16,7 @@ describe("FirebreakScene", () => {
       setCameraMode: vi.fn(),
       setSelectedRobot: vi.fn(),
       setReducedEffects: vi.fn(),
+      adjustCamera: vi.fn(),
       resize: vi.fn(),
       dispose: vi.fn(),
     };

@@ -200,6 +200,12 @@ export function loadFirebreakState(
     recovered = true;
   }
 
+  if (world.phase === "executing") {
+    world = { ...world, phase: "active" };
+    mission = { ...mission, proposal: null, progress: [] };
+    recovered = true;
+  }
+
   return { state: { world, mission, ui }, recovered };
 }
 

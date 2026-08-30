@@ -8,7 +8,10 @@ import { registerStaticTools } from "./registerStaticTools";
 import { ToolRegistry } from "./registry";
 
 async function stagedSetup(
-  options: { wait?: (ms: number, signal: AbortSignal) => Promise<void> } = {},
+  options: {
+    wait?: (ms: number, signal: AbortSignal) => Promise<void>;
+    now?: () => number;
+  } = {},
 ) {
   const adapter = createMemoryAdapter();
   const registry = new ToolRegistry(adapter);
@@ -21,7 +24,7 @@ async function stagedSetup(
   });
   const manager = new DynamicMissionToolManager(registry, {
     driver,
-    now: () => 2_000,
+    now: options.now ?? (() => 2_000),
   });
   await adapter.executeTool("scan_hazards", {
     incidentId: "WH-01",
@@ -121,5 +124,46 @@ describe("DynamicMissionToolManager", () => {
     expect(result).toMatchObject({ ok: false, code: "EXECUTION_CANCELLED" });
     expect(getFirebreakState().mission.receipt?.outcome).toBe("cancelled");
     expect(getFirebreakState().mission.receipt?.reason).toContain("Operator emergency stop");
+  });
+
+  it("unregisters unused authority when its five-minute lifetime expires", async () => {
+    vi.useFakeTimers();
+    let now = 2_000;
+    try {
+      const { adapter, registry, manager } = await stagedSetup({ now: () => now });
+      await manager.approveAndRegister(getFirebreakState().mission.proposal!.id);
+      expect((await adapter.getTools()).map((tool) => tool.name)).toContain(
+        "execute_rescue_mission",
+      );
+
+      now = 302_001;
+      await vi.advanceTimersByTimeAsync(300_001);
+      await registry.settleToolChanges();
+
+      expect((await adapter.getTools()).map((tool) => tool.name)).not.toContain(
+        "execute_rescue_mission",
+      );
+      expect(getFirebreakState().mission.proposal?.status).toBe("revoked");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("waits for active cancellation before runtime destruction completes", async () => {
+    const wait = (_ms: number, signal: AbortSignal) =>
+      new Promise<void>((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+      });
+    const { adapter, manager } = await stagedSetup({ wait });
+    await manager.approveAndRegister(getFirebreakState().mission.proposal!.id);
+    const execution = adapter.executeTool("execute_rescue_mission", {
+      strategy: "coordinated",
+    });
+    await vi.waitFor(() => expect(getFirebreakState().world.phase).toBe("executing"));
+
+    await manager.destroy();
+
+    await expect(execution).resolves.toMatchObject({ ok: false, code: "EXECUTION_CANCELLED" });
+    expect(getFirebreakState().mission.receipt?.outcome).toBe("cancelled");
   });
 });

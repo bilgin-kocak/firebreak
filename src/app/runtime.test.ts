@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { MissionRobotDriver } from "../control/controlTypes";
 import { getFirebreakState, useFirebreakStore } from "../store/useFirebreakStore";
 import { STATIC_TOOL_NAMES } from "../webmcp/staticToolDefinitions";
 import { bootAppRuntime } from "./runtime";
@@ -34,5 +35,21 @@ describe("Firebreak runtime", () => {
 
     await runtime.destroy();
     expect(await runtime.adapter.getTools()).toEqual([]);
+  });
+
+  it("disconnects the active robot driver during runtime destruction", async () => {
+    const driver: MissionRobotDriver = {
+      mode: "browser",
+      connect: vi.fn(async () => undefined),
+      disconnect: vi.fn(async () => undefined),
+      commandManual: vi.fn(async () => undefined),
+      stopAll: vi.fn(async () => undefined),
+      executeRoute: vi.fn(async () => undefined),
+    };
+    const runtime = await bootAppRuntime({ driver });
+
+    await runtime.destroy();
+
+    expect(driver.disconnect).toHaveBeenCalledTimes(1);
   });
 });

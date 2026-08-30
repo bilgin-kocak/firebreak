@@ -17,7 +17,7 @@ Firebreak solves the gap with **compiled mission authority**: the agent may coor
 ## What you do in the demo
 
 1. Click **Start emergency**.
-2. Drive the selected robot with `WASD` or the arrow keys. Use `1`–`4` to select a robot and `Space` for its action. Touch controls and standard gamepads also work.
+2. Drive the selected robot with `WASD` or the arrow keys. Use `1`–`4` to select a robot and `Space` for its action. On a standard gamepad, the left stick drives, the right stick moves the camera, bumpers switch robots, A/Cross acts, and Start/Options opens mission control. Touch has forward, reverse, turn, action, robot selection, and direct camera drag.
 3. Send Prompt 1 by clicking **Ask agent to plan rescue**:
 
    > Assess WH-01, plan a coordinated rescue, verify safety, and stage the mission tool.
@@ -70,7 +70,7 @@ The eleven deterministic gates require:
 
 - the current emergency revision and exact world fingerprint;
 - exactly four allowlisted robots and complete time-bounded routes;
-- no route entering the forbidden collapse polygon;
+- no route entering the forbidden collapse polygon or warehouse shelving;
 - at least 1.25 metres of synchronized robot separation;
 - at least 20% predicted battery reserve;
 - completion within 45 seconds;
@@ -78,7 +78,7 @@ The eleven deterministic gates require:
 - a clean recovery snapshot; and
 - a single coordinated, one-use mission budget.
 
-All tool schemas are closed (`additionalProperties: false`) and revalidated with strict Zod schemas. Execution is rejected if the warehouse changes after simulation. Browser-mode cancellation restores the pre-mission snapshot. ROS mode truthfully stops the fleet and reports partial progress because physical reality cannot be rolled back.
+All tool schemas are closed (`additionalProperties: false`) and revalidated with strict Zod schemas. Execution is rejected if the warehouse changes after simulation. The deterministic 90-second incident clock stops the fleet when time expires. Browser-mode cancellation restores the pre-mission snapshot. ROS mode truthfully stops the fleet and reports partial progress because physical reality cannot be rolled back.
 
 ## Architecture
 
@@ -147,13 +147,13 @@ npm run test:e2e
 
 Vitest covers the world seed, route geometry, safety compiler, mission execution, cancellation rollback, keyboard/touch/gamepad normalization, browser and ROS drivers, persistence recovery, strict schemas, adapters, static tools, dynamic registration, `AbortController` lifecycle, and React integration.
 
-Playwright covers the complete native-like two-prompt journey, actual robot movement, seven→eight→seven registration, human-only authorization, one-use execution, receipt recovery, authority loss on reload, reset isolation, keyboard operation, 44×44 targets, serious/critical axe scans, desktop/mobile presentation, horizontal overflow, screenshots, and runtime console/page errors.
+Playwright covers the complete native-like two-prompt journey, actual keyboard and mocked-standard-gamepad robot movement, camera and robot switching, seven→eight→seven registration, human-only authorization, one-use execution, receipt recovery, authority loss on reload, reset isolation, keyboard operation, 44×44 targets, serious/critical axe scans, desktop/mobile presentation, horizontal overflow, screenshots, and runtime console/page errors.
 
 Evaluation prompts and expected safety behavior are in [`evals/webmcp-cases.json`](evals/webmcp-cases.json).
 
 ## Optional ROS 2 / Gazebo control
 
-[`robotics/README.md`](robotics/README.md) documents the optional ROS 2 Jazzy, Gazebo Harmonic, Nav2, and rosbridge path. The adapter allows only four fixed robot namespaces, fixed `Twist` and `PoseStamped` command topics, telemetry subscriptions, and a fleet emergency-stop topic. It includes a 350 ms velocity watchdog and secure URL rules.
+[`robotics/README.md`](robotics/README.md) documents the optional ROS 2 Jazzy, Gazebo Harmonic, Nav2, and rosbridge path. The adapter allows only four fixed robot namespaces, fixed velocity, pose, and role-action topics, fresh odometry/battery checks, positive action-result feedback, and a fleet emergency-stop topic. It includes a 350 ms velocity watchdog and secure URL rules.
 
 The hosted hackathon demo intentionally uses the deterministic browser driver so judges can run the whole rescue instantly. No claim is made that the app has been certified on physical emergency robots.
 

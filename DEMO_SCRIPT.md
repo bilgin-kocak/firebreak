@@ -20,7 +20,7 @@ Target runtime: **2 minutes 45 seconds**. Use a desktop browser at 100% zoom wit
 
 ## 0:18–0:36 — Make it a game
 
-**Screen:** Select MEDIC-2 with `2`. Drive it with `WASD`, then select SCOUT-1 with `1`. If using a controller, show the stick movement once.
+**Screen:** Drive SCOUT-1 with `WASD`, then tap `2` to show fleet switching. If using a controller, show the left-stick movement and one right-stick camera move.
 
 **Narration:**
 
