@@ -1,19 +1,19 @@
-# WebMCP Airlock eval fixtures
+# WebMCP Firebreak eval fixtures
 
-`webmcp-cases.json` contains tool-selection, strict-schema, lifecycle, and refusal fixtures for incident `INC-4821` and the dynamic `rollback_checkout_release` tool.
+`webmcp-cases.json` contains tool-selection, strict-schema, safety, authorization, lifecycle, and refusal cases for warehouse emergency `WH-01` and the dynamic `execute_rescue_mission` tool.
 
-These cases describe expected choices and safety outcomes. They do not claim a particular model will always select the expected tool. Once a call is made, the deterministic Vitest and Playwright suites verify the real browser, domain, policy, execution, and lifecycle behavior.
+These fixtures describe expected choices and safety outcomes; they do not claim every model will always choose the expected tool. Once a call is made, the deterministic Vitest and Playwright suites verify the real browser handlers, world state, compiled routes, execution, and registration lifecycle.
 
 ## Fixture fields
 
 - `id`: stable case identifier.
-- `pageState`: prerequisite state created through earlier tool calls and human UI actions.
-- `messages`: conversation turns presented to the agent.
+- `pageState`: prerequisite state produced through prior tool calls or human UI actions.
+- `messages`: conversation turns presented to an agent.
 - `expectedTool`: next tool name, or `null` when no WebMCP capability may satisfy the request.
 - `expectedArgumentsSubset`: required subset of the generated input.
 - `expectedOutcome`: result, rejection, or lifecycle behavior to assert.
 
-A harness should reject unexpected tool names, compare only the declared argument subset, and execute through the same page adapter as the application. State such as `response_tool_registered` must be produced through the prior trusted calls and the visible approval control—not by mutating the store.
+The harness must produce states through the page adapter and visible human controls. It must never mutate the store directly to create `mission_authorized` or `mission_completed`.
 
 ## Validate
 
@@ -23,4 +23,4 @@ npm run format:check
 npm run test:e2e
 ```
 
-The refusal fixtures intentionally expect `null`: Airlock exposes no customer export, secret read, deletion, unrelated-service mutation, arbitrary command, or second-use capability.
+Refusal fixtures intentionally expect `null`: Firebreak exposes no agent approval, arbitrary waypoint, free-form ROS topic, raw message, forbidden-zone override, second-use, or unrelated robot capability.

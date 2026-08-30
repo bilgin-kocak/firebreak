@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createFirebreakSeed } from "./firebreakSeed";
-import {
-  compileMissionProposal,
-  validateSafetyEnvelope,
-} from "./safetyCompiler";
+import { compileMissionProposal, validateSafetyEnvelope } from "./safetyCompiler";
 import { simulateCoordinatedMission } from "./missionSimulator";
 
 describe("Firebreak safety compiler", () => {
@@ -22,23 +19,34 @@ describe("Firebreak safety compiler", () => {
     expect(proposal.authorizedAt).toBeNull();
     expect(proposal.expiresAt).toBeNull();
     expect(proposal.oneUse).toBe(true);
-    expect(proposal.allowedRobotIds).toEqual([
-      "SCOUT-1",
-      "MEDIC-2",
-      "SUPPRESS-3",
-      "HAUL-4",
-    ]);
+    expect(proposal.allowedRobotIds).toEqual(["SCOUT-1", "MEDIC-2", "SUPPRESS-3", "HAUL-4"]);
     expect(proposal.strategy).toBe("coordinated");
   });
 
   it.each([
-    ["stale incident revision", (snapshot: ReturnType<typeof createFirebreakSeed>) => ({ ...snapshot, revision: 2 }), "revision"],
-    ["low battery prediction", (snapshot: ReturnType<typeof createFirebreakSeed>) => snapshot, "battery"],
-    ["overlong execution", (snapshot: ReturnType<typeof createFirebreakSeed>) => snapshot, "duration"],
-    ["collapse-zone route", (snapshot: ReturnType<typeof createFirebreakSeed>) => snapshot, "geofence"],
+    [
+      "stale incident revision",
+      (snapshot: ReturnType<typeof createFirebreakSeed>) => ({ ...snapshot, revision: 2 }),
+      "revision",
+    ],
+    [
+      "low battery prediction",
+      (snapshot: ReturnType<typeof createFirebreakSeed>) => snapshot,
+      "battery",
+    ],
+    [
+      "overlong execution",
+      (snapshot: ReturnType<typeof createFirebreakSeed>) => snapshot,
+      "duration",
+    ],
+    [
+      "collapse-zone route",
+      (snapshot: ReturnType<typeof createFirebreakSeed>) => snapshot,
+      "geofence",
+    ],
   ] as const)("rejects %s", (_label, changeSnapshot, expectedCheck) => {
     const original = createFirebreakSeed();
-    let snapshot = changeSnapshot(original);
+    const snapshot = changeSnapshot(original);
     const simulation = simulateCoordinatedMission(original);
 
     if (expectedCheck === "battery") {
@@ -58,11 +66,7 @@ describe("Firebreak safety compiler", () => {
     const report = validateSafetyEnvelope(snapshot, simulation);
 
     expect(report.passed).toBe(false);
-    expect(report.checks.find((check) => check.id === expectedCheck)?.status).toBe(
-      "failed",
-    );
-    expect(() =>
-      compileMissionProposal(snapshot, simulation, report, 1_000),
-    ).toThrow();
+    expect(report.checks.find((check) => check.id === expectedCheck)?.status).toBe("failed");
+    expect(() => compileMissionProposal(snapshot, simulation, report, 1_000)).toThrow();
   });
 });

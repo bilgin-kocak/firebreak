@@ -17,9 +17,7 @@ describe("Firebreak runtime", () => {
   it("boots seven tools and completes the two-prompt journey in memory mode", async () => {
     const runtime = await bootAppRuntime({ accelerated: true });
     expect(runtime.adapter.mode).toBe("memory");
-    expect((await runtime.adapter.getTools()).map((tool) => tool.name)).toEqual(
-      STATIC_TOOL_NAMES,
-    );
+    expect((await runtime.adapter.getTools()).map((tool) => tool.name)).toEqual(STATIC_TOOL_NAMES);
 
     useFirebreakStore.getState().startEmergency();
     await runtime.runPromptA();
@@ -32,9 +30,7 @@ describe("Firebreak runtime", () => {
 
     await runtime.runPromptB();
     expect(getFirebreakState().world.phase).toBe("resolved");
-    expect((await runtime.adapter.getTools()).map((tool) => tool.name)).toEqual(
-      STATIC_TOOL_NAMES,
-    );
+    expect((await runtime.adapter.getTools()).map((tool) => tool.name)).toEqual(STATIC_TOOL_NAMES);
 
     await runtime.destroy();
     expect(await runtime.adapter.getTools()).toEqual([]);

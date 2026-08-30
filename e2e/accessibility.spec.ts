@@ -59,9 +59,12 @@ test("authorization and execution are fully keyboard operable", async ({ page })
 
   for (let index = 0; index < 30; index += 1) {
     await page.keyboard.press("Tab");
-    if (await page.getByRole("button", { name: "Execute approved rescue" }).evaluate(
-      (element) => element === document.activeElement,
-    )) break;
+    if (
+      await page
+        .getByRole("button", { name: "Execute approved rescue" })
+        .evaluate((element) => element === document.activeElement)
+    )
+      break;
   }
   await expect(page.getByRole("button", { name: "Execute approved rescue" })).toBeFocused();
   await page.keyboard.press("Enter");

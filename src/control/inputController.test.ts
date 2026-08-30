@@ -36,9 +36,7 @@ describe("manual input normalization", () => {
     const buttons = Array.from({ length: 16 }, () => button());
     buttons[0] = button(true);
     buttons[5] = button(true);
-    const control = normalizeGamepad(
-      gamepad({ axes: [-0.5, -0.75, 0.25, -0.2], buttons }),
-    );
+    const control = normalizeGamepad(gamepad({ axes: [-0.5, -0.75, 0.25, -0.2], buttons }));
 
     expect(control).toEqual({
       throttle: 0.75,

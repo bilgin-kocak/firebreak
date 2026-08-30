@@ -1,31 +1,15 @@
 export type EmergencyPhase =
-  | "ready"
-  | "active"
-  | "planned"
-  | "authorized"
-  | "executing"
-  | "resolved"
-  | "failed";
+  "ready" | "active" | "planned" | "authorized" | "executing" | "resolved" | "failed";
 
 export type RobotId = "SCOUT-1" | "MEDIC-2" | "SUPPRESS-3" | "HAUL-4";
 export type RobotRole = "scout" | "rescue" | "suppress" | "haul";
 export type RobotStatus =
-  | "idle"
-  | "manual"
-  | "enroute"
-  | "acting"
-  | "stopped"
-  | "complete"
-  | "offline";
+  "idle" | "manual" | "enroute" | "acting" | "stopped" | "complete" | "offline";
 
 export type WorkerId = "WORKER-A" | "WORKER-B";
 export type WorkerStatus = "trapped" | "rescuing" | "safe";
 
-export type ObjectiveId =
-  | "scan-hazards"
-  | "rescue-workers"
-  | "contain-fire"
-  | "move-container";
+export type ObjectiveId = "scan-hazards" | "rescue-workers" | "contain-fire" | "move-container";
 export type ObjectiveStatus = "pending" | "active" | "complete" | "failed";
 
 export interface Vector3Value {

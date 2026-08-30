@@ -1,84 +1,78 @@
-# WebMCP Airlock status
+# WebMCP Firebreak status
 
 **Status:** Complete and deployable  
 **Verified:** 2026-08-30  
-**Environment:** Node.js 22, Chromium, desktop 1440×1000, mobile 390×844
+**Environment:** Node.js 22.20.0, Chromium, desktop 1440×900/1440×1000, mobile 390×844
 
 ## Shipped product
 
-WebMCP Airlock is fully implemented as a static, browser-local React application. The canonical `INC-4821` journey works end to end in both a native-like top-level WebMCP context and the ordinary-browser simulator:
+WebMCP Firebreak is implemented as a static browser application with a complete playable and agent-driven warehouse rescue:
 
-1. Seven static tools register.
-2. Prompt A investigates the outage through real handlers.
-3. Third-party prompt injection is visibly quarantined.
-4. Release correlation, a deterministic 10% canary, and nine Airlock gates pass.
-5. The agent stages `rollback_checkout_release` without registering it.
-6. A person approves one precise permission envelope.
-7. The dynamic tool registers and emits visible `toolchange`.
-8. Prompt B invokes it in the same page session.
-9. The trusted executor snapshots, canaries, promotes, resolves, and records a receipt.
-10. Checkout recovers to 0.6% errors and 420 ms p95 latency on release `2026.08.30.2`.
-11. The one-use tool unregisters through its `AbortController`, emits a second visible `toolchange`, and rejects a second invocation.
+1. The user starts emergency `WH-01` and can drive any selected robot through keyboard, touch, or gamepad input.
+2. Exactly seven static WebMCP tools register at the top-level model context.
+3. Prompt 1 inspects the emergency and four-robot fleet, scans hazards, simulates four synchronized routes, validates eleven gates, and stages `execute_rescue_mission`.
+4. Staging leaves the tool count at seven and opens a visible review sheet.
+5. Only the human **Authorize one mission** control can create authority.
+6. The dynamic tool registers with an `AbortController`, emits `toolchange`, and changes the visible surface from seven to eight tools.
+7. Prompt 2 executes the exact reviewed route set across SCOUT-1, MEDIC-2, SUPPRESS-3, and HAUL-4.
+8. Both workers reach safety, the battery fire is contained, the hazardous load is secured, and a receipt reports zero safety violations.
+9. Successful execution consumes and unregisters the dynamic tool, emits `toolchange`, and returns the surface to seven tools.
+10. Reload never restores live movement authority; a completed receipt persists safely.
 
 ## Architecture and safety evidence
 
-| Requirement                  | Evidence                                                                                                                                                                           |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Top-level imperative WebMCP  | Native adapter calls `document.modelContext.registerTool`; native-like Playwright boot installs the context before page load.                                                      |
-| Exactly seven static tools   | Static name constant, registry tests, Tool Surface, and canonical seven→eight→seven assertions.                                                                                    |
-| Strict typed inputs          | Closed JSON schemas plus strict Zod runtime validation; extra properties and invalid canary values are tested.                                                                     |
-| Evidence trust boundary      | `query_telemetry` has `untrustedContentHint: true`; the canonical third-party instruction is inert, classified, quarantined, and excluded from authority.                          |
-| Safe response compilation    | Policy checks enforce incident revision, checkout-only scope, trusted registry membership, dependency order, expiry, canary thresholds, rollback path, and one mutation.           |
-| Human-approved dynamic tool  | No agent approval tool exists; the visible proposal sheet is the only approval path.                                                                                               |
-| Autonomous bounded execution | One approval covers six fixed trusted operations; execution requires no repeated confirmation inside the approved envelope.                                                        |
-| AbortController lifecycle    | Disable, delete, reset, successful consumption, and expiry remove dynamic registration safely.                                                                                     |
-| Visible `toolchange`         | Tool Surface count and dynamic highlighting update; Activity exposes `WebMCP tool surface changed`; canonical E2E asserts both native events.                                      |
-| Failure safety               | Cancellation and operation failure restore the complete snapshot and record a failed/cancelled receipt.                                                                            |
-| Concurrency and revocation   | An in-flight lock rejects simultaneous one-use calls; caller cancellation or registration abort cancels execution, and revoked/reset authority cannot commit stale state.          |
-| Durable recovery             | Versioned `airlock.incident.v1`, `airlock.responses.v1`, and `airlock.ui.v1` envelopes revalidate on hydration; corrupt, stale, expired, and completed authority does not restore. |
-| No hidden production power   | No backend, network request, credential, arbitrary code, shell, URL, selector, customer-data export, deletion, secret access, or unrelated-service operation exists.               |
+| Requirement                 | Evidence                                                                                                                                                        |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Top-level imperative WebMCP | The native adapter calls `document.modelContext.registerTool`; Playwright installs a native-like context before page load and records calls/events.             |
+| Seven static tools          | One canonical constant, registry tests, UI count, and browser assertions enforce the exact seven names.                                                         |
+| Strict schemas              | Every tool has `additionalProperties: false` plus strict Zod validation; extra fields and invalid enums are rejected before handlers run.                       |
+| Safe interface compilation  | Only a current passing simulation can compile the fixed `execute_rescue_mission` interface; the agent never supplies routes, topics, robot IDs, or coordinates. |
+| Human-approved registration | No approval tool exists. The only authorization path is the visible, focus-trapped human control.                                                               |
+| `AbortController` lifecycle | Completion, failure, cancellation, reset, reload, runtime destruction, and revocation remove page-session authority.                                            |
+| Visible `toolchange`        | The Tool Surface displays seven→eight→seven and native-like E2E asserts registration/unregistration events.                                                     |
+| Human-only final boundary   | Prompt 1 stages but cannot register or move the fleet. Prompt 2 exists only after a person authorizes the reviewed mission.                                     |
+| Stale-state defense         | Revision and FNV-1a world fingerprints bind the simulation, safety proof, proposal, and execution.                                                              |
+| Route safety                | Eleven checks cover exact robots, complete routes, collapse-zone exclusion, 1.25 m separation, battery, duration, roles, recovery, and one-use budget.          |
+| Failure behavior            | Browser execution stops and restores the pre-run world. ROS mode stops and retains truthful partial progress.                                                   |
+| Persistence                 | Three versioned Zod-validated envelopes recover world, mission, and UI state without restoring registered authority.                                            |
+| ROS boundary                | Code-owned allowlists fix four namespaces, topic names, message types, clamps, watchdog, secure bridge URL rules, and fleet stop.                               |
 
 ## Verification results
 
-The latest complete component gate passed:
+| Check                      | Result                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------- |
+| Prettier                   | Passed across the repository                                                                |
+| ESLint                     | Passed with zero warnings                                                                   |
+| Strict TypeScript          | Passed                                                                                      |
+| Unit and integration tests | 17 files, 65 tests passed on Vitest 4.1.11                                                  |
+| Production build           | Passed on Vite 8.2.2; 2,151 modules transformed                                             |
+| Dependency audit           | `npm audit` reports 0 vulnerabilities                                                       |
+| Playwright                 | 9 tests passed in Chromium                                                                  |
+| Canonical journey          | Prompt 1 → human authorization → Prompt 2 → receipt → unregistration passed                 |
+| Accessibility              | No serious or critical axe findings in ready, proposal, authority, and resolved states      |
+| Target sizing              | Every visible tested interactive target is at least 44×44 CSS pixels                        |
+| Keyboard                   | Authorization and execution work without a pointer; dialog focus is trapped and restored    |
+| Persistence                | Reload revocation, completed receipt recovery, and reset isolation passed                   |
+| Responsive UI              | Desktop and mobile judged states have no horizontal overflow                                |
+| Visual QA                  | Initial, proposal, authority, executing, and completed desktop/mobile screenshots inspected |
+| Runtime errors             | Playwright and in-app production inspection collected zero console errors or page errors    |
 
-| Check                      | Result                                                                                           |
-| -------------------------- | ------------------------------------------------------------------------------------------------ |
-| ESLint                     | Passed with zero warnings                                                                        |
-| Prettier check             | Passed                                                                                           |
-| Strict TypeScript check    | Passed                                                                                           |
-| Unit and integration tests | 16 files, 75 tests passed                                                                        |
-| Production build           | Passed; 1,630 modules transformed                                                                |
-| Playwright                 | 11 tests passed                                                                                  |
-| Accessibility              | Zero serious or critical axe findings in initial, proposal, live-tool, and recovered states      |
-| Interaction sizing         | Every visible tested control is at least 44×44 CSS pixels                                        |
-| Keyboard and dialogs       | Approval, Prompt B, focus trap, and focus navigation passed                                      |
-| Persistence lifecycle      | Reload, enabled restoration, expiry, completion, disable, delete, reset, and cancellation passed |
-| Responsive presentation    | Desktop and mobile canonical states have no horizontal overflow                                  |
-| Runtime errors             | Canonical console-error and page-error collection is empty                                       |
+The main application shell is 317.19 kB minified (94.76 kB gzip). The Babylon scene is lazy-loaded as a separate 1,073.58 kB chunk (254.55 kB gzip). Havok is a separate 2,094.56 kB WebAssembly asset (668.98 kB gzip).
 
-The authoritative final command is `npm run check`, which runs lint, formatting, typecheck, Vitest, production build, and the complete Playwright suite in order.
+The authoritative full command is `npm run check`; it runs formatting, lint, strict typechecking, all Vitest tests, a production build, and the complete Playwright suite.
 
-## Screenshot inspection
+## Release assets
 
-Fresh Playwright screenshots were captured and inspected at original resolution for:
-
-- Desktop initial incident, quarantined threat, proposal, dynamic tool live, and resolved receipt states.
-- Desktop responsive initial and proposal states.
-- Mobile initial, proposal, and recovered states.
-
-The final inspection confirmed readable hierarchy, consistent status colors and labels, no clipped controls or horizontal overflow, a usable stacked mobile topology, an unobscured approval sheet, and the corrected deployment timeline: `2026.08.30.2` is **CURRENT · restored stable**, while `2026.08.30.3` is **ROLLED BACK · incident release**.
-
-## Submission assets
-
-- `README.md`: product, journey, WebMCP architecture, safety, setup, tests, deployment, and limitations.
-- `DEMO_SCRIPT.md`: timed 2:45 walkthrough.
+- `README.md`: product, controls, WebMCP architecture, safety, setup, testing, deployment, and limits.
+- `DEMO_SCRIPT.md`: timed 2:45 judge walkthrough with backup instructions.
 - `SUBMISSION_DRAFT.md`: complete challenge narrative with placeholders only for external URLs.
-- `evals/webmcp-cases.json`: 16 valid tool-selection and safety fixtures.
+- `evals/webmcp-cases.json`: 21 tool-selection, schema, safety, lifecycle, and refusal fixtures.
+- `robotics/README.md`: honest optional ROS 2 Jazzy, Gazebo Harmonic, Nav2, and rosbridge integration guide.
+- `robotics/rosbridge-allowlist.yaml`: server-side topic/type allowlist example.
 - `LICENSE`: MIT.
 
 ## Honest limits
 
-Airlock is a fictional incident and deterministic safety demonstration, not a real production-control plane. The injection detector recognizes the shipped fixture; it does not claim general prompt-injection prevention. Native WebMCP depends on browser availability, while the memory simulator proves the same local handlers and lifecycle in ordinary browsers. Automated accessibility checks are regression evidence, not formal certification.
+WH-01 is a fictional, deterministic browser emergency and not a certified live dispatch product. The ROS adapter is covered with a fake bridge; no live Gazebo environment or physical robot was available for this release gate. Native WebMCP remains browser-dependent. Automated accessibility tests are regression evidence, not formal certification.
 
-No known P0 requirement, acceptance criterion, test failure, runtime console error, or presentation blocker remains.
+No known P0 failure, TODO, mock-only control, runtime console error, or presentation blocker remains.

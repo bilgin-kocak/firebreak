@@ -24,7 +24,12 @@ export function AuthorizationSheet({
         aria-modal="true"
         aria-labelledby="authorize-title"
       >
-        <button className="sheet-close" type="button" onClick={onClose} aria-label="Close mission proposal">
+        <button
+          className="sheet-close"
+          type="button"
+          onClick={onClose}
+          aria-label="Close mission proposal"
+        >
           <X aria-hidden="true" />
         </button>
         <div className="sheet-kicker">
@@ -32,7 +37,8 @@ export function AuthorizationSheet({
         </div>
         <h2 id="authorize-title">Authorize rescue mission</h2>
         <p className="sheet-lede">
-          The agent planned and proved the route. Only you can give the robots temporary movement authority.
+          The agent planned and proved the route. Only you can give the robots temporary movement
+          authority.
         </p>
         <div className="authority-grid">
           <article>
@@ -74,7 +80,8 @@ export function AuthorizationSheet({
           onClick={onAuthorize}
           data-autofocus
         >
-          <ShieldCheck aria-hidden="true" /> {busy ? "Registering mission…" : "Authorize one mission"}
+          <ShieldCheck aria-hidden="true" />{" "}
+          {busy ? "Registering mission…" : "Authorize one mission"}
         </button>
         <p className="authority-footnote">This click is never available to the agent.</p>
       </section>

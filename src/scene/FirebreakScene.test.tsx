@@ -30,9 +30,7 @@ describe("FirebreakScene", () => {
     await waitFor(() => expect(synchronizer.applySnapshot).toHaveBeenCalled());
 
     act(() => useFirebreakStore.getState().selectRobot("HAUL-4"));
-    await waitFor(() =>
-      expect(synchronizer.setSelectedRobot).toHaveBeenLastCalledWith("HAUL-4"),
-    );
+    await waitFor(() => expect(synchronizer.setSelectedRobot).toHaveBeenLastCalledWith("HAUL-4"));
     act(() => window.dispatchEvent(new Event("resize")));
     expect(synchronizer.resize).toHaveBeenCalled();
 

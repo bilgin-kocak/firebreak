@@ -7,11 +7,7 @@ import type {
   RobotId,
   Vector3Value,
 } from "../domain/firebreakTypes";
-import type {
-  BrowserDriverOptions,
-  ManualRobotCommand,
-  MissionRobotDriver,
-} from "./controlTypes";
+import type { BrowserDriverOptions, ManualRobotCommand, MissionRobotDriver } from "./controlTypes";
 
 const WORLD_BOUNDS = { minX: -13.5, maxX: 13.5, minZ: -9.5, maxZ: 9.5 };
 const GROUND_SPEED = 2.4;
@@ -86,10 +82,7 @@ function appendEvent(
 
 function tryContextAction(snapshot: FirebreakSnapshot, robotId: RobotId): boolean {
   const robot = snapshot.robots[robotId];
-  if (
-    robot.role === "scout" &&
-    distance(robot.position, snapshot.hazards.fire.position) <= 5
-  ) {
+  if (robot.role === "scout" && distance(robot.position, snapshot.hazards.fire.position) <= 5) {
     snapshot.hazards.scanned = true;
     updateObjective(snapshot, "scan-hazards");
     appendEvent(snapshot, "control", `${robotId} completed a thermal hazard scan.`);
@@ -114,10 +107,7 @@ function tryContextAction(snapshot: FirebreakSnapshot, robotId: RobotId): boolea
   return false;
 }
 
-function applyMissionAction(
-  snapshot: FirebreakSnapshot,
-  action: MissionAction | undefined,
-): void {
+function applyMissionAction(snapshot: FirebreakSnapshot, action: MissionAction | undefined): void {
   if (!action) return;
   if (action === "scan-hazards") {
     snapshot.hazards.scanned = true;
@@ -220,17 +210,10 @@ export class BrowserSimulationDriver implements MissionRobotDriver {
       z: robot.position.z + Math.cos(nextHeading) * throttle * speed * seconds,
     };
 
-    if (
-      throttle !== 0 &&
-      !isPointAllowed(nextPosition, snapshot.hazards.collapseZone)
-    ) {
+    if (throttle !== 0 && !isPointAllowed(nextPosition, snapshot.hazards.collapseZone)) {
       snapshot.robots[command.robotId] = { ...robot, status: "stopped" };
       snapshot.revision += 1;
-      appendEvent(
-        snapshot,
-        "warning",
-        `${command.robotId} stopped before the collapse zone.`,
-      );
+      appendEvent(snapshot, "warning", `${command.robotId} stopped before the collapse zone.`);
       this.options.commitSnapshot(snapshot);
       return;
     }
@@ -281,9 +264,7 @@ export class BrowserSimulationDriver implements MissionRobotDriver {
       snapshot.robots[route.robotId] = {
         ...snapshot.robots[route.robotId],
         position: { ...waypoint.position },
-        battery:
-          initialBattery +
-          (route.predictedBatteryEnd - initialBattery) * progress,
+        battery: initialBattery + (route.predictedBatteryEnd - initialBattery) * progress,
         routeProgress: progress,
         status: waypoint.action
           ? index === route.waypoints.length - 1

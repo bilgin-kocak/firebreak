@@ -30,12 +30,14 @@ test("canonical two-prompt rescue plans, authorizes, moves the fleet, and unregi
   await page.keyboard.down("w");
   await page.waitForTimeout(260);
   await page.keyboard.up("w");
-  await expect.poll(async () =>
-    page.evaluate(() => {
-      const envelope = JSON.parse(localStorage.getItem("firebreak.world.v1")!);
-      return envelope.data.robots["MEDIC-2"].position;
-    }),
-  ).not.toEqual(before);
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const envelope = JSON.parse(localStorage.getItem("firebreak.world.v1")!);
+        return envelope.data.robots["MEDIC-2"].position;
+      }),
+    )
+    .not.toEqual(before);
 
   await page.evaluate(() => {
     document.documentElement.dataset.toolchangeCount = "0";

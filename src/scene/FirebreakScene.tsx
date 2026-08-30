@@ -2,14 +2,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { useFirebreakStore } from "../store/useFirebreakStore";
 import { createWarehouseScene } from "./createWarehouseScene";
-import {
-  createSceneSynchronizer,
-  type SceneSynchronizer,
-} from "./sceneSynchronizer";
+import { createSceneSynchronizer, type SceneSynchronizer } from "./sceneSynchronizer";
 
-export type FirebreakSceneFactory = (
-  canvas: HTMLCanvasElement,
-) => Promise<SceneSynchronizer>;
+export type FirebreakSceneFactory = (canvas: HTMLCanvasElement) => Promise<SceneSynchronizer>;
 
 const defaultFactory: FirebreakSceneFactory = async (canvas) => {
   const scene = await createWarehouseScene(canvas);

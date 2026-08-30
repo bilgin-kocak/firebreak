@@ -1,14 +1,7 @@
 import { ROBOT_IDS } from "../domain/firebreakSeed";
-import type {
-  MissionProgressEvent,
-  MissionRoute,
-  RobotId,
-} from "../domain/firebreakTypes";
+import type { MissionProgressEvent, MissionRoute, RobotId } from "../domain/firebreakTypes";
 import { FirebreakError } from "../domain/firebreakTypes";
-import type {
-  ManualRobotCommand,
-  MissionRobotDriver,
-} from "./controlTypes";
+import type { ManualRobotCommand, MissionRobotDriver } from "./controlTypes";
 
 export interface RosConnectionLike {
   on(event: string, listener: (...args: unknown[]) => void): void;
@@ -25,10 +18,7 @@ export interface RosTopicLike {
 
 export interface RoslibFactory {
   createRos(): RosConnectionLike;
-  createTopic(
-    ros: RosConnectionLike,
-    options: { name: string; messageType: string },
-  ): RosTopicLike;
+  createTopic(ros: RosConnectionLike, options: { name: string; messageType: string }): RosTopicLike;
   createMessage(value: Record<string, unknown>): unknown;
 }
 
@@ -91,8 +81,7 @@ function validatedUrl(value: string): string {
     throw new FirebreakError("OPERATION_FAILED", "ROS bridge URL is invalid.");
   }
   const secure = url.protocol === "wss:";
-  const local =
-    url.protocol === "ws:" && ["localhost", "127.0.0.1"].includes(url.hostname);
+  const local = url.protocol === "ws:" && ["localhost", "127.0.0.1"].includes(url.hostname);
   if (!secure && !local) {
     throw new FirebreakError(
       "OPERATION_FAILED",
@@ -296,7 +285,12 @@ export class Ros2Driver implements MissionRobotDriver {
       options.onProgress({
         robotId: route.robotId,
         progress,
-        status: index === route.waypoints.length - 1 ? "complete" : waypoint.action ? "acting" : "enroute",
+        status:
+          index === route.waypoints.length - 1
+            ? "complete"
+            : waypoint.action
+              ? "acting"
+              : "enroute",
         message: waypoint.action
           ? `${route.robotId}: ${waypoint.action}`
           : `${route.robotId} navigating approved ROS goal`,
@@ -304,7 +298,8 @@ export class Ros2Driver implements MissionRobotDriver {
     }
   }
 
-  public async stopAll(_reason: string): Promise<void> {
+  public async stopAll(reason: string): Promise<void> {
+    void reason;
     if (this.connectionState !== "connected" || !this.factory) return;
     this.clearWatchdogs();
     for (const robotId of ROBOT_IDS) {

@@ -4,10 +4,7 @@ import type { MissionRobotDriver } from "../control/controlTypes";
 import { createFirebreakSeed } from "./firebreakSeed";
 import { executeMission } from "./missionExecutor";
 import { simulateCoordinatedMission } from "./missionSimulator";
-import {
-  compileMissionProposal,
-  validateSafetyEnvelope,
-} from "./safetyCompiler";
+import { compileMissionProposal, validateSafetyEnvelope } from "./safetyCompiler";
 
 function authorizedProposal(now = 1_000) {
   const snapshot = createFirebreakSeed();

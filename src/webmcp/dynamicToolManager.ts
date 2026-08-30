@@ -4,10 +4,7 @@ import type { MissionRobotDriver } from "../control/controlTypes";
 import { executeMission } from "../domain/missionExecutor";
 import { missionStateHash } from "../domain/missionSimulator";
 import { validateSafetyEnvelope } from "../domain/safetyCompiler";
-import {
-  FirebreakError,
-  type MissionProposal,
-} from "../domain/firebreakTypes";
+import { FirebreakError, type MissionProposal } from "../domain/firebreakTypes";
 import { getFirebreakState } from "../store/useFirebreakStore";
 import type { ToolRegistry } from "./registry";
 import { successResult } from "./results";
@@ -33,9 +30,10 @@ export interface DynamicMissionToolManagerDependencies {
   now?: () => number;
 }
 
-function combineAbortSignals(
-  signals: Array<AbortSignal | undefined>,
-): { signal: AbortSignal; cleanup(): void } {
+function combineAbortSignals(signals: Array<AbortSignal | undefined>): {
+  signal: AbortSignal;
+  cleanup(): void;
+} {
   const controller = new AbortController();
   const active = signals.filter((signal): signal is AbortSignal => Boolean(signal));
   const listeners = new Map<AbortSignal, () => void>();
@@ -100,16 +98,6 @@ export class DynamicMissionToolManager {
     if (proposal && !["completed", "cancelled", "failed"].includes(proposal.status)) {
       getFirebreakState().revokeMission(reason);
     }
-  }
-
-  /** @deprecated Retained only while the legacy view is replaced by Firebreak controls. */
-  public disable(_name: string): void {
-    this.revoke("Mission authority disabled by operator");
-  }
-
-  /** @deprecated Retained only while the legacy view is replaced by Firebreak controls. */
-  public delete(_name: string): void {
-    this.revoke("Mission authority deleted by operator");
   }
 
   public async destroy(): Promise<void> {
@@ -200,7 +188,7 @@ export class DynamicMissionToolManager {
             new Error(
               result.outcome === "succeeded"
                 ? "One-use mission completed"
-                : result.receipt.reason ?? "Mission ended",
+                : (result.receipt.reason ?? "Mission ended"),
             ),
           );
           this.controller = null;

@@ -58,9 +58,8 @@ function createReceipt(
     startedAt,
     completedAt,
     durationMs: Math.max(0, completedAt - startedAt),
-    rescuedWorkers: Object.values(snapshot.workers).filter(
-      (worker) => worker.status === "safe",
-    ).length,
+    rescuedWorkers: Object.values(snapshot.workers).filter((worker) => worker.status === "safe")
+      .length,
     fireContained: snapshot.hazards.fire.contained,
     containerSafe: snapshot.hazards.container.status === "safe",
     safetyViolations: outcome === "succeeded" ? 0 : 1,
@@ -163,14 +162,7 @@ export async function executeMission(
     if (signal.aborted) throw signal.reason;
 
     const snapshot = applySuccessfulOutcome(working, authority);
-    const receipt = createReceipt(
-      authority,
-      "succeeded",
-      startedAt,
-      now(),
-      snapshot,
-      null,
-    );
+    const receipt = createReceipt(authority, "succeeded", startedAt, now(), snapshot, null);
     snapshot.receipt = receipt;
     return { outcome: "succeeded", snapshot, receipt };
   } catch (error) {

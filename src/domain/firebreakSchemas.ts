@@ -8,16 +8,9 @@ export const Vector3Schema = z
   })
   .strict();
 
-const PolygonPointSchema = z
-  .object({ x: z.number().finite(), z: z.number().finite() })
-  .strict();
+const PolygonPointSchema = z.object({ x: z.number().finite(), z: z.number().finite() }).strict();
 
-export const RobotIdSchema = z.enum([
-  "SCOUT-1",
-  "MEDIC-2",
-  "SUPPRESS-3",
-  "HAUL-4",
-]);
+export const RobotIdSchema = z.enum(["SCOUT-1", "MEDIC-2", "SUPPRESS-3", "HAUL-4"]);
 
 const RobotSchema = z
   .object({
@@ -29,15 +22,7 @@ const RobotSchema = z
     heading: z.number().finite(),
     battery: z.number().finite().min(0).max(100),
     health: z.number().finite().min(0).max(100),
-    status: z.enum([
-      "idle",
-      "manual",
-      "enroute",
-      "acting",
-      "stopped",
-      "complete",
-      "offline",
-    ]),
+    status: z.enum(["idle", "manual", "enroute", "acting", "stopped", "complete", "offline"]),
     routeProgress: z.number().finite().min(0).max(1),
   })
   .strict();
@@ -54,12 +39,7 @@ const WorkerSchema = z
 
 const ObjectiveSchema = z
   .object({
-    id: z.enum([
-      "scan-hazards",
-      "rescue-workers",
-      "contain-fire",
-      "move-container",
-    ]),
+    id: z.enum(["scan-hazards", "rescue-workers", "contain-fire", "move-container"]),
     label: z.string().min(1).max(80),
     detail: z.string().min(1).max(180),
     status: z.enum(["pending", "active", "complete", "failed"]),
@@ -259,15 +239,7 @@ export const FirebreakSnapshotSchema = z
     version: z.literal(1),
     incidentId: z.literal("WH-01"),
     revision: z.number().int().positive(),
-    phase: z.enum([
-      "ready",
-      "active",
-      "planned",
-      "authorized",
-      "executing",
-      "resolved",
-      "failed",
-    ]),
+    phase: z.enum(["ready", "active", "planned", "authorized", "executing", "resolved", "failed"]),
     elapsedMs: z.number().finite().min(0),
     durationLimitMs: z.number().finite().positive(),
     selectedRobotId: RobotIdSchema,

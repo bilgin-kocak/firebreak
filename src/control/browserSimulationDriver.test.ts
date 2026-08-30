@@ -33,9 +33,7 @@ describe("BrowserSimulationDriver", () => {
     );
     expect(snapshot.robots["MEDIC-2"].battery).toBeLessThan(100);
     expect(snapshot.robots["SCOUT-1"]).toEqual(before.robots["SCOUT-1"]);
-    expect(snapshot.robots["SUPPRESS-3"]).toEqual(
-      before.robots["SUPPRESS-3"],
-    );
+    expect(snapshot.robots["SUPPRESS-3"]).toEqual(before.robots["SUPPRESS-3"]);
     expect(snapshot.robots["HAUL-4"]).toEqual(before.robots["HAUL-4"]);
   });
 
@@ -113,10 +111,9 @@ describe("BrowserSimulationDriver", () => {
       deltaMs: 16,
     });
     expect(snapshot.hazards.scanned).toBe(true);
-    expect(
-      snapshot.objectives.find((objective) => objective.id === "scan-hazards")
-        ?.status,
-    ).toBe("complete");
+    expect(snapshot.objectives.find((objective) => objective.id === "scan-hazards")?.status).toBe(
+      "complete",
+    );
   });
 
   it("stops all robot movement", async () => {
@@ -124,10 +121,7 @@ describe("BrowserSimulationDriver", () => {
     snapshot = {
       ...snapshot,
       robots: Object.fromEntries(
-        Object.entries(snapshot.robots).map(([id, robot]) => [
-          id,
-          { ...robot, status: "manual" },
-        ]),
+        Object.entries(snapshot.robots).map(([id, robot]) => [id, { ...robot, status: "manual" }]),
       ) as FirebreakSnapshot["robots"],
     };
     const driver = new BrowserSimulationDriver({
@@ -139,12 +133,8 @@ describe("BrowserSimulationDriver", () => {
 
     await driver.stopAll("Controller disconnected");
 
-    expect(Object.values(snapshot.robots).every((robot) => robot.status === "stopped")).toBe(
-      true,
-    );
-    expect(snapshot.events.at(-1)?.message).toBe(
-      "All robots stopped: Controller disconnected",
-    );
+    expect(Object.values(snapshot.robots).every((robot) => robot.status === "stopped")).toBe(true);
+    expect(snapshot.events.at(-1)?.message).toBe("All robots stopped: Controller disconnected");
   });
 
   it("plays an approved route through deterministic progress updates", async () => {
@@ -166,12 +156,8 @@ describe("BrowserSimulationDriver", () => {
     });
 
     expect(progress.at(-1)).toBe(1);
-    expect(snapshot.robots["SCOUT-1"].position).toEqual(
-      route.waypoints.at(-1)?.position,
-    );
-    expect(snapshot.robots["SCOUT-1"].battery).toBe(
-      route.predictedBatteryEnd,
-    );
+    expect(snapshot.robots["SCOUT-1"].position).toEqual(route.waypoints.at(-1)?.position);
+    expect(snapshot.robots["SCOUT-1"].battery).toBe(route.predictedBatteryEnd);
     expect(snapshot.hazards.scanned).toBe(true);
   });
 });

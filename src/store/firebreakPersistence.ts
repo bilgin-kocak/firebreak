@@ -77,9 +77,7 @@ const WorldEnvelopeSchema = z
 const MissionEnvelopeSchema = z
   .object({ version: z.literal(1), data: MissionStateSchema })
   .strict();
-const UiEnvelopeSchema = z
-  .object({ version: z.literal(1), data: UiStateSchema })
-  .strict();
+const UiEnvelopeSchema = z.object({ version: z.literal(1), data: UiStateSchema }).strict();
 
 export const defaultMissionState = (): PersistedMissionState => ({
   simulation: null,
@@ -120,18 +118,9 @@ export function saveFirebreakState(
   state: FirebreakPersistedState,
 ): void {
   if (!storage) return;
-  storage.setItem(
-    FIREBREAK_WORLD_KEY,
-    JSON.stringify({ version: 1, data: state.world }),
-  );
-  storage.setItem(
-    FIREBREAK_MISSION_KEY,
-    JSON.stringify({ version: 1, data: state.mission }),
-  );
-  storage.setItem(
-    FIREBREAK_UI_KEY,
-    JSON.stringify({ version: 1, data: state.ui }),
-  );
+  storage.setItem(FIREBREAK_WORLD_KEY, JSON.stringify({ version: 1, data: state.world }));
+  storage.setItem(FIREBREAK_MISSION_KEY, JSON.stringify({ version: 1, data: state.mission }));
+  storage.setItem(FIREBREAK_UI_KEY, JSON.stringify({ version: 1, data: state.ui }));
 }
 
 export function loadFirebreakState(
@@ -139,26 +128,19 @@ export function loadFirebreakState(
   now: number,
 ): { state: FirebreakPersistedState; recovered: boolean } {
   const worldResult = parseEnvelope(storage, FIREBREAK_WORLD_KEY, WorldEnvelopeSchema);
-  const missionResult = parseEnvelope(
-    storage,
-    FIREBREAK_MISSION_KEY,
-    MissionEnvelopeSchema,
-  );
+  const missionResult = parseEnvelope(storage, FIREBREAK_MISSION_KEY, MissionEnvelopeSchema);
   const uiResult = parseEnvelope(storage, FIREBREAK_UI_KEY, UiEnvelopeSchema);
   let world = worldResult.value?.data ?? createFirebreakSeed();
   let mission = missionResult.value?.data ?? defaultMissionState();
   const ui = uiResult.value?.data ?? defaultUiState();
-  let recovered =
-    worldResult.recovered || missionResult.recovered || uiResult.recovered;
+  let recovered = worldResult.recovered || missionResult.recovered || uiResult.recovered;
 
   const simulationCurrent =
     mission.simulation !== null &&
     mission.simulation.incidentRevision === world.revision &&
     mission.simulation.stateHash === missionStateHash(world);
   const completedReceipt =
-    world.phase === "resolved" && mission.receipt?.outcome === "succeeded"
-      ? mission.receipt
-      : null;
+    world.phase === "resolved" && mission.receipt?.outcome === "succeeded" ? mission.receipt : null;
   if (completedReceipt) {
     mission = { ...defaultMissionState(), receipt: completedReceipt };
   } else if (worldResult.recovered) {
@@ -186,10 +168,7 @@ export function loadFirebreakState(
     recovered = true;
   }
 
-  if (
-    mission.proposal?.status === "authorized" ||
-    mission.proposal?.status === "registered"
-  ) {
+  if (mission.proposal?.status === "authorized" || mission.proposal?.status === "registered") {
     mission = {
       ...mission,
       proposal: {
@@ -203,21 +182,9 @@ export function loadFirebreakState(
     recovered = true;
   } else if (
     mission.proposal &&
-    ([
-      "executing",
-      "completed",
-      "cancelled",
-      "failed",
-      "expired",
-      "revoked",
-    ] as const).includes(
+    (["executing", "completed", "cancelled", "failed", "expired", "revoked"] as const).includes(
       mission.proposal.status as
-        | "executing"
-        | "completed"
-        | "cancelled"
-        | "failed"
-        | "expired"
-        | "revoked",
+        "executing" | "completed" | "cancelled" | "failed" | "expired" | "revoked",
     )
   ) {
     mission = { ...mission, proposal: null, progress: [] };

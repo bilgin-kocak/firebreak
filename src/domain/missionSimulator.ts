@@ -130,10 +130,7 @@ function interpolate(route: MissionRoute, atMs: number): Vector3Value {
   return last.position;
 }
 
-export function routeIntersectsPolygon(
-  route: MissionRoute,
-  polygon: PolygonPoint[],
-): boolean {
+export function routeIntersectsPolygon(route: MissionRoute, polygon: PolygonPoint[]): boolean {
   for (let index = 1; index < route.waypoints.length; index += 1) {
     const start = route.waypoints[index - 1]!;
     const end = route.waypoints[index]!;
@@ -160,9 +157,7 @@ export function routeIntersectsPolygon(
   return false;
 }
 
-export function minimumSynchronizedSeparation(
-  routes: Record<RobotId, MissionRoute>,
-): number {
+export function minimumSynchronizedSeparation(routes: Record<RobotId, MissionRoute>): number {
   const durationMs = Math.max(...ROBOT_IDS.map((id) => routes[id].durationMs));
   let minimum = Number.POSITIVE_INFINITY;
   for (let atMs = 0; atMs <= durationMs; atMs += 250) {
@@ -177,9 +172,7 @@ export function minimumSynchronizedSeparation(
   return minimum;
 }
 
-export function simulateCoordinatedMission(
-  snapshot: FirebreakSnapshot,
-): MissionSimulation {
+export function simulateCoordinatedMission(snapshot: FirebreakSnapshot): MissionSimulation {
   const routes = createRoutes(snapshot);
   const stateHash = missionStateHash(snapshot);
   const geofenceFailure = Object.values(routes).some((route) =>
@@ -195,11 +188,7 @@ export function simulateCoordinatedMission(
     stateHash,
     strategy: "coordinated",
     feasible,
-    reasonCode: geofenceFailure
-      ? "NO_SAFE_ROUTE"
-      : robotConflict
-        ? "ROBOT_CONFLICT"
-        : "READY",
+    reasonCode: geofenceFailure ? "NO_SAFE_ROUTE" : robotConflict ? "ROBOT_CONFLICT" : "READY",
     durationMs: Math.max(...Object.values(routes).map((route) => route.durationMs)),
     routes,
     predictions: {

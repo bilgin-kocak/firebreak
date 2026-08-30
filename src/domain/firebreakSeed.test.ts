@@ -40,9 +40,7 @@ describe("createFirebreakSeed", () => {
       "suppress",
       "haul",
     ]);
-    expect(Object.values(seed.robots).map((robot) => robot.battery)).toEqual([
-      100, 100, 100, 100,
-    ]);
+    expect(Object.values(seed.robots).map((robot) => robot.battery)).toEqual([100, 100, 100, 100]);
     expect(
       new Set(
         Object.values(seed.robots).map(
@@ -91,8 +89,6 @@ describe("createFirebreakSeed", () => {
         objectives: [...seed.objectives, seed.objectives[0]],
       }),
     ).toThrow();
-    expect(() =>
-      FirebreakSnapshotSchema.parse({ ...seed, unexpectedAuthority: true }),
-    ).toThrow();
+    expect(() => FirebreakSnapshotSchema.parse({ ...seed, unexpectedAuthority: true })).toThrow();
   });
 });

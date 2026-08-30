@@ -78,7 +78,11 @@ describe("allowlisted ROS 2 driver", () => {
   afterEach(() => vi.useRealTimers());
 
   it("connects only to local ws or secure wss endpoints and creates exact allowlisted topics", async () => {
-    for (const url of ["javascript:alert(1)", "ws://robot.example.com:9090", "http://localhost:9090"]) {
+    for (const url of [
+      "javascript:alert(1)",
+      "ws://robot.example.com:9090",
+      "http://localhost:9090",
+    ]) {
       const { driver } = setup();
       await expect(driver.connectTo(url)).rejects.toThrow(/ROS bridge URL/i);
     }
@@ -164,7 +168,10 @@ describe("allowlisted ROS 2 driver", () => {
     await driver.connect();
     const route = simulateCoordinatedMission(createFirebreakSeed()).routes["HAUL-4"];
     const progress = vi.fn();
-    await driver.executeRoute(route, { signal: new AbortController().signal, onProgress: progress });
+    await driver.executeRoute(route, {
+      signal: new AbortController().signal,
+      onProgress: progress,
+    });
 
     const goals = topic(ROS_TOPIC_MAP["HAUL-4"].goalPose).publications as Array<{
       header: { frame_id: string };

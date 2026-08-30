@@ -98,11 +98,7 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
         state.selectRobot(ROBOT_IDS[next]!);
       }
       const canDrive = state.world.phase === "active" || state.world.phase === "planned";
-      if (
-        canDrive &&
-        !commanding &&
-        (input.throttle !== 0 || input.turn !== 0 || input.action)
-      ) {
+      if (canDrive && !commanding && (input.throttle !== 0 || input.turn !== 0 || input.action)) {
         commanding = true;
         const deltaMs = Math.min(80, Math.max(16, at - lastAt));
         void runtime.driver
@@ -239,7 +235,11 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
               return (
                 <li key={objective.id} className={`objective-${objective.status}`}>
                   <span className="objective-icon">
-                    {objective.status === "complete" ? <Check aria-hidden="true" /> : <Icon aria-hidden="true" />}
+                    {objective.status === "complete" ? (
+                      <Check aria-hidden="true" />
+                    ) : (
+                      <Icon aria-hidden="true" />
+                    )}
                   </span>
                   <span>
                     <strong>{objective.label}</strong>
@@ -269,9 +269,14 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
           {world.phase === "ready" ? (
             <div className="console-content console-intro">
               <p>
-                Start the emergency, try driving a robot, then let the agent coordinate the whole fleet.
+                Start the emergency, try driving a robot, then let the agent coordinate the whole
+                fleet.
               </p>
-              <button className="mission-primary danger-action" type="button" onClick={startEmergency}>
+              <button
+                className="mission-primary danger-action"
+                type="button"
+                onClick={startEmergency}
+              >
                 <Flame aria-hidden="true" /> Start emergency
               </button>
             </div>
@@ -281,7 +286,8 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
             <div className="console-content">
               <div className="prompt-bubble">
                 <span>PROMPT 1</span>
-                “Assess WH-01, plan a coordinated rescue, verify safety, and stage the mission tool.”
+                “Assess WH-01, plan a coordinated rescue, verify safety, and stage the mission
+                tool.”
               </div>
               <button
                 className="mission-primary"
@@ -294,7 +300,8 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
                   }, "Safe routes staged for your review.")
                 }
               >
-                <Sparkles aria-hidden="true" /> {busy ? "Planning safe routes…" : "Ask agent to plan rescue"}
+                <Sparkles aria-hidden="true" />{" "}
+                {busy ? "Planning safe routes…" : "Ask agent to plan rescue"}
               </button>
             </div>
           ) : null}
@@ -309,8 +316,14 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
                 <strong>11/11</strong>
                 <span>safety gates</span>
               </div>
-              <p><ShieldCheck aria-hidden="true" /> Agent stopped at the human boundary.</p>
-              <button className="mission-primary" type="button" onClick={() => setProposalOpen(true)}>
+              <p>
+                <ShieldCheck aria-hidden="true" /> Agent stopped at the human boundary.
+              </p>
+              <button
+                className="mission-primary"
+                type="button"
+                onClick={() => setProposalOpen(true)}
+              >
                 Review mission authority
               </button>
             </div>
@@ -318,7 +331,9 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
 
           {authorityRegistered ? (
             <div className="console-content authority-live">
-              <div className="authority-pulse"><span /> ONE-USE AUTHORITY LIVE</div>
+              <div className="authority-pulse">
+                <span /> ONE-USE AUTHORITY LIVE
+              </div>
               <div className="prompt-bubble">
                 <span>PROMPT 2</span>
                 “Execute the approved rescue mission now.”
@@ -341,7 +356,9 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
 
           {world.phase === "executing" ? (
             <div className="console-content executing-panel">
-              <div className="execution-scan"><span /></div>
+              <div className="execution-scan">
+                <span />
+              </div>
               <strong>Fleet moving on approved routes</strong>
               <p>{mission.progress.at(-1)?.message ?? "Dispatching four robots…"}</p>
               <button
@@ -356,18 +373,34 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
 
           {world.phase === "resolved" && mission.receipt ? (
             <div className="console-content receipt-card">
-              <span className="receipt-check"><Check aria-hidden="true" /></span>
+              <span className="receipt-check">
+                <Check aria-hidden="true" />
+              </span>
               <div>
                 <small>VERIFIED RECEIPT</small>
                 <h2>Mission complete</h2>
               </div>
               <dl>
-                <div><dt>People</dt><dd>{mission.receipt.rescuedWorkers} workers safe</dd></div>
-                <div><dt>Fire</dt><dd>{mission.receipt.fireContained ? "contained" : "active"}</dd></div>
-                <div><dt>Load</dt><dd>{mission.receipt.containerSafe ? "secured" : "exposed"}</dd></div>
-                <div><dt>Safety</dt><dd>{mission.receipt.safetyViolations} violations</dd></div>
+                <div>
+                  <dt>People</dt>
+                  <dd>{mission.receipt.rescuedWorkers} workers safe</dd>
+                </div>
+                <div>
+                  <dt>Fire</dt>
+                  <dd>{mission.receipt.fireContained ? "contained" : "active"}</dd>
+                </div>
+                <div>
+                  <dt>Load</dt>
+                  <dd>{mission.receipt.containerSafe ? "secured" : "exposed"}</dd>
+                </div>
+                <div>
+                  <dt>Safety</dt>
+                  <dd>{mission.receipt.safetyViolations} violations</dd>
+                </div>
               </dl>
-              <p><ShieldCheck aria-hidden="true" /> One-use tool consumed and unregistered.</p>
+              <p>
+                <ShieldCheck aria-hidden="true" /> One-use tool consumed and unregistered.
+              </p>
             </div>
           ) : null}
         </aside>
@@ -387,12 +420,16 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
       </div>
 
       <FirebreakToolSurface />
-      <FleetControls onTouch={(state: Partial<TouchControlState>) => inputRef.current?.setTouchState(state)} />
+      <FleetControls
+        onTouch={(state: Partial<TouchControlState>) => inputRef.current?.setTouchState(state)}
+      />
 
       {message ? (
         <div className="firebreak-toast" role="status">
           <Gamepad2 aria-hidden="true" /> {message}
-          <button type="button" onClick={() => setMessage("")} aria-label="Dismiss message">×</button>
+          <button type="button" onClick={() => setMessage("")} aria-label="Dismiss message">
+            ×
+          </button>
         </div>
       ) : null}
 

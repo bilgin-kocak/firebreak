@@ -7,11 +7,7 @@ import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 
 import { ROBOT_IDS } from "../domain/firebreakSeed";
-import type {
-  FirebreakSnapshot,
-  RobotId,
-  WorkerId,
-} from "../domain/firebreakTypes";
+import type { FirebreakSnapshot, RobotId, WorkerId } from "../domain/firebreakTypes";
 import type { PersistedUiState } from "../store/firebreakPersistence";
 import type { RobotMeshHandle } from "./createRobotMesh";
 
@@ -48,7 +44,7 @@ export function createSceneSynchronizer(handle: WarehouseSceneHandle): SceneSync
 
   function updateCamera(): void {
     handle.camera.lockedTarget =
-      cameraMode === "follow" ? handle.robots.get(selectedRobot)?.root ?? null : null;
+      cameraMode === "follow" ? (handle.robots.get(selectedRobot)?.root ?? null) : null;
   }
 
   return {

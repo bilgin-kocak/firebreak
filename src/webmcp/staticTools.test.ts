@@ -26,9 +26,7 @@ describe("seven static Firebreak tools", () => {
 
     expect(tools.map((tool) => tool.name)).toEqual(STATIC_TOOL_NAMES);
     expect(tools).toHaveLength(7);
-    expect(tools.every((tool) => tool.inputSchema.additionalProperties === false)).toBe(
-      true,
-    );
+    expect(tools.every((tool) => tool.inputSchema.additionalProperties === false)).toBe(true);
     expect(tools.some((tool) => tool.name === "execute_rescue_mission")).toBe(false);
     expect(tools.every((tool) => !tool.annotations.untrustedContentHint)).toBe(true);
   });
@@ -111,9 +109,7 @@ describe("seven static Firebreak tools", () => {
 
     expect(getFirebreakState().world.routes["SCOUT-1"].length).toBeGreaterThan(2);
     expect(getFirebreakState().mission.proposal?.status).toBe("staged");
-    expect((await adapter.getTools()).map((tool) => tool.name)).toEqual(
-      STATIC_TOOL_NAMES,
-    );
+    expect((await adapter.getTools()).map((tool) => tool.name)).toEqual(STATIC_TOOL_NAMES);
   });
 
   it("refuses validation and staging without their current proof", async () => {

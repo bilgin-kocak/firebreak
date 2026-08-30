@@ -2,10 +2,7 @@ import { z } from "zod";
 
 import { FirebreakError, type FirebreakSnapshot } from "../domain/firebreakTypes";
 import { simulateCoordinatedMission } from "../domain/missionSimulator";
-import {
-  compileMissionProposal,
-  validateSafetyEnvelope,
-} from "../domain/safetyCompiler";
+import { compileMissionProposal, validateSafetyEnvelope } from "../domain/safetyCompiler";
 import { getFirebreakState, type FirebreakState } from "../store/useFirebreakStore";
 import { successResult } from "./results";
 import type { RegistryToolDefinition } from "./types";
@@ -94,9 +91,8 @@ export const createStaticToolDefinitions = (
           incidentId: world.incidentId,
           phase: world.phase,
           revision: world.revision,
-          trappedWorkers: Object.values(world.workers).filter(
-            (worker) => worker.status !== "safe",
-          ).length,
+          trappedWorkers: Object.values(world.workers).filter((worker) => worker.status !== "safe")
+            .length,
           fireIntensity: world.hazards.fire.intensity,
           objectives: structuredClone(world.objectives),
           durationLimitMs: world.durationLimitMs,
@@ -198,10 +194,9 @@ export const createStaticToolDefinitions = (
       name: "validate_safety_envelope",
       description:
         "Evaluate eleven deterministic gates over the exact simulated routes and current warehouse state.",
-      inputSchema: closedObject(
-        { simulationId: { type: "string", minLength: 1 } },
-        ["simulationId"],
-      ),
+      inputSchema: closedObject({ simulationId: { type: "string", minLength: 1 } }, [
+        "simulationId",
+      ]),
       annotations: read,
       inputValidator: strict({ simulationId: z.string().min(1) }),
       origin: "built_in",
@@ -305,9 +300,7 @@ export const createStaticToolDefinitions = (
                 oneUse: proposal.oneUse,
               }
             : null,
-          dynamicRegistered: state.webmcp.registeredToolNames.includes(
-            "execute_rescue_mission",
-          ),
+          dynamicRegistered: state.webmcp.registeredToolNames.includes("execute_rescue_mission"),
         });
       },
     }),

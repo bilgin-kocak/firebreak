@@ -24,7 +24,11 @@ export function FirebreakToolSurface() {
         <span className="tool-live-dot" aria-hidden="true" />
         <span>
           <strong>{names.length} tools live</strong>
-          <small>{dynamic ? "One-use movement authority granted" : "Planning only · no movement authority"}</small>
+          <small>
+            {dynamic
+              ? "One-use movement authority granted"
+              : "Planning only · no movement authority"}
+          </small>
         </span>
         <span className="tool-mode">
           <Radio size={13} aria-hidden="true" /> {mode === "native" ? "WebMCP" : "Local WebMCP"}

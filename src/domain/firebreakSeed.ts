@@ -1,8 +1,4 @@
-import type {
-  FirebreakSnapshot,
-  PolygonPoint,
-  RobotId,
-} from "./firebreakTypes";
+import type { FirebreakSnapshot, PolygonPoint, RobotId } from "./firebreakTypes";
 
 export const INCIDENT_ID = "WH-01" as const;
 export const ROBOT_IDS = [

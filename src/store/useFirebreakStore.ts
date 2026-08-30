@@ -341,7 +341,6 @@ export const useFirebreakStore = create<FirebreakState>((set, get) => {
   };
 });
 
-export const getFirebreakState = (): FirebreakState =>
-  useFirebreakStore.getState();
+export const getFirebreakState = (): FirebreakState => useFirebreakStore.getState();
 
 export type { MissionReceipt };

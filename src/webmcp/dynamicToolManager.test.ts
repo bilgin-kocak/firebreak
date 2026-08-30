@@ -7,7 +7,9 @@ import { createMemoryAdapter } from "./memoryAdapter";
 import { registerStaticTools } from "./registerStaticTools";
 import { ToolRegistry } from "./registry";
 
-async function stagedSetup(options: { wait?: (ms: number, signal: AbortSignal) => Promise<void> } = {}) {
+async function stagedSetup(
+  options: { wait?: (ms: number, signal: AbortSignal) => Promise<void> } = {},
+) {
   const adapter = createMemoryAdapter();
   const registry = new ToolRegistry(adapter);
   await registerStaticTools(registry, { now: () => 1_000 });
@@ -60,9 +62,7 @@ describe("DynamicMissionToolManager", () => {
     await manager.approveAndRegister(proposal.id);
 
     expect(getFirebreakState().mission.proposal?.status).toBe("registered");
-    expect((await adapter.getTools()).map((tool) => tool.name)).toContain(
-      "execute_rescue_mission",
-    );
+    expect((await adapter.getTools()).map((tool) => tool.name)).toContain("execute_rescue_mission");
   });
 
   it("executes once, resolves the rescue, and unregisters itself", async () => {
@@ -120,8 +120,6 @@ describe("DynamicMissionToolManager", () => {
 
     expect(result).toMatchObject({ ok: false, code: "EXECUTION_CANCELLED" });
     expect(getFirebreakState().mission.receipt?.outcome).toBe("cancelled");
-    expect(getFirebreakState().mission.receipt?.reason).toContain(
-      "Operator emergency stop",
-    );
+    expect(getFirebreakState().mission.receipt?.reason).toContain("Operator emergency stop");
   });
 });

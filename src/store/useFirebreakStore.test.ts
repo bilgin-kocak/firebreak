@@ -2,10 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { createFirebreakSeed } from "../domain/firebreakSeed";
 import { simulateCoordinatedMission } from "../domain/missionSimulator";
-import {
-  compileMissionProposal,
-  validateSafetyEnvelope,
-} from "../domain/safetyCompiler";
+import { compileMissionProposal, validateSafetyEnvelope } from "../domain/safetyCompiler";
 import { useFirebreakStore } from "./useFirebreakStore";
 
 function plannedMission(now = 1_000) {
@@ -49,9 +46,7 @@ describe("useFirebreakStore", () => {
     store.setSimulation(simulation);
     store.stageProposal(proposal);
 
-    expect(() => store.authorizeProposal(proposal.id, 2_000)).toThrow(
-      "passing safety checks",
-    );
+    expect(() => store.authorizeProposal(proposal.id, 2_000)).toThrow("passing safety checks");
   });
 
   it("selects robots and applies driver snapshots without losing mission state", () => {
@@ -64,9 +59,7 @@ describe("useFirebreakStore", () => {
     store.replaceWorld(driven);
 
     expect(useFirebreakStore.getState().world.selectedRobotId).toBe("HAUL-4");
-    expect(useFirebreakStore.getState().world.robots["HAUL-4"].position.z).toBe(
-      -7,
-    );
+    expect(useFirebreakStore.getState().world.robots["HAUL-4"].position.z).toBe(-7);
   });
 
   it("reset reproduces the seed while retaining accessibility preferences", () => {

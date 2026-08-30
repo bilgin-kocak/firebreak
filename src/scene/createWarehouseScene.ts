@@ -85,7 +85,10 @@ function createWorker(scene: Scene, id: WorkerId, color: StandardMaterial): Tran
   return root;
 }
 
-async function enableOptionalHavok(scene: Scene, ground: ReturnType<typeof MeshBuilder.CreateGround>) {
+async function enableOptionalHavok(
+  scene: Scene,
+  ground: ReturnType<typeof MeshBuilder.CreateGround>,
+) {
   try {
     const { default: HavokPhysics } = await import("@babylonjs/havok");
     const havok = await HavokPhysics({ locateFile: () => havokWasmUrl });
@@ -206,7 +209,11 @@ export async function createWarehouseScene(
     wall.material = steel;
   }
 
-  const bay = MeshBuilder.CreateBox("battery-bay-b", { width: 3.2, height: 0.35, depth: 2.5 }, scene);
+  const bay = MeshBuilder.CreateBox(
+    "battery-bay-b",
+    { width: 3.2, height: 0.35, depth: 2.5 },
+    scene,
+  );
   bay.position.set(4.5, 0.18, 3);
   bay.material = danger;
   const fireRoot = new TransformNode("fire-root", scene);

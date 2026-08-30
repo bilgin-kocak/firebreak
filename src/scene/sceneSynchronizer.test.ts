@@ -54,11 +54,7 @@ describe("scene synchronizer", () => {
 
     synchronizer.applySnapshot(snapshot);
 
-    expect(handle.robots.get("MEDIC-2")?.root.position.asArray()).toEqual([
-      3,
-      0.45,
-      4,
-    ]);
+    expect(handle.robots.get("MEDIC-2")?.root.position.asArray()).toEqual([3, 0.45, 4]);
     expect(handle.robots.get("MEDIC-2")?.selectionRing.isEnabled()).toBe(true);
     expect(handle.robots.get("SCOUT-1")?.selectionRing.isEnabled()).toBe(false);
     expect(handle.workers.get("WORKER-A")?.isEnabled()).toBe(false);

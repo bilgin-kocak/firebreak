@@ -31,9 +31,7 @@ export const executeTool = <T extends Record<string, unknown>>(
   );
 
 export const toolNames = (page: Page) =>
-  page.evaluate(async () =>
-    (await document.modelContext!.getTools()).map((tool) => tool.name),
-  );
+  page.evaluate(async () => (await document.modelContext!.getTools()).map((tool) => tool.name));
 
 export const boot = async (page: Page) => {
   await page.addInitScript(installModelContextMock);
@@ -63,10 +61,7 @@ export const approve = async (page: Page) => {
   const dialog = page.getByRole("dialog", { name: "Authorize rescue mission" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Authorize one mission" }).click();
-  await expect.poll(() => toolNames(page)).toEqual([
-    ...STATIC_TOOLS,
-    "execute_rescue_mission",
-  ]);
+  await expect.poll(() => toolNames(page)).toEqual([...STATIC_TOOLS, "execute_rescue_mission"]);
   await expect(page.getByRole("button", { name: "Execute approved rescue" })).toBeVisible();
 };
 

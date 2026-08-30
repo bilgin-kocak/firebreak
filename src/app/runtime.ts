@@ -37,11 +37,11 @@ const supportsNativeWebMCP = (
 ): modelContext is NonNullable<Document["modelContext"]> =>
   Boolean(
     modelContext &&
-      typeof modelContext.registerTool === "function" &&
-      typeof modelContext.getTools === "function" &&
-      typeof modelContext.executeTool === "function" &&
-      typeof modelContext.addEventListener === "function" &&
-      typeof modelContext.removeEventListener === "function",
+    typeof modelContext.registerTool === "function" &&
+    typeof modelContext.getTools === "function" &&
+    typeof modelContext.executeTool === "function" &&
+    typeof modelContext.addEventListener === "function" &&
+    typeof modelContext.removeEventListener === "function",
   );
 
 function expectSuccess(result: unknown): SuccessfulToolResult {
@@ -60,20 +60,14 @@ function expectSuccess(result: unknown): SuccessfulToolResult {
   return result as SuccessfulToolResult;
 }
 
-export const bootAppRuntime = async (
-  options: AppRuntimeOptions = {},
-): Promise<AppRuntime> => {
+export const bootAppRuntime = async (options: AppRuntimeOptions = {}): Promise<AppRuntime> => {
   const modelContext = document.modelContext;
   const adapter = supportsNativeWebMCP(modelContext)
     ? createNativeAdapter(modelContext)
     : createMemoryAdapter();
   const registry = new ToolRegistry(adapter, { now: options.now });
   const rootController = new AbortController();
-  await registerStaticTools(
-    registry,
-    { now: options.now },
-    { signal: rootController.signal },
-  );
+  await registerStaticTools(registry, { now: options.now }, { signal: rootController.signal });
 
   const driver =
     options.driver ??
@@ -96,18 +90,14 @@ export const bootAppRuntime = async (
     dynamicTools,
     driver,
     async runPromptA() {
-      expectSuccess(
-        await adapter.executeTool("inspect_emergency", { incidentId: "WH-01" }),
-      );
+      expectSuccess(await adapter.executeTool("inspect_emergency", { incidentId: "WH-01" }));
       expectSuccess(
         await adapter.executeTool("scan_hazards", {
           incidentId: "WH-01",
           sensorMode: "thermal",
         }),
       );
-      expectSuccess(
-        await adapter.executeTool("inspect_fleet", { incidentId: "WH-01" }),
-      );
+      expectSuccess(await adapter.executeTool("inspect_fleet", { incidentId: "WH-01" }));
       const simulation = expectSuccess(
         await adapter.executeTool("simulate_mission", {
           incidentId: "WH-01",
@@ -115,18 +105,14 @@ export const bootAppRuntime = async (
         }),
       );
       const simulationId = String(simulation.data?.simulationId ?? "");
-      expectSuccess(
-        await adapter.executeTool("validate_safety_envelope", { simulationId }),
-      );
+      expectSuccess(await adapter.executeTool("validate_safety_envelope", { simulationId }));
       expectSuccess(
         await adapter.executeTool("stage_mission_tool", {
           simulationId,
           toolName: "execute_rescue_mission",
         }),
       );
-      expectSuccess(
-        await adapter.executeTool("list_mission_tools", { incidentId: "WH-01" }),
-      );
+      expectSuccess(await adapter.executeTool("list_mission_tools", { incidentId: "WH-01" }));
     },
     async authorizeMission(proposalId) {
       await dynamicTools.approveAndRegister(proposalId);

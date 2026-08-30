@@ -5,8 +5,8 @@ import { createNativeAdapter } from "./nativeAdapter";
 import type { WebMCPToolDefinition } from "./types";
 
 const tool = (execute: WebMCPToolDefinition["execute"] = async (input) => input) => ({
-  name: "inspect_incident",
-  description: "Inspect the incident.",
+  name: "inspect_emergency",
+  description: "Inspect the emergency.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   annotations: { readOnlyHint: true, untrustedContentHint: false },
   execute,
@@ -32,18 +32,22 @@ describe("native WebMCP adapter", () => {
     const listener = vi.fn();
 
     await adapter.registerTool(tool(), { signal: controller.signal });
-    await adapter.executeTool("inspect_incident", {}, controller.signal);
+    await adapter.executeTool("inspect_emergency", {}, controller.signal);
     await adapter.getTools();
     const unsubscribe = adapter.subscribeToToolChange(listener);
     unsubscribe();
 
     expect(registerTool).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "inspect_incident" }),
+      expect.objectContaining({ name: "inspect_emergency" }),
       {
         signal: controller.signal,
       },
     );
-    expect(executeTool).toHaveBeenCalledWith("inspect_incident", {}, { signal: controller.signal });
+    expect(executeTool).toHaveBeenCalledWith(
+      "inspect_emergency",
+      {},
+      { signal: controller.signal },
+    );
     expect(addEventListener).toHaveBeenCalledWith("toolchange", listener);
     expect(removeEventListener).toHaveBeenCalledWith("toolchange", listener);
     Reflect.deleteProperty(document, "modelContext");
@@ -56,12 +60,12 @@ describe("memory WebMCP adapter", () => {
     await adapter.registerTool(tool());
 
     expect(await adapter.getTools()).toEqual([
-      expect.objectContaining({ name: "inspect_incident", description: "Inspect the incident." }),
+      expect.objectContaining({ name: "inspect_emergency", description: "Inspect the emergency." }),
     ]);
     await expect(
-      adapter.executeTool("inspect_incident", '{"incidentId":"INC-4821"}'),
+      adapter.executeTool("inspect_emergency", '{"incidentId":"WH-01"}'),
     ).resolves.toEqual({
-      incidentId: "INC-4821",
+      incidentId: "WH-01",
     });
   });
 
@@ -72,7 +76,7 @@ describe("memory WebMCP adapter", () => {
     await expect(adapter.registerTool(tool(async () => "second"))).rejects.toMatchObject({
       code: "TOOL_ALREADY_REGISTERED",
     });
-    await expect(adapter.executeTool("inspect_incident", {})).resolves.toBe("first");
+    await expect(adapter.executeTool("inspect_emergency", {})).resolves.toBe("first");
   });
 
   it("emits local toolchange events on registration and abort unregistration", async () => {
@@ -102,7 +106,7 @@ describe("memory WebMCP adapter", () => {
     const controller = new AbortController();
     controller.abort();
 
-    await expect(adapter.executeTool("inspect_incident", {}, controller.signal)).resolves.toEqual({
+    await expect(adapter.executeTool("inspect_emergency", {}, controller.signal)).resolves.toEqual({
       aborted: true,
     });
     expect(receivedSignal).toBe(controller.signal);

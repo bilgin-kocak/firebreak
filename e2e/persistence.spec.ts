@@ -1,13 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import {
-  approve,
-  boot,
-  executeApproved,
-  runPromptA,
-  STATIC_TOOLS,
-  toolNames,
-} from "./helpers";
+import { approve, boot, executeApproved, runPromptA, STATIC_TOOLS, toolNames } from "./helpers";
 
 test("reload removes dynamic authority and requires a fresh human decision", async ({ page }) => {
   await boot(page);

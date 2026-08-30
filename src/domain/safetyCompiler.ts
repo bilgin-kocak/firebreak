@@ -18,19 +18,10 @@ const ROLE_ACTIONS: Record<RobotRole, readonly MissionAction[]> = {
   scout: ["scan-hazards"],
   rescue: ["rescue-worker-a", "deliver-worker-a"],
   suppress: ["isolate-power", "suppress-fire"],
-  haul: [
-    "rescue-worker-b",
-    "pickup-container",
-    "deliver-worker-b-and-container",
-  ],
+  haul: ["rescue-worker-b", "pickup-container", "deliver-worker-b-and-container"],
 };
 
-function check(
-  id: SafetyCheck["id"],
-  label: string,
-  passed: boolean,
-  detail: string,
-): SafetyCheck {
+function check(id: SafetyCheck["id"], label: string, passed: boolean, detail: string): SafetyCheck {
   return { id, label, status: passed ? "passed" : "failed", detail };
 }
 
@@ -52,11 +43,7 @@ export function validateSafetyEnvelope(
     );
   });
   const routesOutsideCollapse = ROBOT_IDS.every(
-    (robotId) =>
-      !routeIntersectsPolygon(
-        simulation.routes[robotId],
-        snapshot.hazards.collapseZone,
-      ),
+    (robotId) => !routeIntersectsPolygon(simulation.routes[robotId], snapshot.hazards.collapseZone),
   );
   const rolesValid = ROBOT_IDS.every((robotId) => {
     const allowed = ROLE_ACTIONS[snapshot.robots[robotId].role];
@@ -104,9 +91,7 @@ export function validateSafetyEnvelope(
     check(
       "battery",
       "Battery reserve",
-      ROBOT_IDS.every(
-        (robotId) => simulation.routes[robotId].predictedBatteryEnd >= 20,
-      ),
+      ROBOT_IDS.every((robotId) => simulation.routes[robotId].predictedBatteryEnd >= 20),
       "Every robot must finish with at least 20% predicted battery.",
     ),
     check(

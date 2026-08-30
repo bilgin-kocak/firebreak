@@ -38,9 +38,7 @@ describe("WebMCP Firebreak application", () => {
   it("completes the canonical two-prompt journey with one visible human authorization", async () => {
     const user = userEvent.setup();
     render(<App accelerated />);
-    await waitFor(() =>
-      expect(getFirebreakState().webmcp.registeredToolNames).toHaveLength(7),
-    );
+    await waitFor(() => expect(getFirebreakState().webmcp.registeredToolNames).toHaveLength(7));
 
     await user.click(screen.getByRole("button", { name: /start emergency/i }));
     await user.click(screen.getByRole("button", { name: /ask agent to plan rescue/i }));
@@ -53,9 +51,7 @@ describe("WebMCP Firebreak application", () => {
 
     await user.click(within(proposal).getByRole("button", { name: /authorize one mission/i }));
     await waitFor(() =>
-      expect(getFirebreakState().webmcp.registeredToolNames).toContain(
-        "execute_rescue_mission",
-      ),
+      expect(getFirebreakState().webmcp.registeredToolNames).toContain("execute_rescue_mission"),
     );
     expect(screen.getByText(/8 tools live/i)).toBeVisible();
 

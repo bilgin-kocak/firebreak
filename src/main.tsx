@@ -4,5 +4,5 @@ import { App } from "./app/App";
 import "./styles/index.css";
 
 const root = document.getElementById("root");
-if (!root) throw new Error("WebMCP Airlock root element is missing.");
+if (!root) throw new Error("WebMCP Firebreak root element is missing.");
 createRoot(root).render(<App />);

@@ -33,7 +33,11 @@ function labelRobot(scene: Scene, robot: RobotState, root: TransformNode): void 
   plane.billboardMode = 7;
   plane.parent = root;
   plane.isPickable = false;
-  const texture = new DynamicTexture(`${robot.id}-label-texture`, { width: 512, height: 96 }, scene);
+  const texture = new DynamicTexture(
+    `${robot.id}-label-texture`,
+    { width: 512, height: 96 },
+    scene,
+  );
   texture.hasAlpha = true;
   texture.drawText(robot.id, null, 67, "700 42px monospace", "#f4f7f8", "transparent", true);
   const labelMaterial = new StandardMaterial(`${robot.id}-label-material`, scene);
@@ -54,13 +58,25 @@ export function createRobotMesh(scene: Scene, robot: RobotState): RobotMeshHandl
   const animatedParts: TransformNode[] = [];
 
   if (robot.role === "scout") {
-    const body = MeshBuilder.CreateSphere(`${robot.id}-body`, { diameter: 0.85, segments: 12 }, scene);
+    const body = MeshBuilder.CreateSphere(
+      `${robot.id}-body`,
+      { diameter: 0.85, segments: 12 },
+      scene,
+    );
     body.scaling.y = 0.45;
     body.material = shell;
-    const mast = MeshBuilder.CreateCylinder(`${robot.id}-mast`, { height: 0.35, diameter: 0.12 }, scene);
+    const mast = MeshBuilder.CreateCylinder(
+      `${robot.id}-mast`,
+      { height: 0.35, diameter: 0.12 },
+      scene,
+    );
     mast.position.y = 0.35;
     mast.material = dark;
-    const sensor = MeshBuilder.CreateSphere(`${robot.id}-sensor`, { diameter: 0.22, segments: 8 }, scene);
+    const sensor = MeshBuilder.CreateSphere(
+      `${robot.id}-sensor`,
+      { diameter: 0.22, segments: 8 },
+      scene,
+    );
     sensor.position.set(0, 0.55, 0.04);
     sensor.material = lamp;
     const arms = [

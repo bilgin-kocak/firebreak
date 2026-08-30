@@ -1,9 +1,5 @@
 import type { RobotId } from "../domain/firebreakTypes";
-import type {
-  InputSnapshot,
-  NormalizedControl,
-  TouchControlState,
-} from "./controlTypes";
+import type { InputSnapshot, NormalizedControl, TouchControlState } from "./controlTypes";
 
 export interface GamepadButtonLike {
   pressed: boolean;
@@ -61,10 +57,7 @@ function isPressed(gamepad: GamepadLike, index: number): boolean {
   return Boolean(gamepad.buttons[index]?.pressed);
 }
 
-export function normalizeGamepad(
-  gamepad: GamepadLike,
-  deadZone = 0.15,
-): NormalizedControl {
+export function normalizeGamepad(gamepad: GamepadLike, deadZone = 0.15): NormalizedControl {
   if (!gamepad.connected || gamepad.mapping !== "standard") {
     return { ...ZERO_CONTROL };
   }
@@ -82,9 +75,7 @@ export function normalizeGamepad(
   };
 }
 
-export function createInputController(
-  options: InputControllerOptions = {},
-): InputController {
+export function createInputController(options: InputControllerOptions = {}): InputController {
   const pressedKeys = new Set<string>();
   let touch: TouchControlState = { throttle: 0, turn: 0, action: false };
   let gamepad = { ...ZERO_CONTROL };
@@ -95,13 +86,10 @@ export function createInputController(
   const getGamepads =
     options.getGamepads ??
     (() =>
-      typeof navigator.getGamepads === "function"
-        ? Array.from(navigator.getGamepads())
-        : []);
+      typeof navigator.getGamepads === "function" ? Array.from(navigator.getGamepads()) : []);
   const requestFrame =
     options.requestFrame ?? ((callback) => window.requestAnimationFrame(callback));
-  const cancelFrame =
-    options.cancelFrame ?? ((handle) => window.cancelAnimationFrame(handle));
+  const cancelFrame = options.cancelFrame ?? ((handle) => window.cancelAnimationFrame(handle));
 
   function clear(): void {
     pressedKeys.clear();
@@ -112,15 +100,12 @@ export function createInputController(
 
   function poll(): void {
     if (!running) return;
-    const active = getGamepads().find(
-      (candidate): candidate is GamepadLike =>
-        Boolean(candidate?.connected && candidate.mapping === "standard"),
+    const active = getGamepads().find((candidate): candidate is GamepadLike =>
+      Boolean(candidate?.connected && candidate.mapping === "standard"),
     );
     const next = active ? normalizeGamepad(active) : { ...ZERO_CONTROL };
     const selectDelta =
-      next.selectDelta !== 0 && next.selectDelta === previousGamepadSelect
-        ? 0
-        : next.selectDelta;
+      next.selectDelta !== 0 && next.selectDelta === previousGamepadSelect ? 0 : next.selectDelta;
     previousGamepadSelect = next.selectDelta;
     gamepad = { ...next, selectDelta };
     frameHandle = requestFrame(poll);
@@ -145,19 +130,11 @@ export function createInputController(
   function keyboardSnapshot(): InputSnapshot {
     const forward = pressedKeys.has("KeyW") || pressedKeys.has("ArrowUp");
     const reverse = pressedKeys.has("KeyS") || pressedKeys.has("ArrowDown");
-    const left =
-      pressedKeys.has("KeyA") ||
-      pressedKeys.has("ArrowLeft") ||
-      pressedKeys.has("KeyQ");
+    const left = pressedKeys.has("KeyA") || pressedKeys.has("ArrowLeft") || pressedKeys.has("KeyQ");
     const right =
-      pressedKeys.has("KeyD") ||
-      pressedKeys.has("ArrowRight") ||
-      pressedKeys.has("KeyE");
-    const selectRobot = Object.entries(ROBOT_KEY_MAP).find(([code]) =>
-      pressedKeys.has(code),
-    )?.[1];
-    const active =
-      forward || reverse || left || right || pressedKeys.has("Space") || selectRobot;
+      pressedKeys.has("KeyD") || pressedKeys.has("ArrowRight") || pressedKeys.has("KeyE");
+    const selectRobot = Object.entries(ROBOT_KEY_MAP).find(([code]) => pressedKeys.has(code))?.[1];
+    const active = forward || reverse || left || right || pressedKeys.has("Space") || selectRobot;
 
     return {
       throttle: Number(forward) - Number(reverse),

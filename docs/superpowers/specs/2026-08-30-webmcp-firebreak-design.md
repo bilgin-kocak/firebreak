@@ -36,12 +36,12 @@ The scene is a stylized, low-poly distribution warehouse at night. A damaged lit
 
 The fleet contains four visually distinct robots:
 
-| Robot | Form | Mission role |
-| --- | --- | --- |
-| `SCOUT-1` | quadcopter | map heat, smoke, workers, and route visibility |
-| `MEDIC-2` | tracked rescue rover | reach and evacuate Worker A |
-| `SUPPRESS-3` | heavy fire rover | isolate power and suppress Battery Bay B |
-| `HAUL-4` | compact carrier rover | evacuate Worker B and move the hazardous container |
+| Robot        | Form                  | Mission role                                       |
+| ------------ | --------------------- | -------------------------------------------------- |
+| `SCOUT-1`    | quadcopter            | map heat, smoke, workers, and route visibility     |
+| `MEDIC-2`    | tracked rescue rover  | reach and evacuate Worker A                        |
+| `SUPPRESS-3` | heavy fire rover      | isolate power and suppress Battery Bay B           |
+| `HAUL-4`     | compact carrier rover | evacuate Worker B and move the hazardous container |
 
 ### 3.2 Player controls
 
@@ -176,15 +176,15 @@ The Babylon scene renders the world. React renders the HUD and all semantic cont
 
 Exactly seven static tools register at startup:
 
-| Tool | Input | Effect |
-| --- | --- | --- |
-| `inspect_emergency` | `{ incidentId: "WH-01" }` | returns trusted objectives, timer, environment, and emergency phase |
-| `scan_hazards` | `{ incidentId: "WH-01", sensorMode: "thermal" }` | reveals fire, smoke, collapse zone, workers, and container locations |
-| `inspect_fleet` | `{ incidentId: "WH-01" }` | returns robot roles, position, battery, health, and availability |
-| `simulate_mission` | `{ incidentId: "WH-01", strategy: "coordinated" }` | produces four deterministic routes and predicted outcomes without moving robots |
-| `validate_safety_envelope` | `{ simulationId: string }` | evaluates scope, route, collision, battery, geofence, timeout, and rollback gates |
-| `stage_mission_tool` | `{ simulationId: string, toolName: "execute_rescue_mission" }` | compiles a passing simulation into a reviewable proposal; never authorizes it |
-| `list_mission_tools` | `{ incidentId: "WH-01" }` | lists staged, registered, completed, expired, disabled, rejected, and cancelled missions |
+| Tool                       | Input                                                          | Effect                                                                                   |
+| -------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `inspect_emergency`        | `{ incidentId: "WH-01" }`                                      | returns trusted objectives, timer, environment, and emergency phase                      |
+| `scan_hazards`             | `{ incidentId: "WH-01", sensorMode: "thermal" }`               | reveals fire, smoke, collapse zone, workers, and container locations                     |
+| `inspect_fleet`            | `{ incidentId: "WH-01" }`                                      | returns robot roles, position, battery, health, and availability                         |
+| `simulate_mission`         | `{ incidentId: "WH-01", strategy: "coordinated" }`             | produces four deterministic routes and predicted outcomes without moving robots          |
+| `validate_safety_envelope` | `{ simulationId: string }`                                     | evaluates scope, route, collision, battery, geofence, timeout, and rollback gates        |
+| `stage_mission_tool`       | `{ simulationId: string, toolName: "execute_rescue_mission" }` | compiles a passing simulation into a reviewable proposal; never authorizes it            |
+| `list_mission_tools`       | `{ incidentId: "WH-01" }`                                      | lists staged, registered, completed, expired, disabled, rejected, and cancelled missions |
 
 The approved dynamic tool is:
 
@@ -332,4 +332,3 @@ Implementation is complete only when all of the following are true:
 11. The optional ROS adapter cannot publish arbitrary topics or message types supplied by an agent.
 12. Lint, format check, strict typecheck, unit and integration tests, production build, Playwright, accessibility checks, responsive screenshots, and console-error assertions pass.
 13. There are no TODOs, mock screens, dead controls, stale Airlock copy, or known P0 failures.
-

@@ -21,20 +21,15 @@ describe("simulateCoordinatedMission", () => {
     expect(simulation.feasible).toBe(true);
     expect(Object.keys(simulation.routes)).toEqual(ROBOT_IDS);
     expect(simulation.durationMs).toBeLessThanOrEqual(45_000);
-    expect(
-      Object.values(simulation.routes).every(
-        (route) => route.predictedBatteryEnd >= 20,
-      ),
-    ).toBe(true);
-    expect(
-      Object.values(simulation.routes).every(
-        (route) =>
-          !routeIntersectsPolygon(route, snapshot.hazards.collapseZone),
-      ),
-    ).toBe(true);
-    expect(minimumSynchronizedSeparation(simulation.routes)).toBeGreaterThanOrEqual(
-      1.25,
+    expect(Object.values(simulation.routes).every((route) => route.predictedBatteryEnd >= 20)).toBe(
+      true,
     );
+    expect(
+      Object.values(simulation.routes).every(
+        (route) => !routeIntersectsPolygon(route, snapshot.hazards.collapseZone),
+      ),
+    ).toBe(true);
+    expect(minimumSynchronizedSeparation(simulation.routes)).toBeGreaterThanOrEqual(1.25);
     expect(simulation.predictions).toEqual({
       rescuedWorkers: 2,
       fireContained: true,
@@ -58,9 +53,7 @@ describe("simulateCoordinatedMission", () => {
   it("does not invalidate physical proof when only the review phase changes", () => {
     const snapshot = createFirebreakSeed();
 
-    expect(missionStateHash({ ...snapshot, phase: "planned" })).toBe(
-      missionStateHash(snapshot),
-    );
+    expect(missionStateHash({ ...snapshot, phase: "planned" })).toBe(missionStateHash(snapshot));
     expect(
       missionStateHash({
         ...snapshot,

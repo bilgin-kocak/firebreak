@@ -8,9 +8,9 @@ import { ToolRegistry } from "./registry";
 import type { RegistryToolDefinition } from "./types";
 
 function definition(
-  execute: RegistryToolDefinition<{ incidentId: "WH-01" }>["execute"] = vi.fn(
-    async () => ({ ok: true }),
-  ),
+  execute: RegistryToolDefinition<{ incidentId: "WH-01" }>["execute"] = vi.fn(async () => ({
+    ok: true,
+  })),
 ) {
   return {
     name: "inspect_emergency",
@@ -44,9 +44,7 @@ describe("WebMCP tool registry", () => {
     await expect(registry.register(definition())).rejects.toMatchObject({
       code: "TOOL_ALREADY_REGISTERED",
     });
-    expect(getFirebreakState().webmcp.registeredToolNames).toEqual([
-      "inspect_emergency",
-    ]);
+    expect(getFirebreakState().webmcp.registeredToolNames).toEqual(["inspect_emergency"]);
   });
 
   it("validates inputs before domain execution and returns compact failures", async () => {

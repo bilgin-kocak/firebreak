@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createFirebreakSeed } from "../domain/firebreakSeed";
 import { simulateCoordinatedMission } from "../domain/missionSimulator";
-import {
-  compileMissionProposal,
-  validateSafetyEnvelope,
-} from "../domain/safetyCompiler";
+import { compileMissionProposal, validateSafetyEnvelope } from "../domain/safetyCompiler";
 import {
   FIREBREAK_MISSION_KEY,
   FIREBREAK_UI_KEY,
