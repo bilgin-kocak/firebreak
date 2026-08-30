@@ -4,14 +4,14 @@ const focusableSelector =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 const dialogStack: HTMLElement[] = [];
 
-export const useDialogFocus = (
+export const useDialogFocus = <T extends HTMLElement = HTMLDivElement>(
   open: boolean,
   onClose: () => void,
   returnTarget?: HTMLElement | null,
   getFallbackTarget?: () => HTMLElement | null,
   preferFallback?: () => boolean,
 ) => {
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<T>(null);
 
   useEffect(() => {
     if (!open) return;

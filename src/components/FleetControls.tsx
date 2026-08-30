@@ -56,7 +56,7 @@ export function FleetControls({
           );
         })}
       </div>
-      <div className="touch-pad" aria-label="Touch robot controls">
+      <div className="touch-pad" role="group" aria-label="Touch robot controls">
         <button
           type="button"
           aria-label="Turn left"

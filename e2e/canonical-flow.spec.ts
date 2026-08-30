@@ -4,73 +4,71 @@ import {
   approve,
   boot,
   collectRuntimeErrors,
+  executeApproved,
   executeTool,
   runPromptA,
   screenshot,
   STATIC_TOOLS,
+  startEmergency,
   toolNames,
 } from "./helpers";
 
-test("canonical two-prompt incident journey quarantines, approves, resolves, and unregisters", async ({
+test("canonical two-prompt rescue plans, authorizes, moves the fleet, and unregisters", async ({
   page,
 }, testInfo) => {
-  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.setViewportSize({ width: 1440, height: 900 });
   const runtimeErrors = collectRuntimeErrors(page);
   await boot(page);
-  await screenshot(page, testInfo, "airlock-01-initial-desktop.png");
-  await expect(page.getByText("31.8%", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("4,820", { exact: false }).first()).toBeVisible();
+  await screenshot(page, testInfo, "firebreak-01-initial-desktop.png");
+
+  await startEmergency(page);
+  await page.getByRole("button", { name: /MEDIC-2/i }).click();
+  const before = await page.evaluate(() => {
+    const envelope = JSON.parse(localStorage.getItem("firebreak.world.v1")!);
+    return envelope.data.robots["MEDIC-2"].position;
+  });
+  await page.keyboard.down("w");
+  await page.waitForTimeout(260);
+  await page.keyboard.up("w");
+  await expect.poll(async () =>
+    page.evaluate(() => {
+      const envelope = JSON.parse(localStorage.getItem("firebreak.world.v1")!);
+      return envelope.data.robots["MEDIC-2"].position;
+    }),
+  ).not.toEqual(before);
 
   await page.evaluate(() => {
     document.documentElement.dataset.toolchangeCount = "0";
     document.modelContext!.addEventListener("toolchange", () => {
-      const current = Number(document.documentElement.dataset.toolchangeCount ?? "0");
-      document.documentElement.dataset.toolchangeCount = String(current + 1);
+      const count = Number(document.documentElement.dataset.toolchangeCount ?? "0");
+      document.documentElement.dataset.toolchangeCount = String(count + 1);
     });
   });
-
-  await runPromptA(page, async () => {
-    await expect(page.getByText("UNTRUSTED PATH BLOCKED")).toBeVisible();
-    await expect(page.getByText("QUARANTINED")).toBeVisible();
-    await screenshot(page, testInfo, "airlock-02-threat-quarantined.png");
-  });
-  await expect(page.getByRole("dialog", { name: "Approve one-use response?" })).toBeVisible();
+  await runPromptA(page);
   await expect.poll(() => toolNames(page)).toEqual([...STATIC_TOOLS]);
-  await screenshot(page, testInfo, "airlock-03-proposal.png");
+  await expect(page.getByText("11/11")).toBeVisible();
+  await screenshot(page, testInfo, "firebreak-02-routes-and-proposal.png");
 
   await approve(page);
   await expect
     .poll(() => page.evaluate(() => document.documentElement.dataset.toolchangeCount))
     .toBe("1");
-  await expect(page.getByRole("button", { name: "Invoke approved response" })).toBeVisible();
-  await screenshot(page, testInfo, "airlock-04-tool-live.png");
+  await expect(page.getByText("8 tools live")).toBeVisible();
+  await expect(page.getByText("ONE-USE AUTHORITY LIVE")).toBeVisible();
+  await screenshot(page, testInfo, "firebreak-03-authority-live.png");
 
-  const result = await executeTool<{
-    receiptId: string;
-    finalErrorRate: number;
-    finalP95LatencyMs: number;
-    productionMutations: number;
-  }>(page, "rollback_checkout_release", { canaryPercent: 10 });
-  expect(result).toMatchObject({
-    ok: true,
-    code: "INCIDENT_RESOLVED",
-    data: { finalErrorRate: 0.6, finalP95LatencyMs: 420, productionMutations: 1 },
-  });
-  await expect(page.getByRole("heading", { name: "Checkout path restored" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Checkout recovered" })).toBeVisible();
-  await expect(page.getByText("Recovery verified across checkout path")).toBeVisible();
-  await expect.poll(() => toolNames(page)).toEqual([...STATIC_TOOLS]);
+  await executeApproved(page);
   await expect
     .poll(() => page.evaluate(() => document.documentElement.dataset.toolchangeCount))
     .toBe("2");
+  await expect(page.getByText("2 workers safe")).toBeVisible();
+  await expect(page.getByText("0 violations")).toBeVisible();
   await expect(page.getByText("One-use tool consumed and unregistered.")).toBeVisible();
-  await page.getByRole("tab", { name: "activity" }).click();
-  await expect(page.getByText("WebMCP tool surface changed").first()).toBeVisible();
-  await page.getByRole("tab", { name: "tools" }).click();
-  await screenshot(page, testInfo, "airlock-05-resolved.png");
+  await expect(page.getByText("7 tools live")).toBeVisible();
+  await screenshot(page, testInfo, "firebreak-04-mission-complete.png");
 
   await expect(
-    executeTool(page, "rollback_checkout_release", { canaryPercent: 10 }),
+    executeTool(page, "execute_rescue_mission", { strategy: "coordinated" }),
   ).rejects.toThrow(/not registered/i);
   expect(runtimeErrors).toEqual([]);
 });

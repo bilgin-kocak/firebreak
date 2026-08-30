@@ -12,6 +12,7 @@ import { PhysicsShapeType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugi
 import { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { Scene } from "@babylonjs/core/scene";
+import havokWasmUrl from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 
 import { createFirebreakSeed, ROBOT_IDS } from "../domain/firebreakSeed";
 import type { RobotId, WorkerId } from "../domain/firebreakTypes";
@@ -87,7 +88,7 @@ function createWorker(scene: Scene, id: WorkerId, color: StandardMaterial): Tran
 async function enableOptionalHavok(scene: Scene, ground: ReturnType<typeof MeshBuilder.CreateGround>) {
   try {
     const { default: HavokPhysics } = await import("@babylonjs/havok");
-    const havok = await HavokPhysics();
+    const havok = await HavokPhysics({ locateFile: () => havokWasmUrl });
     scene.enablePhysics(new Vector3(0, -9.81, 0), new HavokPlugin(true, havok));
     new PhysicsAggregate(
       ground,
@@ -133,6 +134,7 @@ export async function createWarehouseScene(
   camera.wheelDeltaPercentage = 0.012;
   camera.panningSensibility = 0;
   camera.attachControl(canvas, true);
+  canvas.tabIndex = 0;
 
   const ambient = new HemisphericLight("warehouse-ambient", new Vector3(0, 1, 0), scene);
   ambient.intensity = 0.54;

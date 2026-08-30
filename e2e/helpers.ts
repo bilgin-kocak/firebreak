@@ -1,16 +1,15 @@
 import { expect, type Page, type TestInfo } from "@playwright/test";
 
-import { trustedRemediationOperationIds } from "../src/domain/incidentSeed";
 import { installModelContextMock } from "../src/test/modelContextMock";
 
 export const STATIC_TOOLS = [
-  "inspect_deployments",
-  "inspect_incident",
-  "list_response_tools",
-  "query_telemetry",
-  "run_airlock_checks",
-  "simulate_remediation",
-  "stage_response_tool",
+  "inspect_emergency",
+  "scan_hazards",
+  "inspect_fleet",
+  "simulate_mission",
+  "validate_safety_envelope",
+  "stage_mission_tool",
+  "list_mission_tools",
 ] as const;
 
 export interface ToolResult<T extends Record<string, unknown> = Record<string, unknown>> {
@@ -33,88 +32,54 @@ export const executeTool = <T extends Record<string, unknown>>(
 
 export const toolNames = (page: Page) =>
   page.evaluate(async () =>
-    (await document.modelContext!.getTools()).map((tool) => tool.name).sort(),
+    (await document.modelContext!.getTools()).map((tool) => tool.name),
   );
 
 export const boot = async (page: Page) => {
   await page.addInitScript(installModelContextMock);
   await page.goto("/");
-  await expect(
-    page.getByRole("heading", { name: "Checkout is failing in production" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: /rescue two workers/i })).toBeVisible();
   await expect.poll(() => toolNames(page)).toEqual([...STATIC_TOOLS]);
-  await expect(page.getByText("Native WebMCP")).toHaveCount(1);
+  await expect(page.getByText("WEBMCP NATIVE")).toHaveCount(1);
+  await expect(
+    page.getByRole("img", { name: /interactive warehouse rescue scene/i }),
+  ).toBeVisible();
 };
 
-export const runPromptA = async (
-  page: Page,
-  afterTelemetry?: () => Promise<void>,
-): Promise<string> => {
-  expect(await executeTool(page, "inspect_incident", { incidentId: "INC-4821" })).toMatchObject({
-    ok: true,
-    code: "INCIDENT_INSPECTED",
-  });
-  expect(
-    await executeTool(page, "query_telemetry", { incidentId: "INC-4821", limit: 8 }),
-  ).toMatchObject({
-    ok: true,
-    code: "TELEMETRY_QUERIED",
-    data: { quarantinedEvidenceIds: ["log-third-party-injection"] },
-  });
-  await afterTelemetry?.();
-  expect(
-    await executeTool(page, "inspect_deployments", { serviceId: "checkout-api" }),
-  ).toMatchObject({
-    ok: true,
-    code: "DEPLOYMENTS_INSPECTED",
-  });
-  const simulation = await executeTool<{ simulationId: string }>(page, "simulate_remediation", {
-    incidentId: "INC-4821",
-    serviceId: "checkout-api",
-    canaryPercent: 10,
-  });
-  const simulationId = simulation.data?.simulationId;
-  if (!simulationId) throw new Error("Simulation proof was not returned.");
-  expect(simulation).toMatchObject({
-    ok: true,
-    code: "REMEDIATION_SIMULATED",
-    data: { predictedErrorRate: 0.6, predictedP95LatencyMs: 420 },
-  });
-  expect(await executeTool(page, "run_airlock_checks", { simulationId })).toMatchObject({
-    ok: true,
-    code: "AIRLOCK_CHECKS_COMPLETED",
-    data: { checkCount: 9, blockingFailures: 0 },
-  });
-  expect(
-    await executeTool(page, "stage_response_tool", {
-      simulationId,
-      name: "rollback_checkout_release",
-      title: "Rollback checkout release",
-      description: "Canary and restore the previous stable checkout release.",
-      operationIds: [...trustedRemediationOperationIds],
-    }),
-  ).toMatchObject({
-    ok: true,
-    code: "RESPONSE_TOOL_STAGED",
-    data: { status: "awaiting_approval", requiresHumanApproval: true },
-  });
-  expect(await executeTool(page, "list_response_tools", {})).toMatchObject({
-    ok: true,
-    code: "RESPONSE_TOOLS_LISTED",
-  });
-  return simulationId;
+export const startEmergency = async (page: Page) => {
+  const start = page.getByRole("button", { name: "Start emergency" });
+  if (await start.isVisible()) await start.click();
+  await expect(page.getByRole("button", { name: /ask agent to plan rescue/i })).toBeVisible();
+};
+
+export const runPromptA = async (page: Page) => {
+  await startEmergency(page);
+  await page.getByRole("button", { name: /ask agent to plan rescue/i }).click();
+  await expect(page.getByRole("dialog", { name: "Authorize rescue mission" })).toBeVisible();
+  await expect(page.getByText("routes compiled")).toBeVisible();
 };
 
 export const approve = async (page: Page) => {
-  const dialog = page.getByRole("dialog", { name: "Approve one-use response?" });
+  const dialog = page.getByRole("dialog", { name: "Authorize rescue mission" });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Approve & register once" }).click();
-  await expect.poll(() => toolNames(page)).toContain("rollback_checkout_release");
+  await dialog.getByRole("button", { name: "Authorize one mission" }).click();
+  await expect.poll(() => toolNames(page)).toEqual([
+    ...STATIC_TOOLS,
+    "execute_rescue_mission",
+  ]);
+  await expect(page.getByRole("button", { name: "Execute approved rescue" })).toBeVisible();
+};
+
+export const executeApproved = async (page: Page) => {
+  await page.getByRole("button", { name: "Execute approved rescue" }).click();
+  await expect(page.getByRole("heading", { name: "Mission complete" })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect.poll(() => toolNames(page)).toEqual([...STATIC_TOOLS]);
 };
 
 export const screenshot = async (page: Page, testInfo: TestInfo, name: string) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: testInfo.outputPath(name), fullPage: true });
 };
 

@@ -145,7 +145,7 @@ export function loadFirebreakState(
     MissionEnvelopeSchema,
   );
   const uiResult = parseEnvelope(storage, FIREBREAK_UI_KEY, UiEnvelopeSchema);
-  const world = worldResult.value?.data ?? createFirebreakSeed();
+  let world = worldResult.value?.data ?? createFirebreakSeed();
   let mission = missionResult.value?.data ?? defaultMissionState();
   const ui = uiResult.value?.data ?? defaultUiState();
   let recovered =
@@ -155,7 +155,13 @@ export function loadFirebreakState(
     mission.simulation !== null &&
     mission.simulation.incidentRevision === world.revision &&
     mission.simulation.stateHash === missionStateHash(world);
-  if (worldResult.recovered) {
+  const completedReceipt =
+    world.phase === "resolved" && mission.receipt?.outcome === "succeeded"
+      ? mission.receipt
+      : null;
+  if (completedReceipt) {
+    mission = { ...defaultMissionState(), receipt: completedReceipt };
+  } else if (worldResult.recovered) {
     mission = defaultMissionState();
   } else if (mission.simulation && !simulationCurrent) {
     mission = defaultMissionState();
@@ -180,7 +186,10 @@ export function loadFirebreakState(
     recovered = true;
   }
 
-  if (mission.proposal?.status === "authorized") {
+  if (
+    mission.proposal?.status === "authorized" ||
+    mission.proposal?.status === "registered"
+  ) {
     mission = {
       ...mission,
       proposal: {
@@ -190,11 +199,11 @@ export function loadFirebreakState(
         expiresAt: null,
       },
     };
+    world = { ...world, phase: "planned" };
     recovered = true;
   } else if (
     mission.proposal &&
     ([
-      "registered",
       "executing",
       "completed",
       "cancelled",
@@ -203,7 +212,6 @@ export function loadFirebreakState(
       "revoked",
     ] as const).includes(
       mission.proposal.status as
-        | "registered"
         | "executing"
         | "completed"
         | "cancelled"

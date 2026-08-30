@@ -224,7 +224,7 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
       </header>
 
       <main id="mission-control" className="mission-overlay">
-        <section className="mission-brief" aria-labelledby="mission-title">
+        <section className="mission-brief" aria-labelledby="mission-title" tabIndex={0}>
           <div className="mission-kicker">
             <Flame aria-hidden="true" /> Emergency objective
           </div>

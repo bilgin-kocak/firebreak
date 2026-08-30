@@ -1,6 +1,7 @@
 import { Bot, Clock3, MapPinned, ShieldCheck, X } from "lucide-react";
 
 import type { MissionProposal } from "../domain/firebreakTypes";
+import { useDialogFocus } from "./useDialogFocus";
 
 export function AuthorizationSheet({
   proposal,
@@ -13,9 +14,11 @@ export function AuthorizationSheet({
   onAuthorize: () => void;
   onClose: () => void;
 }) {
+  const dialogRef = useDialogFocus<HTMLElement>(true, onClose);
   return (
     <div className="sheet-backdrop">
       <section
+        ref={dialogRef}
         className="authorization-sheet"
         role="dialog"
         aria-modal="true"
@@ -69,6 +72,7 @@ export function AuthorizationSheet({
           type="button"
           disabled={busy}
           onClick={onAuthorize}
+          data-autofocus
         >
           <ShieldCheck aria-hidden="true" /> {busy ? "Registering mission…" : "Authorize one mission"}
         </button>

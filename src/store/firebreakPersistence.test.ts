@@ -106,6 +106,29 @@ describe("Firebreak persistence", () => {
     });
   });
 
+  it("removes registered runtime authority but keeps the reviewed plan staged", () => {
+    const storage = memoryStorage();
+    const state = validState();
+    state.world.phase = "authorized";
+    state.mission.proposal = {
+      ...state.mission.proposal!,
+      status: "registered",
+      authorizedAt: 1_500,
+      expiresAt: 301_500,
+    };
+    saveFirebreakState(storage, state);
+
+    const loaded = loadFirebreakState(storage, 2_000);
+
+    expect(loaded.recovered).toBe(true);
+    expect(loaded.state.world.phase).toBe("planned");
+    expect(loaded.state.mission.proposal).toMatchObject({
+      status: "staged",
+      authorizedAt: null,
+      expiresAt: null,
+    });
+  });
+
   it("uses the three required versioned storage keys", () => {
     const storage = memoryStorage();
     saveFirebreakState(storage, validState());
@@ -113,5 +136,44 @@ describe("Firebreak persistence", () => {
     expect(storage.getItem(FIREBREAK_WORLD_KEY)).not.toBeNull();
     expect(storage.getItem(FIREBREAK_MISSION_KEY)).not.toBeNull();
     expect(storage.getItem(FIREBREAK_UI_KEY)).not.toBeNull();
+  });
+
+  it("preserves a successful receipt after resolved-world revision changes", () => {
+    const storage = memoryStorage();
+    const state = validState();
+    state.world.phase = "resolved";
+    state.world.revision += 1;
+    state.mission.receipt = {
+      id: "RECEIPT-MISSION-1",
+      proposalId: state.mission.proposal!.id,
+      outcome: "succeeded",
+      startedAt: 2_000,
+      completedAt: 3_000,
+      durationMs: 1_000,
+      rescuedWorkers: 2,
+      fireContained: true,
+      containerSafe: true,
+      safetyViolations: 0,
+      finalBattery: {
+        "SCOUT-1": 74,
+        "MEDIC-2": 63,
+        "SUPPRESS-3": 68,
+        "HAUL-4": 57,
+      },
+      partialProgress: {
+        "SCOUT-1": 1,
+        "MEDIC-2": 1,
+        "SUPPRESS-3": 1,
+        "HAUL-4": 1,
+      },
+      reason: null,
+    };
+    saveFirebreakState(storage, state);
+
+    const loaded = loadFirebreakState(storage, 4_000);
+
+    expect(loaded.state.mission.receipt).toEqual(state.mission.receipt);
+    expect(loaded.state.mission.simulation).toBeNull();
+    expect(loaded.state.mission.proposal).toBeNull();
   });
 });
