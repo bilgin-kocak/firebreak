@@ -1,4 +1,6 @@
-# WebMCP Firebreak demo script
+# Firebreak: WebMCP Emergency Robot Commander — demo script
+
+**Tagline:** One agent. Four robots. One human-approved rescue boundary.
 
 Target runtime: **2 minutes 45 seconds**. Use a desktop browser at 100% zoom with sound off. Begin from a reset warehouse.
 

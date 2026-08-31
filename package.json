@@ -2,6 +2,7 @@
   "name": "webmcp-firebreak",
   "private": true,
   "version": "0.0.0",
+  "description": "One agent. Four robots. One human-approved rescue boundary.",
   "type": "module",
   "scripts": {
     "dev": "vite",

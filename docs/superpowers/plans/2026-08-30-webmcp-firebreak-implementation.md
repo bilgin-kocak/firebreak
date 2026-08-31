@@ -1,4 +1,4 @@
-# WebMCP Firebreak Implementation Plan
+# Firebreak: WebMCP Emergency Robot Commander — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
@@ -704,7 +704,7 @@ git commit -m "test: verify the Firebreak rescue journey"
 
 - [x] **Step 1: Rename package and page metadata**
 
-Set package name to `webmcp-firebreak`, document title to `WebMCP Firebreak — Emergency Robot Fleet`, description to the one-sentence product value, and theme color to the visual-system navy.
+Set package name to `webmcp-firebreak`, document title to `Firebreak: WebMCP Emergency Robot Commander`, description to the one-sentence product value, and theme color to the visual-system navy.
 
 - [x] **Step 2: Rewrite the README**
 

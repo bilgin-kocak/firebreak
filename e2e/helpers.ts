@@ -36,6 +36,7 @@ export const toolNames = (page: Page) =>
 export const boot = async (page: Page) => {
   await page.addInitScript(installModelContextMock);
   await page.goto("/");
+  await expect(page).toHaveTitle("Firebreak: WebMCP Emergency Robot Commander");
   await expect(page.getByRole("heading", { name: /rescue two workers/i })).toBeVisible();
   await expect.poll(() => toolNames(page)).toEqual([...STATIC_TOOLS]);
   await expect(page.getByText("WEBMCP NATIVE")).toHaveCount(1);

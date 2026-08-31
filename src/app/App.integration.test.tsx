@@ -12,7 +12,7 @@ vi.mock("../scene/FirebreakScene", () => ({
   ),
 }));
 
-describe("WebMCP Firebreak application", () => {
+describe("Firebreak application", () => {
   beforeEach(() => {
     useFirebreakStore.getState().setPersistenceStorage(undefined);
     useFirebreakStore.getState().resetDemo();
@@ -20,6 +20,19 @@ describe("WebMCP Firebreak application", () => {
       configurable: true,
       value: undefined,
     });
+  });
+
+  it("presents the official Firebreak identity at mission entry", async () => {
+    render(<App accelerated />);
+
+    expect(screen.getByText("FIREBREAK")).toBeVisible();
+    expect(screen.getByText("Emergency robot commander")).toBeVisible();
+    expect(
+      screen.getByText("One agent. Four robots. One human-approved rescue boundary."),
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(getFirebreakState().webmcp.registeredToolNames).toEqual(STATIC_TOOL_NAMES),
+    );
   });
 
   it("makes the robot rescue problem and playable controls immediately clear", async () => {

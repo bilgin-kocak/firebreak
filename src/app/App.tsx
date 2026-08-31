@@ -224,7 +224,7 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
           </span>
           <span>
             <strong>FIREBREAK</strong>
-            <small>WebMCP robot command</small>
+            <small>Emergency robot commander</small>
           </span>
         </div>
         <div className="incident-id">
@@ -266,7 +266,10 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
             Rescue two workers.
             <span>Contain the battery fire.</span>
           </h1>
-          <p>You drive one robot. The agent coordinates four—inside a route you approve.</p>
+          <p className="mission-deck">
+            <strong>One agent. Four robots. One human-approved rescue boundary.</strong>
+            <span>You drive one robot. The agent coordinates four—inside a route you approve.</span>
+          </p>
           <ol className="objective-list" aria-label="Mission objectives">
             {world.objectives.map((objective) => {
               const Icon = objectiveIcon[objective.id];

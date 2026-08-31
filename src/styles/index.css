@@ -394,6 +394,24 @@ button:disabled {
   line-height: 1.5;
 }
 
+.mission-deck strong,
+.mission-deck span {
+  display: block;
+}
+
+.mission-deck strong {
+  color: var(--chalk);
+  font-family: "Arial Narrow", "DIN Condensed", Impact, sans-serif;
+  font-size: 1.02rem;
+  line-height: 1.08;
+  letter-spacing: 0.015em;
+  text-transform: uppercase;
+}
+
+.mission-deck span {
+  margin-top: 5px;
+}
+
 .objective-list {
   display: grid;
   gap: 4px;

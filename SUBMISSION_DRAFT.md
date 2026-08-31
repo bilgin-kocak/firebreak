@@ -2,11 +2,11 @@
 
 ## Project name
 
-WebMCP Firebreak
+Firebreak: WebMCP Emergency Robot Commander
 
 ## Tagline
 
-Play one rescue robot. Let an agent safely coordinate the fleet.
+One agent. Four robots. One human-approved rescue boundary.
 
 ## One-line pitch
 
@@ -94,7 +94,7 @@ React 19, TypeScript, Vite, Babylon.js, Havok, Zustand, Zod, imperative WebMCP, 
 ## Links
 
 - Live demo: `[ADD DEPLOYED URL]`
-- Source: `[ADD REPOSITORY URL]`
+- Source: [github.com/bilgin-kocak/firebreak](https://github.com/bilgin-kocak/firebreak)
 - Demo video: `[ADD VIDEO URL]`
 
 ## License

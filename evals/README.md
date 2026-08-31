@@ -1,4 +1,4 @@
-# WebMCP Firebreak eval fixtures
+# Firebreak WebMCP eval fixtures
 
 `webmcp-cases.json` contains tool-selection, strict-schema, safety, authorization, lifecycle, and refusal cases for warehouse emergency `WH-01` and the dynamic `execute_rescue_mission` tool.
 

@@ -1,13 +1,16 @@
-# WebMCP Firebreak Design
+# Firebreak: WebMCP Emergency Robot Commander — Design
 
-**Date:** 2026-08-30  
-**Status:** Approved for implementation  
-**Product:** WebMCP Firebreak — Emergency Robot Fleet  
-**Tagline:** One person drives one robot. An agent coordinates the whole rescue.
+**Date:** 2026-08-30
+
+**Status:** Approved for implementation
+
+**Product:** Firebreak: WebMCP Emergency Robot Commander
+
+**Tagline:** One agent. Four robots. One human-approved rescue boundary.
 
 ## 1. Product decision
 
-WebMCP Firebreak replaces the fictional production-incident dashboard with a playable emergency-robot game. The previous Airlock safety architecture remains useful, but its domain, interface, copy, fixtures, and canonical journey are replaced.
+Firebreak replaces the fictional production-incident dashboard with a playable emergency-robot game. The previous Airlock safety architecture remains useful, but its domain, interface, copy, fixtures, and canonical journey are replaced.
 
 The shipped live application must work without accounts, secrets, a backend, ROS, or special hardware. It runs a complete deterministic warehouse rescue in the browser. An optional ROS 2 adapter maps the same control interface to standard robot topics so the project demonstrates a credible path from browser simulation to Gazebo or physical robots.
 

@@ -1,12 +1,14 @@
-# WebMCP Firebreak status
+# Firebreak: WebMCP Emergency Robot Commander — status
 
-**Status:** Complete and deployable  
-**Verified:** 2026-08-30  
+**Status:** Complete and deployable
+
+**Verified:** 2026-08-31
+
 **Environment:** Node.js 22.20.0, Chromium, desktop 1440×900/1440×1000, mobile 390×844
 
 ## Shipped product
 
-WebMCP Firebreak is implemented as a static browser application with a complete playable and agent-driven warehouse rescue:
+Firebreak is implemented as a static browser application with a complete playable and agent-driven warehouse rescue:
 
 1. The user starts emergency `WH-01` and can drive any selected robot through keyboard, full touch controls, or standard-gamepad driving, camera, action, and fleet-selection input.
 2. Exactly seven static WebMCP tools register at the top-level model context.
@@ -45,7 +47,7 @@ WebMCP Firebreak is implemented as a static browser application with a complete 
 | Prettier                   | Passed across the repository                                                                                       |
 | ESLint                     | Passed with zero warnings                                                                                          |
 | Strict TypeScript          | Passed                                                                                                             |
-| Unit and integration tests | 17 files, 80 tests passed on Vitest 4.1.11                                                                         |
+| Unit and integration tests | 17 files, 81 tests passed on Vitest 4.1.11                                                                         |
 | Production build           | Passed on Vite 8.2.2; 2,151 modules transformed                                                                    |
 | Dependency audit           | `npm audit` reports 0 vulnerabilities                                                                              |
 | Playwright                 | 10 tests passed in Chromium                                                                                        |
@@ -58,7 +60,7 @@ WebMCP Firebreak is implemented as a static browser application with a complete 
 | Visual QA                  | Initial, proposal, authority, executing, and completed desktop/mobile screenshots inspected                        |
 | Runtime errors             | Playwright and in-app production inspection collected zero console errors or page errors                           |
 
-The main application shell is 324.11 kB minified (96.68 kB gzip). The Babylon scene is lazy-loaded as a separate 1,074.85 kB chunk (254.98 kB gzip). Havok is a separate 2,094.56 kB WebAssembly asset (668.98 kB gzip).
+The main application shell is 324.25 kB minified (96.71 kB gzip). The Babylon scene is lazy-loaded as a separate 1,074.85 kB chunk (254.99 kB gzip). Havok is a separate 2,094.56 kB WebAssembly asset (668.98 kB gzip).
 
 The authoritative full command is `npm run check`; it runs formatting, lint, strict typechecking, all Vitest tests, a production build, and the complete Playwright suite.
 

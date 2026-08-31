@@ -1,8 +1,8 @@
-# WebMCP Firebreak
+# Firebreak: WebMCP Emergency Robot Commander
 
-**Play one rescue robot. Let an agent safely coordinate the fleet.**
+**One agent. Four robots. One human-approved rescue boundary.**
 
-WebMCP Firebreak is a cinematic, browser-playable warehouse rescue that demonstrates a concrete WebMCP superpower: a website can give an AI agent a new physical-world capability for one reviewed mission, then remove it automatically.
+Firebreak is a cinematic, browser-playable warehouse rescue that demonstrates a concrete WebMCP superpower: a website can give an AI agent a new physical-world capability for one reviewed mission, then remove it automatically.
 
 Battery Bay B is burning. Two workers are trapped and a hazardous container is exposed. A person can drive one of four specialist robots with a keyboard, touch controls, or a gamepad. The WebMCP agent can inspect the same emergency, map hazards, plan all four routes, prove eleven safety constraints, and stage a rescue capability. Only a person can authorize it. The one-use `execute_rescue_mission` tool then appears, moves the fleet, returns a receipt, and unregisters itself.
 
