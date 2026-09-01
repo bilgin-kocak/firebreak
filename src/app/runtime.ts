@@ -35,14 +35,7 @@ export interface AppRuntimeOptions {
 const supportsNativeWebMCP = (
   modelContext: Document["modelContext"],
 ): modelContext is NonNullable<Document["modelContext"]> =>
-  Boolean(
-    modelContext &&
-    typeof modelContext.registerTool === "function" &&
-    typeof modelContext.getTools === "function" &&
-    typeof modelContext.executeTool === "function" &&
-    typeof modelContext.addEventListener === "function" &&
-    typeof modelContext.removeEventListener === "function",
-  );
+  Boolean(modelContext && typeof modelContext.registerTool === "function");
 
 function expectSuccess(result: unknown): SuccessfulToolResult {
   if (

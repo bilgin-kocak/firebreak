@@ -6,7 +6,7 @@ Firebreak is a cinematic, browser-playable warehouse rescue that demonstrates a 
 
 Battery Bay B is burning. Two workers are trapped and a hazardous container is exposed. A person can drive one of four specialist robots with a keyboard, touch controls, or a gamepad. The WebMCP agent can inspect the same emergency, map hazards, plan all four routes, prove eleven safety constraints, and stage a rescue capability. Only a person can authorize it. The one-use `execute_rescue_mission` tool then appears, moves the fleet, returns a receipt, and unregisters itself.
 
-The complete judged demo runs locally in the browser with no account, API key, or backend. An optional ROS 2 adapter shows how the identical bounded driver contract can connect to a controlled Gazebo or robotics lab.
+The application itself needs no API key or backend. In the Codex or ChatGPT built-in browser, the signed-in agent discovers and invokes the page tools directly. In an ordinary browser, an explicitly labeled **Demo Autopilot** runs the same handlers so the full safety journey remains reviewable. An optional ROS 2 adapter shows how the identical bounded driver contract can connect to a controlled Gazebo or robotics lab.
 
 ## The problem in one sentence
 
@@ -18,13 +18,13 @@ Firebreak solves the gap with **compiled mission authority**: the agent may coor
 
 1. Click **Start emergency**.
 2. Drive the selected robot with `WASD` or the arrow keys. Use `1`–`4` to select a robot and `Space` for its action. On a standard gamepad, the left stick drives, the right stick moves the camera, bumpers switch robots, A/Cross acts, and Start/Options opens mission control. Touch has forward, reverse, turn, action, robot selection, and direct camera drag.
-3. Send Prompt 1 by clicking **Ask agent to plan rescue**:
+3. In the Codex or ChatGPT chat beside the built-in browser, send Prompt 1 shown on the page:
 
    > Assess WH-01, plan a coordinated rescue, verify safety, and stage the mission tool.
 
 4. Watch the four colored routes appear. Review the exact robots, geofence, lifetime, and 11/11 safety proof.
 5. Click **Authorize one mission**. This is a human-only control; no agent tool can press or bypass it.
-6. Send Prompt 2 by clicking **Execute approved rescue**:
+6. Return to the chat beside the page and send Prompt 2:
 
    > Execute the approved rescue mission now.
 
@@ -34,7 +34,7 @@ The WebMCP surface visibly changes from seven tools, to eight after authorizatio
 
 ## Why this needs WebMCP
 
-This is not a chatbot acting out a scripted answer. The page exposes seven real typed capabilities through the top-level imperative WebMCP API. The built-in agent journey invokes those same handlers through either native `document.modelContext` or a browser-local adapter.
+This is not a chatbot acting out a scripted answer. The page exposes seven real typed capabilities through the top-level imperative WebMCP API, and a Codex or ChatGPT agent in the built-in browser invokes those handlers through native `document.modelContext`. In an ordinary browser there is no model: **Demo Autopilot** is a disclosed deterministic fallback, never presented as a live agent.
 
 Exactly seven static tools register on boot:
 
@@ -92,13 +92,15 @@ flowchart LR
   D -->|toolchange 7 → 8| M[execute_rescue_mission]
   A -->|Prompt 2| M
   M --> X[Bounded fleet driver]
-  X --> B[Browser simulator]
+  X --> B[Browser robot simulation]
   X -. optional .-> ROS[ROS 2 / Gazebo]
   X --> C[Receipt + AbortController]
   C -->|toolchange 8 → 7| A
 ```
 
 The React interface, Zustand state, Babylon.js warehouse, simulation, policy compiler, browser driver, and WebMCP registry all run locally. Havok powers the scene physics setup. A narrow ROSLIB adapter publishes only code-owned topics and message types.
+
+The native compatibility boundary requires only the standard top-level `document.modelContext.registerTool` method. When optional page-side discovery, manual execution, or `toolchange` helpers are unavailable, Firebreak mirrors those bookkeeping functions locally while the browser agent continues to discover and invoke the real registered site tools.
 
 ## Run locally
 
@@ -109,9 +111,9 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite, normally `http://127.0.0.1:5173`.
+For the live-agent demo, use the latest ChatGPT desktop app with GPT-5.6 Sol or Terra, then open the local URL printed by Vite—normally `http://127.0.0.1:5173`—in the Codex or ChatGPT built-in browser. When site tools are available for the host account, click **Start emergency**, send the two on-screen prompts from the surrounding chat, and the page shows **WebMCP Native** while it waits for real agent tool calls. OpenAI notes that site-tool availability depends on rollout.
 
-No API key, environment variable, account, camera, controller, backend, robot, or ROS installation is required. If native WebMCP is unavailable, the page shows **Browser Sim** and runs the same registered definitions and handlers locally.
+The app requires no OpenAI API key, environment variable, camera, controller, backend, robot, or ROS installation; Codex/ChatGPT uses the account already signed into the host app. If native WebMCP is unavailable, the page shows **Demo Autopilot**. Its two local buttons run the same registered definitions and handlers without claiming a model is involved.
 
 For a production-like local run:
 
@@ -147,7 +149,7 @@ npm run test:e2e
 
 Vitest covers the world seed, route geometry, safety compiler, mission execution, cancellation rollback, keyboard/touch/gamepad normalization, browser and ROS drivers, persistence recovery, strict schemas, adapters, static tools, dynamic registration, `AbortController` lifecycle, and React integration.
 
-Playwright covers the complete native-like two-prompt journey, actual keyboard and mocked-standard-gamepad robot movement, camera and robot switching, seven→eight→seven registration, human-only authorization, one-use execution, receipt recovery, authority loss on reload, reset isolation, keyboard operation, 44×44 targets, serious/critical axe scans, desktop/mobile presentation, horizontal overflow, screenshots, and runtime console/page errors.
+Playwright covers the complete native-like two-prompt journey by invoking tools through the page's `document.modelContext` boundary—not through in-page agent buttons—plus actual keyboard and mocked-standard-gamepad robot movement, camera and robot switching, seven→eight→seven registration, human-only authorization, one-use execution, receipt recovery, authority loss on reload, reset isolation, keyboard operation, 44×44 targets, serious/critical axe scans, desktop/mobile presentation, horizontal overflow, screenshots, and runtime console/page errors.
 
 Evaluation prompts and expected safety behavior are in [`evals/webmcp-cases.json`](evals/webmcp-cases.json).
 
@@ -183,6 +185,7 @@ Publish `dist/` to any HTTPS static host. Use `npm run build` as the build comma
 - Browser mode uses deterministic simulation rather than sensor-derived physics.
 - The ROS adapter is tested with a fake bridge; live Gazebo and physical hardware validation are separate integration work.
 - Native WebMCP availability depends on the browser while the API evolves.
+- Demo Autopilot is a deterministic local fallback, not an AI agent.
 - Automated accessibility checks are strong regression evidence, not formal certification.
 
 ## License

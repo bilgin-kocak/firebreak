@@ -47,9 +47,9 @@ Firebreak is built around a website-owned capability surface, not DOM automation
 - No tool exists for human approval; registration requires the visible user action.
 - An `AbortController` owns dynamic authority and emits visible `toolchange` on registration and removal.
 - The tool surface visibly changes 7 → 8 → 7.
-- The same handlers run through a browser-local adapter where native WebMCP is unavailable.
+- The normal-browser **Demo Autopilot** runs the same handlers as a disclosed deterministic fallback; the live judged path uses a real Codex/ChatGPT agent through native WebMCP.
 
-Without WebMCP, this would be a rescue game with a scripted automation button. With WebMCP, the agent discovers and invokes live website capabilities, and the site can safely create and revoke a new capability as the shared situation changes.
+Without WebMCP, this is only a rescue simulation with deterministic automation. With WebMCP, a real Codex or ChatGPT agent discovers and invokes live website capabilities, and the site safely creates and revokes a new capability as the shared situation changes.
 
 ## What is technically distinctive
 
@@ -79,7 +79,7 @@ npm install
 npm run dev
 ```
 
-Open the printed URL, click **Start emergency**, and follow the two prompts on screen. No key, account, backend, or robot is required.
+Open the printed URL in the Codex or ChatGPT built-in browser, click **Start emergency**, and send the two prompts from the surrounding chat. The application needs no API key, backend, or robot; it uses the agent already signed into the host app. In an ordinary browser, the clearly labeled **Demo Autopilot** is available for local rehearsal.
 
 Run the entire release gate with:
 

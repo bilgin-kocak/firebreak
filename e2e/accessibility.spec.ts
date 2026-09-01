@@ -49,26 +49,14 @@ test("every visible interactive target is at least 44 by 44 pixels", async ({ pa
   expect(undersized).toEqual([]);
 });
 
-test("authorization and execution are fully keyboard operable", async ({ page }) => {
+test("human authorization is keyboard operable and agent execution stays external", async ({
+  page,
+}) => {
   await boot(page);
   await runPromptA(page);
   const authorize = page.getByRole("button", { name: "Authorize one mission" });
   await expect(authorize).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("button", { name: "Execute approved rescue" })).toBeVisible();
-
-  for (let index = 0; index < 30; index += 1) {
-    await page.keyboard.press("Tab");
-    if (
-      await page
-        .getByRole("button", { name: "Execute approved rescue" })
-        .evaluate((element) => element === document.activeElement)
-    )
-      break;
-  }
-  await expect(page.getByRole("button", { name: "Execute approved rescue" })).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: "Mission complete" })).toBeVisible({
-    timeout: 20_000,
-  });
+  await expect(page.getByText(/send prompt 2 in codex or chatgpt/i)).toBeVisible();
+  await executeApproved(page);
 });

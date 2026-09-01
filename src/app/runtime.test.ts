@@ -37,6 +37,25 @@ describe("Firebreak runtime", () => {
     expect(await runtime.adapter.getTools()).toEqual([]);
   });
 
+  it("uses native registration when the host exposes only registerTool", async () => {
+    const registerTool = vi.fn(async () => undefined);
+    Object.defineProperty(document, "modelContext", {
+      configurable: true,
+      value: { registerTool },
+    });
+
+    const runtime = await bootAppRuntime({ accelerated: true });
+    try {
+      expect(runtime.adapter.mode).toBe("native");
+      expect((await runtime.adapter.getTools()).map((tool) => tool.name)).toEqual(
+        STATIC_TOOL_NAMES,
+      );
+      expect(registerTool).toHaveBeenCalledTimes(7);
+    } finally {
+      await runtime.destroy();
+    }
+  });
+
   it("disconnects the active robot driver during runtime destruction", async () => {
     const driver: MissionRobotDriver = {
       mode: "browser",

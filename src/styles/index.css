@@ -583,6 +583,94 @@ button:disabled {
   letter-spacing: 0.14em;
 }
 
+.agent-handoff,
+.demo-autopilot {
+  padding: 12px;
+  border: 1px solid rgba(88, 217, 243, 0.24);
+  background:
+    linear-gradient(135deg, rgba(88, 217, 243, 0.09), transparent 62%), rgba(7, 15, 20, 0.72);
+}
+
+.agent-handoff-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 9px;
+  color: var(--rescue);
+  font:
+    850 0.56rem/1 "SFMono-Regular",
+    Consolas,
+    monospace;
+  letter-spacing: 0.13em;
+}
+
+.agent-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--safe);
+  box-shadow: 0 0 12px rgba(199, 239, 91, 0.72);
+  animation: beacon 1.4s infinite;
+}
+
+.agent-handoff > strong {
+  display: block;
+  color: #f3f7f8;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.agent-handoff > p,
+.demo-autopilot > p {
+  margin: 5px 0 11px;
+  color: #9fb0b7;
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.agent-waiting {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px;
+  color: var(--rescue);
+  border-left: 2px solid var(--rescue);
+  background: rgba(88, 217, 243, 0.07);
+  font:
+    700 0.59rem/1.35 "SFMono-Regular",
+    Consolas,
+    monospace;
+}
+
+.agent-waiting svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.agent-handoff-authorized {
+  border-color: rgba(199, 239, 91, 0.28);
+  background:
+    linear-gradient(135deg, rgba(199, 239, 91, 0.09), transparent 62%), rgba(7, 15, 20, 0.72);
+}
+
+.authority-waiting {
+  color: var(--safe);
+  border-left-color: var(--safe);
+  background: rgba(199, 239, 91, 0.07);
+}
+
+.demo-autopilot {
+  border-color: rgba(248, 171, 67, 0.28);
+  background:
+    linear-gradient(135deg, rgba(248, 171, 67, 0.08), transparent 62%), rgba(7, 15, 20, 0.72);
+}
+
+.demo-autopilot .agent-handoff-label {
+  color: #f8ab43;
+}
+
 .mission-primary,
 .authorize-button,
 .emergency-stop {
@@ -1477,6 +1565,17 @@ button:disabled {
     margin-bottom: 8px;
     padding: 8px;
     font-size: 0.65rem;
+  }
+
+  .agent-handoff,
+  .demo-autopilot {
+    padding: 9px;
+  }
+
+  .agent-handoff > p,
+  .demo-autopilot > p {
+    margin-bottom: 8px;
+    font-size: 0.62rem;
   }
 
   .mission-primary,

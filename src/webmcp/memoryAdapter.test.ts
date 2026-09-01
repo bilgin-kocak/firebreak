@@ -15,7 +15,15 @@ const tool = (execute: WebMCPToolDefinition["execute"] = async (input) => input)
 describe("native WebMCP adapter", () => {
   it("delegates registration, execution, discovery, and toolchange to the top-level modelContext", async () => {
     const registerTool = vi.fn(async () => undefined);
-    const getTools = vi.fn(async () => []);
+    const registeredTool = {
+      name: "inspect_emergency",
+      description: "Inspect the emergency.",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: true, untrustedContentHint: false },
+      origin: window.location.origin,
+      window,
+    };
+    const getTools = vi.fn(async () => [registeredTool]);
     const executeTool = vi.fn(async () => ({ ok: true }));
     const addEventListener = vi.fn();
     const removeEventListener = vi.fn();
@@ -43,11 +51,7 @@ describe("native WebMCP adapter", () => {
         signal: controller.signal,
       },
     );
-    expect(executeTool).toHaveBeenCalledWith(
-      "inspect_emergency",
-      {},
-      { signal: controller.signal },
-    );
+    expect(executeTool).toHaveBeenCalledWith(registeredTool, {}, { signal: controller.signal });
     expect(addEventListener).toHaveBeenCalledWith("toolchange", listener);
     expect(removeEventListener).toHaveBeenCalledWith("toolchange", listener);
     Reflect.deleteProperty(document, "modelContext");

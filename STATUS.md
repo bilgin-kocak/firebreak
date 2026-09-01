@@ -12,14 +12,15 @@ Firebreak is implemented as a static browser application with a complete playabl
 
 1. The user starts emergency `WH-01` and can drive any selected robot through keyboard, full touch controls, or standard-gamepad driving, camera, action, and fleet-selection input.
 2. Exactly seven static WebMCP tools register at the top-level model context.
-3. Prompt 1 inspects the emergency and four-robot fleet, scans hazards, simulates four synchronized routes, validates eleven gates, and stages `execute_rescue_mission`.
+3. In the Codex or ChatGPT built-in browser, Prompt 1 is sent from the surrounding chat. The real agent invokes page tools to inspect the emergency and fleet, scan hazards, simulate four synchronized routes, validate eleven gates, and stage `execute_rescue_mission`.
 4. Staging leaves the tool count at seven and opens a visible review sheet.
 5. Only the human **Authorize one mission** control can create authority.
 6. The dynamic tool registers with an `AbortController`, emits `toolchange`, and changes the visible surface from seven to eight tools.
-7. Prompt 2 executes the exact reviewed route set across SCOUT-1, MEDIC-2, SUPPRESS-3, and HAUL-4.
+7. Prompt 2 is sent from the surrounding chat and the agent invokes the newly registered tool to execute the exact reviewed route set across SCOUT-1, MEDIC-2, SUPPRESS-3, and HAUL-4.
 8. Both workers reach safety, the battery fire is contained, the hazardous load is secured, and a receipt reports zero safety violations.
 9. Successful execution consumes and unregisters the dynamic tool, emits `toolchange`, and returns the surface to seven tools.
 10. Reload never restores live movement authority; a completed receipt persists safely.
+11. In ordinary browsers, **Demo Autopilot** is explicitly identified as a no-model deterministic fallback and never masquerades as a live agent.
 
 ## Architecture and safety evidence
 
@@ -42,25 +43,26 @@ Firebreak is implemented as a static browser application with a complete playabl
 
 ## Verification results
 
-| Check                      | Result                                                                                                             |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Prettier                   | Passed across the repository                                                                                       |
-| ESLint                     | Passed with zero warnings                                                                                          |
-| Strict TypeScript          | Passed                                                                                                             |
-| Unit and integration tests | 17 files, 81 tests passed on Vitest 4.1.11                                                                         |
-| Production build           | Passed on Vite 8.2.2; 2,151 modules transformed                                                                    |
-| Dependency audit           | `npm audit` reports 0 vulnerabilities                                                                              |
-| Playwright                 | 10 tests passed in Chromium                                                                                        |
-| Canonical journey          | Prompt 1 → human authorization → Prompt 2 → receipt → unregistration passed                                        |
-| Accessibility              | No serious or critical axe findings in ready, proposal, authority, and resolved states                             |
-| Target sizing              | Every visible tested interactive target is at least 44×44 CSS pixels                                               |
-| Keyboard and gamepad       | Keyboard-only authorization works; mocked gamepad drives, switches robots, moves camera, and opens mission control |
-| Persistence                | Reload revocation, completed receipt recovery, and reset isolation passed                                          |
-| Responsive UI              | Desktop and mobile judged states have no horizontal overflow                                                       |
-| Visual QA                  | Initial, proposal, authority, executing, and completed desktop/mobile screenshots inspected                        |
-| Runtime errors             | Playwright and in-app production inspection collected zero console errors or page errors                           |
+| Check                      | Result                                                                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Prettier                   | Passed across the repository                                                                                                               |
+| ESLint                     | Passed with zero warnings                                                                                                                  |
+| Strict TypeScript          | Passed                                                                                                                                     |
+| Unit and integration tests | 18 files, 84 tests passed on Vitest 4.1.11                                                                                                 |
+| Production build           | Passed on Vite 8.2.2; 2,151 modules transformed                                                                                            |
+| Dependency audit           | `npm audit` reports 0 vulnerabilities                                                                                                      |
+| Playwright                 | 11 tests passed in Chromium                                                                                                                |
+| Canonical journey          | Native-like mocked `document.modelContext` Prompt 1 → human authorization → dynamic Prompt 2 → receipt → unregistration passed             |
+| Accessibility              | No serious or critical axe findings in ready, proposal, authority, and resolved states                                                     |
+| Target sizing              | Every visible tested interactive target is at least 44×44 CSS pixels                                                                       |
+| Keyboard and gamepad       | Keyboard-only authorization works; mocked gamepad drives, switches robots, moves camera, and opens mission control                         |
+| Persistence                | Reload revocation, completed receipt recovery, and reset isolation passed                                                                  |
+| Responsive UI              | Desktop and mobile judged states have no horizontal overflow                                                                               |
+| Visual QA                  | Initial, proposal, authority, executing, and completed desktop/mobile screenshots inspected                                                |
+| Runtime errors             | Playwright and in-app development inspection collected zero console errors or page errors                                                  |
+| Built-in browser check     | GPT-5.6 Sol discovered all seven native tools and completed Prompt 1 through 11/11 safety gates to the staged human authorization boundary |
 
-The main application shell is 324.25 kB minified (96.71 kB gzip). The Babylon scene is lazy-loaded as a separate 1,074.85 kB chunk (254.99 kB gzip). Havok is a separate 2,094.56 kB WebAssembly asset (668.98 kB gzip).
+The main application shell is 326.49 kB minified (97.18 kB gzip). The Babylon scene is lazy-loaded as a separate 1,074.85 kB chunk (254.99 kB gzip). Havok is a separate 2,094.56 kB WebAssembly asset (668.98 kB gzip).
 
 The authoritative full command is `npm run check`; it runs formatting, lint, strict typechecking, all Vitest tests, a production build, and the complete Playwright suite.
 
@@ -76,6 +78,6 @@ The authoritative full command is `npm run check`; it runs formatting, lint, str
 
 ## Honest limits
 
-WH-01 is a fictional, deterministic browser emergency and not a certified live dispatch product. The ROS adapter is covered with a fake bridge; no live Gazebo environment or physical robot was available for this release gate. Native WebMCP remains browser-dependent. Automated accessibility tests are regression evidence, not formal certification.
+WH-01 is a fictional, deterministic browser emergency and not a certified live dispatch product. The ROS adapter is covered with a fake bridge; no live Gazebo environment or physical robot was available for this release gate. Native WebMCP remains browser- and rollout-dependent. GPT-5.6 Sol completed the actual native Prompt 1 journey and stopped at human authorization; the full authorization and Prompt 2 journey remains covered by the native-like browser test until a person approves the live staged mission. Automated accessibility tests are regression evidence, not formal certification.
 
 No known P0 failure, TODO, mock-only control, runtime console error, or presentation blocker remains.

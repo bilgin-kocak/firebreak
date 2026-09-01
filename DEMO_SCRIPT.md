@@ -10,7 +10,8 @@ Target runtime: **2 minutes 45 seconds**. Use a desktop browser at 100% zoom wit
 - Click the reset icon and confirm **7 tools live**.
 - Connect a gamepad if available; keyboard input is equally reliable.
 - Keep the camera in **Overview** until the fleet starts, then switch to **Follow** for a closer shot.
-- In a normal browser the badge reads **Browser Sim**. With a native implementation it reads **WebMCP Native**; both use the same tool definitions and handlers.
+- Open the site in the Codex or ChatGPT built-in browser. Confirm the badge reads **WebMCP Native** and the mission panel reads **Live Agent**.
+- Keep the surrounding Codex/ChatGPT chat visible enough that the two real prompts and tool activity are credible on camera.
 
 ## 0:00–0:18 — Immediate stakes
 
@@ -30,7 +31,7 @@ Target runtime: **2 minutes 45 seconds**. Use a desktop browser at 100% zoom wit
 
 ## 0:36–1:02 — Prompt 1: coordinate four
 
-**Screen:** Click **Ask agent to plan rescue**. Leave the prompt visible:
+**Screen:** In the Codex or ChatGPT chat beside the page, send the visible Prompt 1:
 
 > Assess WH-01, plan a coordinated rescue, verify safety, and stage the mission tool.
 
@@ -56,7 +57,7 @@ Target runtime: **2 minutes 45 seconds**. Use a desktop browser at 100% zoom wit
 
 ## 1:35–2:15 — Prompt 2: fleet rescue
 
-**Screen:** Click **Execute approved rescue** while this prompt is visible:
+**Screen:** In the Codex or ChatGPT chat beside the page, send Prompt 2:
 
 > Execute the approved rescue mission now.
 
@@ -86,5 +87,5 @@ Switch the camera to **Follow** for several seconds, then return to **Overview**
 
 - Press the reset icon; the complete browser journey takes under one minute at the shipped playback rate.
 - If a controller disconnects, continue with `WASD`; the app does not change modes silently.
-- If native WebMCP is unavailable, continue in Browser Sim. Do not claim it is native.
+- If native WebMCP is unavailable, the page switches to **Demo Autopilot**. It is useful for rehearsing visuals, but do not use it for the judged live-agent recording or claim it is AI.
 - A real ROS/Gazebo bridge is optional and should only be shown if it has been validated separately.

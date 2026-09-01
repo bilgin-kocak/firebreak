@@ -236,7 +236,7 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
         </div>
         <div className="header-telemetry">
           <span className="runtime-mode">
-            <Radio aria-hidden="true" /> {mode === "native" ? "WEBMCP NATIVE" : "BROWSER SIM"}
+            <Radio aria-hidden="true" /> {mode === "native" ? "WEBMCP NATIVE" : "DEMO AUTOPILOT"}
           </span>
           <span className={`mission-clock ${remaining < 30_000 ? "clock-critical" : ""}`}>
             <Clock3 aria-hidden="true" />
@@ -335,20 +335,37 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
                 “Assess WH-01, plan a coordinated rescue, verify safety, and stage the mission
                 tool.”
               </div>
-              <button
-                className="mission-primary"
-                type="button"
-                disabled={!runtime || busy}
-                onClick={() =>
-                  void perform(async () => {
-                    if (!runtime) throw new Error("WebMCP is still starting.");
-                    await runtime.runPromptA();
-                  }, "Safe routes staged for your review.")
-                }
-              >
-                <Sparkles aria-hidden="true" />{" "}
-                {busy ? "Planning safe routes…" : "Ask agent to plan rescue"}
-              </button>
+              {mode === "native" ? (
+                <div className="agent-handoff" aria-live="polite">
+                  <div className="agent-handoff-label">
+                    <span className="agent-live-dot" aria-hidden="true" /> LIVE AGENT
+                  </div>
+                  <strong>Send Prompt 1 in Codex or ChatGPT.</strong>
+                  <p>The agent beside this page can discover and call Firebreak’s seven tools.</p>
+                  <div className="agent-waiting">
+                    <Radio aria-hidden="true" /> Waiting for agent tool calls…
+                  </div>
+                </div>
+              ) : (
+                <div className="demo-autopilot">
+                  <div className="agent-handoff-label">DEMO AUTOPILOT · NO MODEL CONNECTED</div>
+                  <p>A fixed local sequence runs the same seven page-tool handlers.</p>
+                  <button
+                    className="mission-primary"
+                    type="button"
+                    disabled={!runtime || busy}
+                    onClick={() =>
+                      void perform(async () => {
+                        if (!runtime) throw new Error("WebMCP is still starting.");
+                        await runtime.runPromptA();
+                      }, "Safe routes staged for your review.")
+                    }
+                  >
+                    <Sparkles aria-hidden="true" />{" "}
+                    {busy ? "Running demo plan…" : "Run demo prompt 1"}
+                  </button>
+                </div>
+              )}
             </div>
           ) : null}
 
@@ -384,19 +401,36 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
                 <span>PROMPT 2</span>
                 “Execute the approved rescue mission now.”
               </div>
-              <button
-                className="mission-primary execute-action"
-                type="button"
-                disabled={busy}
-                onClick={() =>
-                  void perform(async () => {
-                    if (!runtime) throw new Error("WebMCP is still starting.");
-                    await runtime.runPromptB();
-                  }, "Mission complete. Dynamic authority removed.")
-                }
-              >
-                <Play aria-hidden="true" /> Execute approved rescue
-              </button>
+              {mode === "native" ? (
+                <div className="agent-handoff agent-handoff-authorized" aria-live="polite">
+                  <div className="agent-handoff-label">
+                    <span className="agent-live-dot" aria-hidden="true" /> LIVE AGENT
+                  </div>
+                  <strong>Send Prompt 2 in Codex or ChatGPT.</strong>
+                  <p>The agent can now see one new, one-use execution tool.</p>
+                  <div className="agent-waiting authority-waiting">
+                    <ShieldCheck aria-hidden="true" /> Waiting for approved invocation…
+                  </div>
+                </div>
+              ) : (
+                <div className="demo-autopilot">
+                  <div className="agent-handoff-label">DEMO AUTOPILOT · APPROVED PATH</div>
+                  <p>The local fallback invokes the same one-use dynamic tool.</p>
+                  <button
+                    className="mission-primary execute-action"
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      void perform(async () => {
+                        if (!runtime) throw new Error("WebMCP is still starting.");
+                        await runtime.runPromptB();
+                      }, "Mission complete. Dynamic authority removed.")
+                    }
+                  >
+                    <Play aria-hidden="true" /> Run demo prompt 2
+                  </button>
+                </div>
+              )}
             </div>
           ) : null}
 

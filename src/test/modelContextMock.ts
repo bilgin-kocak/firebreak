@@ -1,4 +1,4 @@
-import type { WebMCPToolDefinition, WebMCPToolMetadata } from "../webmcp/types";
+import type { WebMCPRegisteredTool, WebMCPToolDefinition } from "../webmcp/types";
 
 /**
  * Installs the narrow native-like browser boundary used by Playwright.
@@ -9,6 +9,7 @@ import type { WebMCPToolDefinition, WebMCPToolMetadata } from "../webmcp/types";
 export function installModelContextMock(): void {
   interface StoredTool {
     definition: WebMCPToolDefinition;
+    descriptor: WebMCPRegisteredTool;
     unregister?: () => void;
   }
 
@@ -34,25 +35,31 @@ export function installModelContextMock(): void {
           }
         : undefined;
 
-      tools.set(definition.name, { definition, unregister });
+      const descriptor: WebMCPRegisteredTool = {
+        name: definition.name,
+        description: definition.description,
+        inputSchema: structuredClone(definition.inputSchema),
+        annotations: structuredClone(definition.annotations),
+        origin: window.location.origin,
+        window,
+      };
+      tools.set(definition.name, { definition, descriptor, unregister });
       if (options.signal && unregister) {
         options.signal.addEventListener("abort", unregister, { once: true });
       }
       emitToolChange();
     },
 
-    async getTools(): Promise<WebMCPToolMetadata[]> {
-      return [...tools.values()].map(({ definition }) => ({
-        name: definition.name,
-        description: definition.description,
-        inputSchema: structuredClone(definition.inputSchema),
-        annotations: structuredClone(definition.annotations),
-      }));
+    async getTools(): Promise<WebMCPRegisteredTool[]> {
+      return [...tools.values()].map(({ descriptor }) => descriptor);
     },
 
-    async executeTool(name, input, options = {}) {
-      const stored = tools.get(name);
-      if (!stored) throw new Error(`Tool '${name}' is not registered.`);
+    async executeTool(tool, input, options = {}) {
+      const stored = tools.get(tool.name);
+      if (!stored) throw new Error(`Tool '${tool.name}' is not registered.`);
+      if (stored.descriptor !== tool) {
+        throw new Error(`Tool '${tool.name}' descriptor is not registered by this context.`);
+      }
       if (options.signal?.aborted) {
         throw new DOMException("Tool execution was cancelled.", "AbortError");
       }
