@@ -304,6 +304,12 @@ button:disabled {
   color: var(--thermal);
 }
 
+.clock-paused > svg,
+.clock-paused small,
+.clock-paused strong {
+  color: var(--rescue);
+}
+
 .header-reset,
 .sheet-close {
   display: grid;
@@ -564,12 +570,22 @@ button:disabled {
 .prompt-bubble {
   position: relative;
   margin-bottom: 13px;
-  padding: 12px;
+  padding: 12px 82px 12px 12px;
   color: #d9e4e8;
   border-left: 2px solid var(--rescue);
   background: rgba(88, 217, 243, 0.07);
   font-size: 0.75rem;
   line-height: 1.5;
+}
+
+.preflight-prompt {
+  margin: 12px 0;
+  max-height: 152px;
+  overflow: auto;
+}
+
+.preflight-prompt button {
+  min-height: 44px;
 }
 
 .prompt-bubble span {
@@ -838,6 +854,12 @@ button:disabled {
 
 .plan-ready p svg {
   width: 16px;
+}
+
+.plan-ready .timer-paused-note {
+  margin-top: -6px;
+  color: var(--rescue);
+  font-size: 0.64rem;
 }
 
 .authority-pulse {
@@ -1413,7 +1435,7 @@ button:disabled {
 
 .trace-duration {
   padding-top: 2px;
-  color: #667b84;
+  color: #81969f;
   font:
     700 0.46rem/1 "SFMono-Regular",
     Consolas,
@@ -1508,8 +1530,10 @@ button:disabled {
 }
 
 .firebreak-toast button {
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
   margin-left: auto;
   border: 0;
   background: transparent;
@@ -1851,15 +1875,21 @@ button:disabled {
     font-size: 0.64rem;
   }
 
+  .console-intro .preflight-prompt {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+
   .console-intro .mission-primary {
-    width: auto;
+    grid-column: 1 / -1;
+    width: 100%;
     min-height: 44px;
     padding-inline: 12px;
   }
 
   .prompt-bubble {
     margin-bottom: 8px;
-    padding: 8px;
+    padding: 8px 58px 8px 8px;
     font-size: 0.65rem;
   }
 

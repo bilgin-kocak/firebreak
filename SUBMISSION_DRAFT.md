@@ -38,6 +38,8 @@ The live trace also makes failure legible: if the agent requests simulation befo
 
 The agent stops at a visible human decision boundary. The operator reviews four named robots, exact bounded routes, the excluded collapse zone, one-use scope, five-minute post-authorization expiry, and the 11/11 proof. Clicking **Authorize one mission** registers `execute_rescue_mission` as the eighth tool.
 
+Fresh-chat latency does not steal emergency time: the 90-second clock runs only while the agent is actively planning or the fleet is executing. It visibly pauses before the first tool call, during human review, and after authorization while the operator sends Prompt 2. The copied prompts explicitly constrain the agent to the current Firebreak tab’s WebMCP tools instead of web search.
+
 Prompt 2 invokes it. Four simulated 3D robots move concurrently: SCOUT-1 maps danger, MEDIC-2 rescues one worker, SUPPRESS-3 isolates and contains the battery fire, and HAUL-4 rescues the second worker while moving the exposed load. A deterministic receipt reports two workers safe, the fire contained, the load secured, and zero violations. The one-use tool unregisters and the surface returns to seven tools.
 
 ## Why WebMCP is essential
@@ -86,7 +88,7 @@ npm install
 npm run dev
 ```
 
-Open the printed URL in the Codex or ChatGPT built-in browser, click **Start emergency**, and send the two prompts from the surrounding chat. The application needs no API key, backend, or robot; it uses the agent already signed into the host app. In an ordinary browser, the clearly labeled **Replay walkthrough · no agent** is available for local rehearsal.
+Open the printed URL in a fresh Codex or ChatGPT built-in browser chat and confirm **WebMCP Native**. Click **Start emergency + copy prompt**, paste Prompt 1 into the surrounding chat, authorize the reviewed mission, then copy and paste Prompt 2. The application needs no API key, backend, or robot; it uses the agent already signed into the host app. In an ordinary browser, the clearly labeled **Replay walkthrough · no agent** is available for local rehearsal.
 
 Run the entire release gate with:
 

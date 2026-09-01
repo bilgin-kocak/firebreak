@@ -19,7 +19,7 @@ test("ordinary browsers disclose and complete the no-agent replay", async ({ pag
   await expect(page).toHaveTitle("Firebreak: WebMCP Emergency Robot Commander");
   await expect(page.getByText("7 tools live", { exact: true })).toBeVisible();
   await expect(page.locator("canvas[data-scene-ready='true']")).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Start emergency" }).click();
+  await page.getByRole("button", { name: /^Start emergency/ }).click();
 
   const console = page.getByLabel("Agent mission console");
   await expect(console.getByText("REPLAY WALKTHROUGH · NO AGENT")).toBeVisible();

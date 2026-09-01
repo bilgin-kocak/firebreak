@@ -29,6 +29,7 @@ export interface FirebreakWebMCPState {
   registeredToolNames: string[];
   lastToolChangeAt: number | null;
   toolCallCount: number;
+  planningStarted: boolean;
   trace: WebMCPTraceEntry[];
 }
 
@@ -84,6 +85,7 @@ const initialWebMCP = (): FirebreakWebMCPState => ({
   registeredToolNames: [],
   lastToolChangeAt: null,
   toolCallCount: 0,
+  planningStarted: false,
   trace: [],
 });
 
@@ -170,8 +172,11 @@ export const useFirebreakStore = create<FirebreakState>((set, get) => {
       }));
     },
     advanceClock(deltaMs) {
-      const world = get().world;
-      if (!["active", "planned", "authorized", "executing"].includes(world.phase)) return false;
+      const state = get();
+      const world = state.world;
+      const isPlanning = world.phase === "active" && state.webmcp.planningStarted;
+      const isExecuting = world.phase === "executing";
+      if (!isPlanning && !isExecuting) return false;
       const elapsedMs = Math.min(
         world.durationLimitMs,
         world.elapsedMs + Math.max(0, Math.min(1_000, Number.isFinite(deltaMs) ? deltaMs : 0)),
@@ -394,7 +399,11 @@ export const useFirebreakStore = create<FirebreakState>((set, get) => {
     },
     recordToolCall() {
       set((state) => ({
-        webmcp: { ...state.webmcp, toolCallCount: state.webmcp.toolCallCount + 1 },
+        webmcp: {
+          ...state.webmcp,
+          toolCallCount: state.webmcp.toolCallCount + 1,
+          planningStarted: state.webmcp.planningStarted || state.world.phase === "active",
+        },
       }));
     },
     recordWebMCPTrace(entry) {

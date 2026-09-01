@@ -27,7 +27,7 @@ test("ready, proposal, authority, and resolved states have no serious axe findin
 test("every visible interactive target is at least 44 by 44 pixels", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await boot(page);
-  await page.getByRole("button", { name: "Start emergency" }).click();
+  await page.getByRole("button", { name: /^Start emergency/ }).click();
   const controls = page.locator(
     "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary",
   );

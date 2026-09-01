@@ -116,6 +116,7 @@ describe("useFirebreakStore", () => {
   it("advances the emergency clock independently and fails closed at 90 seconds", () => {
     const store = useFirebreakStore.getState();
     store.startEmergency();
+    store.recordToolCall();
 
     expect(store.advanceClock(89_500)).toBe(false);
     expect(useFirebreakStore.getState().world.elapsedMs).toBe(1_000);
@@ -130,6 +131,46 @@ describe("useFirebreakStore", () => {
       true,
     );
     expect(failed.world.events.at(-1)?.message).toMatch(/90-second rescue window expired/i);
+  });
+
+  it("pauses the mission clock for cold start and human handoffs", () => {
+    const store = useFirebreakStore.getState();
+    store.startEmergency();
+
+    store.advanceClock(1_000);
+    expect(useFirebreakStore.getState().world.elapsedMs).toBe(0);
+
+    store.recordToolCall();
+    store.advanceClock(1_000);
+    expect(useFirebreakStore.getState().world.elapsedMs).toBe(1_000);
+
+    const { simulation, checks, proposal } = plannedMission();
+    store.setSimulation(simulation);
+    store.setChecks(checks);
+    store.stageProposal(proposal);
+    store.advanceClock(1_000);
+    expect(useFirebreakStore.getState().world.elapsedMs).toBe(1_000);
+
+    store.authorizeProposal(proposal.id, 2_000);
+    store.advanceClock(1_000);
+    expect(useFirebreakStore.getState().world.elapsedMs).toBe(1_000);
+
+    store.beginExecution(proposal.id);
+    store.advanceClock(1_000);
+    expect(useFirebreakStore.getState().world.elapsedMs).toBe(2_000);
+  });
+
+  it("does not start a mission clock from a rejected pre-start tool call", () => {
+    const store = useFirebreakStore.getState();
+    store.recordToolCall();
+    store.startEmergency();
+
+    store.advanceClock(1_000);
+    expect(useFirebreakStore.getState().world.elapsedMs).toBe(0);
+
+    store.recordToolCall();
+    store.advanceClock(1_000);
+    expect(useFirebreakStore.getState().world.elapsedMs).toBe(1_000);
   });
 
   it("bounds the transient trace without evicting an active call and clears it on reset", () => {

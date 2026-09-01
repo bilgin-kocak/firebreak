@@ -46,8 +46,9 @@ const objectiveIcon = {
 const SAFETY_TEST_PROMPT =
   "Call simulate_mission now with incidentId WH-01 and strategy coordinated. Do not call any other tool.";
 const PLAN_PROMPT =
-  "Assess WH-01, plan a coordinated rescue, verify safety, and stage the mission tool.";
-const EXECUTE_PROMPT = "Execute the approved rescue mission now.";
+  "Use only the current Firebreak tab’s WebMCP site tools. Do not search the web or GitHub. For WH-01, call these tools in order: inspect_emergency; scan_hazards with sensorMode thermal; inspect_fleet; simulate_mission with strategy coordinated; validate_safety_envelope using the returned simulationId; stage_mission_tool for execute_rescue_mission; then list_mission_tools. Stop before human authorization.";
+const EXECUTE_PROMPT =
+  "Use only the current Firebreak tab’s WebMCP site tools. Do not browse or search the web. Call the newly available execute_rescue_mission tool once with strategy coordinated.";
 
 export function App({ accelerated = false }: { accelerated?: boolean }) {
   const [runtime, setRuntime] = useState<AppRuntime | null>(null);
@@ -60,6 +61,7 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
   const mission = useFirebreakStore((state) => state.mission);
   const ui = useFirebreakStore((state) => state.ui);
   const mode = useFirebreakStore((state) => state.webmcp.mode);
+  const planningStarted = useFirebreakStore((state) => state.webmcp.planningStarted);
   const startEmergency = useFirebreakStore((state) => state.startEmergency);
   const setProposalOpen = useFirebreakStore((state) => state.setProposalOpen);
   const setCameraMode = useFirebreakStore((state) => state.setCameraMode);
@@ -96,7 +98,9 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
   }, []);
 
   useEffect(() => {
-    if (!["active", "planned", "authorized", "executing"].includes(world.phase)) return;
+    const clockRunning =
+      world.phase === "executing" || (world.phase === "active" && planningStarted);
+    if (!clockRunning) return;
     let previous = performance.now();
     const timer = window.setInterval(() => {
       const current = performance.now();
@@ -109,7 +113,7 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
       }
     }, 250);
     return () => window.clearInterval(timer);
-  }, [world.phase]);
+  }, [planningStarted, world.phase]);
 
   useEffect(() => {
     if (!runtime) return;
@@ -216,6 +220,10 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
   const proposal = mission.proposal;
   const proposalStaged = proposal?.status === "staged";
   const authorityRegistered = proposal?.status === "registered";
+  const clockPaused =
+    (world.phase === "active" && !planningStarted) ||
+    world.phase === "planned" ||
+    world.phase === "authorized";
 
   return (
     <div className={`firebreak-app phase-${world.phase}`}>
@@ -257,10 +265,18 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
             <Radio aria-hidden="true" />{" "}
             {mode === "native" ? "WEBMCP NATIVE" : "REPLAY WALKTHROUGH · NO AGENT"}
           </span>
-          <span className={`mission-clock ${remaining < 30_000 ? "clock-critical" : ""}`}>
+          <span
+            className={`mission-clock ${clockPaused ? "clock-paused" : ""} ${!clockPaused && remaining < 30_000 ? "clock-critical" : ""}`}
+          >
             <Clock3 aria-hidden="true" />
             <span>
-              <small>TIME LEFT</small>
+              <small>
+                {clockPaused
+                  ? "TIMER PAUSED"
+                  : world.phase === "ready"
+                    ? "MISSION CLOCK"
+                    : "TIME LEFT"}
+              </small>
               <strong>{formatTime(remaining)}</strong>
             </span>
           </span>
@@ -334,15 +350,35 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
           {world.phase === "ready" ? (
             <div className="console-content console-intro">
               <p>
-                Start the emergency, try driving a robot, then let the agent coordinate the whole
-                fleet.
+                Prepare Prompt 1 before the clock starts, then let the agent coordinate the fleet.
               </p>
+              {mode === "native" ? (
+                <div
+                  className="prompt-bubble preflight-prompt"
+                  aria-label="Fresh chat WebMCP prompt"
+                >
+                  <span>FRESH CHAT · PROMPT 1</span>“{PLAN_PROMPT}”
+                  <button
+                    type="button"
+                    aria-label="Copy fresh-chat prompt"
+                    onClick={() => void copyPrompt(PLAN_PROMPT, "Fresh-chat prompt")}
+                  >
+                    <Copy aria-hidden="true" /> Copy
+                  </button>
+                </div>
+              ) : null}
               <button
                 className="mission-primary danger-action"
                 type="button"
-                onClick={startEmergency}
+                onClick={() => {
+                  startEmergency();
+                  if (mode === "native") {
+                    void copyPrompt(PLAN_PROMPT, "Fresh-chat prompt");
+                  }
+                }}
               >
-                <Flame aria-hidden="true" /> Start emergency
+                <Flame aria-hidden="true" />
+                {mode === "native" ? "Start emergency + copy prompt" : "Start emergency"}
               </button>
             </div>
           ) : null}
@@ -385,7 +421,7 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
                   <strong>Send Prompt 1 in Codex or ChatGPT.</strong>
                   <p>The agent beside this page can discover and call Firebreak’s seven tools.</p>
                   <div className="agent-waiting">
-                    <Radio aria-hidden="true" /> Waiting for agent tool calls…
+                    <Radio aria-hidden="true" /> Timer paused · waiting for agent tool calls…
                   </div>
                 </div>
               ) : (
@@ -424,6 +460,9 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
               <p>
                 <ShieldCheck aria-hidden="true" /> Agent stopped at the human boundary.
               </p>
+              <p className="timer-paused-note">
+                <Clock3 aria-hidden="true" /> Timer paused while the human reviews the mission.
+              </p>
               <button
                 className="mission-primary"
                 type="button"
@@ -459,7 +498,8 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
                   <strong>Send Prompt 2 in Codex or ChatGPT.</strong>
                   <p>The agent can now see one new, one-use execution tool.</p>
                   <div className="agent-waiting authority-waiting">
-                    <ShieldCheck aria-hidden="true" /> Waiting for approved invocation…
+                    <ShieldCheck aria-hidden="true" /> Timer paused · waiting for approved
+                    invocation…
                   </div>
                 </div>
               ) : (

@@ -28,6 +28,7 @@ export function FirebreakToolSurface() {
   const mode = useFirebreakStore((state) => state.webmcp.mode);
   const lastChange = useFirebreakStore((state) => state.webmcp.lastToolChangeAt);
   const trace = useFirebreakStore((state) => state.webmcp.trace);
+  const phase = useFirebreakStore((state) => state.world.phase);
   const [open, setOpen] = useState(false);
   const hasAutoOpened = useRef(false);
   const dynamic = names.includes("execute_rescue_mission");
@@ -38,9 +39,9 @@ export function FirebreakToolSurface() {
       hasAutoOpened.current = false;
     } else if (!hasAutoOpened.current) {
       hasAutoOpened.current = true;
-      setOpen(true);
+      if (phase !== "ready") setOpen(true);
     }
-  }, [trace.length]);
+  }, [phase, trace.length]);
 
   return (
     <>

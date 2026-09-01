@@ -75,6 +75,46 @@ describe("Firebreak application", () => {
     );
   });
 
+  it("prepares a fresh-chat WebMCP prompt before start and pauses timed handoffs", async () => {
+    const user = userEvent.setup();
+    installModelContextMock();
+    render(<App accelerated />);
+    await waitFor(() => expect(getFirebreakState().webmcp.mode).toBe("native"));
+
+    const preflight = screen.getByLabelText("Fresh chat WebMCP prompt");
+    expect(preflight).toHaveTextContent(/use only the current firebreak tab/i);
+    expect(preflight).toHaveTextContent(/do not search the web or github/i);
+    expect(preflight).toHaveTextContent(/inspect_emergency.*scan_hazards.*inspect_fleet/i);
+    expect(screen.getByRole("button", { name: /copy fresh-chat prompt/i })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: /start emergency/i }));
+    expect(getFirebreakState().world.phase).toBe("active");
+    expect(await navigator.clipboard.readText()).toMatch(
+      /inspect_emergency; scan_hazards.*stage_mission_tool.*list_mission_tools/i,
+    );
+    expect(screen.getByText(/fresh-chat prompt copied/i)).toBeVisible();
+    expect(screen.getByText("TIMER PAUSED", { exact: true })).toBeVisible();
+    expect(screen.getByText(/timer paused.*waiting for agent tool calls/i)).toBeVisible();
+    act(() => useFirebreakStore.getState().advanceClock(1_000));
+    expect(getFirebreakState().world.elapsedMs).toBe(0);
+
+    await act(invokePromptOneThroughNativeWebMCP);
+    await waitFor(() => expect(getFirebreakState().mission.proposal?.status).toBe("staged"));
+    const elapsedAtReview = getFirebreakState().world.elapsedMs;
+    act(() => useFirebreakStore.getState().advanceClock(1_000));
+    expect(getFirebreakState().world.elapsedMs).toBe(elapsedAtReview);
+    expect(screen.getByText(/timer paused while the human reviews/i)).toBeVisible();
+
+    const proposal = screen.getByRole("dialog", { name: /authorize rescue mission/i });
+    await user.click(within(proposal).getByRole("button", { name: /authorize one mission/i }));
+    await waitFor(() =>
+      expect(getFirebreakState().webmcp.registeredToolNames).toContain("execute_rescue_mission"),
+    );
+    expect(screen.getByText(/timer paused.*waiting for approved invocation/i)).toBeVisible();
+    act(() => useFirebreakStore.getState().advanceClock(1_000));
+    expect(getFirebreakState().world.elapsedMs).toBe(elapsedAtReview);
+  }, 15_000);
+
   it("labels the no-model journey as a replay walkthrough", async () => {
     const user = userEvent.setup();
     render(<App accelerated />);

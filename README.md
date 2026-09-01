@@ -9,7 +9,7 @@ Firebreak is a cinematic, browser-playable warehouse rescue that demonstrates a 
 ## For judges
 
 - **Live demo:** [firebreak-eosin.vercel.app](https://firebreak-eosin.vercel.app/)
-- **Real agent path:** open Firebreak in the Codex or ChatGPT built-in browser, confirm **WebMCP Native**, and paste the two prompts shown on the page.
+- **Real agent path:** open Firebreak in a fresh Codex or ChatGPT chat, confirm **WebMCP Native**, then use the page’s one-click prompt handoffs.
 - **What to watch:** a refused out-of-sequence call, seven planning tools, 11/11 gates, one human click, `toolchange` from **7 → 8**, one execution, then **8 → 7**.
 - **What is not AI:** an ordinary browser shows **Replay walkthrough · no agent**, a disclosed deterministic fallback for viewing the product.
 - **Source:** [github.com/bilgin-kocak/firebreak](https://github.com/bilgin-kocak/firebreak)
@@ -26,20 +26,21 @@ Firebreak solves the gap with **compiled mission authority**: the agent may coor
 
 ## What you do in the demo
 
-1. Click **Start emergency**.
-2. Optional: copy the red safety-test prompt. The agent asks to simulate too early; Firebreak refuses with `HAZARD_SCAN_REQUIRED`, and the robots do not move.
-3. Drive the selected robot with `WASD` or the arrow keys. Use `1`–`4` to select a robot and `Space` for its action. On a standard gamepad, the left stick drives, the right stick moves the camera, bumpers switch robots, A/Cross acts, and Start/Options opens mission control. Touch has forward, reverse, turn, action, robot selection, and direct camera drag.
-4. In the Codex or ChatGPT chat beside the built-in browser, send Prompt 1 shown on the page:
+1. In a fresh Codex or ChatGPT chat, open Firebreak and confirm **WebMCP Native**. Prompt 1 is already visible before the mission starts.
+2. Click **Start emergency + copy prompt**. The exact current-tab WebMCP instruction is now on your clipboard, and the 90-second clock remains paused until the first site-tool call.
+3. Optional: copy the red safety-test prompt. The agent asks to simulate too early; Firebreak refuses with `HAZARD_SCAN_REQUIRED`, and the robots do not move.
+4. Drive the selected robot with `WASD` or the arrow keys. Use `1`–`4` to select a robot and `Space` for its action. On a standard gamepad, the left stick drives, the right stick moves the camera, bumpers switch robots, A/Cross acts, and Start/Options opens mission control. Touch has forward, reverse, turn, action, robot selection, and direct camera drag.
+5. Paste Prompt 1 into the chat beside the page:
 
-   > Assess WH-01, plan a coordinated rescue, verify safety, and stage the mission tool.
+   > Use only the current Firebreak tab’s WebMCP site tools. Do not search the web or GitHub. For WH-01, call these tools in order: inspect_emergency; scan_hazards with sensorMode thermal; inspect_fleet; simulate_mission with strategy coordinated; validate_safety_envelope using the returned simulationId; stage_mission_tool for execute_rescue_mission; then list_mission_tools. Stop before human authorization.
 
-5. Watch the live trace and four colored routes appear. Review the exact robots, geofence, lifetime, and 11/11 safety proof.
-6. Click **Authorize one mission**. This is a human-only control; no agent tool can press or bypass it.
-7. Return to the chat beside the page and send Prompt 2:
+6. Watch the live trace and four colored routes appear. The clock pauses again while you review the exact robots, geofence, lifetime, and 11/11 safety proof.
+7. Click **Authorize one mission**. This is a human-only control; no agent tool can press or bypass it. The clock remains paused while you return to the chat.
+8. Copy the newly shown Prompt 2 and paste it into the chat:
 
-   > Execute the approved rescue mission now.
+   > Use only the current Firebreak tab’s WebMCP site tools. Do not browse or search the web. Call the newly available execute_rescue_mission tool once with strategy coordinated.
 
-8. Watch four specialist robots complete the deterministic warehouse scenario. The final simulated receipt reports two workers safe, the fire contained, the load secured, and zero safety violations.
+9. Watch four specialist robots complete the deterministic warehouse scenario. The final simulated receipt reports two workers safe, the fire contained, the load secured, and zero safety violations.
 
 The WebMCP surface visibly changes from seven tools, to eight after authorization, and back to seven after the one-use mission is consumed.
 
@@ -96,7 +97,7 @@ The eleven deterministic gates require:
 - a clean recovery snapshot; and
 - a single coordinated, one-use mission budget.
 
-All tool schemas are closed (`additionalProperties: false`) and revalidated with strict Zod schemas. Execution is rejected if the warehouse changes after simulation. The deterministic 90-second incident clock stops the fleet when time expires. Browser-mode cancellation restores the pre-mission snapshot. ROS mode truthfully stops the fleet and reports partial progress because physical reality cannot be rolled back.
+All tool schemas are closed (`additionalProperties: false`) and revalidated with strict Zod schemas. Execution is rejected if the warehouse changes after simulation. The deterministic 90-second incident clock runs during active agent planning and robot execution, but visibly pauses for agent cold start and human handoffs; when active time expires, the fleet stops. Browser-mode cancellation restores the pre-mission snapshot. ROS mode truthfully stops the fleet and reports partial progress because physical reality cannot be rolled back.
 
 ## Architecture
 
@@ -129,7 +130,7 @@ npm install
 npm run dev
 ```
 
-For the tested live-agent path, use the Codex or ChatGPT desktop built-in browser with GPT-5.6 Sol, then open [firebreak-eosin.vercel.app](https://firebreak-eosin.vercel.app/). When site tools are available for the host account, click **Start emergency**, send the two on-screen prompts from the surrounding chat, and the page shows **WebMCP Native** while it waits for real agent tool calls. You can use the local URL printed by Vite—normally `http://127.0.0.1:5173`—for development.
+For the tested live-agent path, start a fresh Codex or ChatGPT desktop chat with GPT-5.6 Sol, open [firebreak-eosin.vercel.app](https://firebreak-eosin.vercel.app/), and confirm **WebMCP Native**. Click **Start emergency + copy prompt**, paste into the surrounding chat, authorize the reviewed mission, then copy and paste Prompt 2. Both prompts explicitly tell the agent to use only the current tab’s site tools, so it should not spend the demo searching the web or GitHub. The mission clock visibly pauses before the first tool call and at both human handoffs. You can use the local URL printed by Vite—normally `http://127.0.0.1:5173`—for development.
 
 The app requires no OpenAI API key, environment variable, camera, controller, backend, robot, or ROS installation; Codex/ChatGPT uses the account already signed into the host app. If native WebMCP is unavailable, the page shows **Replay walkthrough · no agent**. Its two local buttons exercise the same registered definitions and handlers without claiming a model is involved.
 

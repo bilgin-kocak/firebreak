@@ -51,7 +51,7 @@ export const boot = async (page: Page) => {
 };
 
 export const startEmergency = async (page: Page) => {
-  const start = page.getByRole("button", { name: "Start emergency" });
+  const start = page.getByRole("button", { name: /^Start emergency/ });
   if (await start.isVisible()) await start.click({ noWaitAfter: true });
   await expect(page.getByText("LIVE AGENT", { exact: true })).toBeVisible();
   await expect(page.getByText(/send prompt 1 in codex or chatgpt/i)).toBeVisible();

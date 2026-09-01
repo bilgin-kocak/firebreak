@@ -43,6 +43,6 @@ test("reset revokes authority, restores the seed, and preserves unrelated storag
   await page.getByRole("button", { name: "Reset warehouse demo" }).click();
 
   await expect.poll(() => toolNames(page)).toEqual([...STATIC_TOOLS]);
-  await expect(page.getByRole("button", { name: "Start emergency" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Start emergency/ })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("outside-firebreak"))).toBe("keep");
 });
