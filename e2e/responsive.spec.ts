@@ -3,10 +3,11 @@ import { expect, test } from "@playwright/test";
 import {
   approve,
   boot,
-  executeApproved,
   expectNoOverflow,
+  finishApprovedExecution,
   invokeNativePlanningJourney,
   screenshot,
+  startApprovedExecution,
 } from "./helpers";
 
 test("desktop rescue, proposal, and resolved views keep the warehouse dominant", async ({
@@ -23,7 +24,10 @@ test("desktop rescue, proposal, and resolved views keep the warehouse dominant",
   await screenshot(page, testInfo, "responsive-firebreak-proposal-desktop.png");
 
   await approve(page);
-  await executeApproved(page);
+  await startApprovedExecution(page);
+  await expectNoOverflow(page);
+  await screenshot(page, testInfo, "responsive-firebreak-executing-desktop.png");
+  await finishApprovedExecution(page);
   await expectNoOverflow(page);
   await screenshot(page, testInfo, "responsive-firebreak-complete-desktop.png");
 });
@@ -43,7 +47,10 @@ test("mobile rescue, proposal, and resolved views have no horizontal overflow", 
   await screenshot(page, testInfo, "responsive-firebreak-proposal-mobile.png");
 
   await approve(page);
-  await executeApproved(page);
+  await startApprovedExecution(page);
+  await expectNoOverflow(page);
+  await screenshot(page, testInfo, "responsive-firebreak-executing-mobile.png");
+  await finishApprovedExecution(page);
   await expectNoOverflow(page);
   await screenshot(page, testInfo, "responsive-firebreak-complete-mobile.png");
 });

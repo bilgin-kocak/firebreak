@@ -146,6 +146,7 @@ describe("Firebreak application", () => {
       expect(getFirebreakState().webmcp.registeredToolNames).toEqual(STATIC_TOOL_NAMES),
     );
     expect(screen.getByText(/7 tools live/i)).toBeVisible();
+    expect(screen.getByText(/7 tools live/i).closest("details")).not.toHaveAttribute("open");
   }, 15_000);
 
   it("lets a native Codex or ChatGPT agent complete both prompts through page tools", async () => {
@@ -250,4 +251,40 @@ describe("Firebreak application", () => {
     expect(within(trace).getByText("HAZARD_SCAN_REQUIRED")).toBeVisible();
     expect(getFirebreakState().world.phase).toBe("active");
   });
+
+  it("turns live execution into a focused cinematic mission view", async () => {
+    const user = userEvent.setup();
+    render(<App accelerated />);
+    await waitFor(() => expect(getFirebreakState().webmcp.registeredToolNames).toHaveLength(7));
+
+    await user.click(screen.getByRole("button", { name: /start emergency/i }));
+    await user.click(screen.getByRole("button", { name: /replay planning walkthrough/i }));
+    await waitFor(() => expect(getFirebreakState().mission.proposal?.status).toBe("staged"));
+
+    const proposal = screen.getByRole("dialog", { name: /authorize rescue mission/i });
+    await user.click(within(proposal).getByRole("button", { name: /authorize one mission/i }));
+    await waitFor(() =>
+      expect(getFirebreakState().webmcp.registeredToolNames).toContain("execute_rescue_mission"),
+    );
+
+    act(() => {
+      const proposalId = getFirebreakState().mission.proposal?.id;
+      if (!proposalId) throw new Error("Mission proposal was not staged.");
+      useFirebreakStore.getState().beginExecution(proposalId);
+    });
+
+    const cinema = screen.getByRole("region", { name: /cinematic mission view/i });
+    expect(screen.queryByText(/one-use mission authority registered/i)).not.toBeInTheDocument();
+    expect(within(cinema).getByText(/autonomous rescue in progress/i)).toBeVisible();
+    expect(within(cinema).getByText(/8 tools live.*one-use authority/i)).toBeVisible();
+    expect(within(cinema).getByText(/auto director.*following scout-1/i)).toBeVisible();
+    expect(within(cinema).getByRole("button", { name: /emergency stop/i })).toBeVisible();
+    for (const robotId of ["SCOUT-1", "MEDIC-2", "SUPPRESS-3", "HAUL-4"]) {
+      expect(within(cinema).getByText(robotId)).toBeVisible();
+    }
+    expect(cinema.querySelectorAll(".cinematic-robot-focused")).toHaveLength(1);
+    act(() => useFirebreakStore.getState().setReducedEffects(true));
+    expect(cinema.querySelectorAll(".cinematic-robot-focused")).toHaveLength(0);
+    expect(within(cinema).getByText(/auto director.*overview/i)).toBeVisible();
+  }, 15_000);
 });

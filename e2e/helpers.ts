@@ -100,9 +100,47 @@ export const executeApproved = async (page: Page) => {
   await expect.poll(() => toolNames(page)).toEqual([...STATIC_TOOLS]);
 };
 
+export const startApprovedExecution = async (page: Page) => {
+  await page.evaluate(async () => {
+    const modelContext = document.modelContext!;
+    const tool = (await modelContext.getTools()).find(
+      (candidate) => candidate.name === "execute_rescue_mission",
+    );
+    if (!tool) throw new Error("Dynamic mission tool is not registered.");
+    const running = modelContext.executeTool(tool, { strategy: "coordinated" });
+    (
+      window as Window & {
+        __firebreakMissionExecution?: Promise<unknown>;
+      }
+    ).__firebreakMissionExecution = running;
+  });
+  await expect(page.getByRole("region", { name: "Cinematic mission view" })).toBeVisible();
+};
+
+export const finishApprovedExecution = async (page: Page) => {
+  const result = await page.evaluate(async () => {
+    const runtimeWindow = window as Window & {
+      __firebreakMissionExecution?: Promise<unknown>;
+    };
+    if (!runtimeWindow.__firebreakMissionExecution) {
+      throw new Error("Mission execution was not started.");
+    }
+    return runtimeWindow.__firebreakMissionExecution;
+  });
+  expect(result).toMatchObject({ ok: true });
+  await expect(page.getByRole("heading", { name: "Mission complete" })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect.poll(() => toolNames(page)).toEqual([...STATIC_TOOLS]);
+};
+
 export const screenshot = async (page: Page, testInfo: TestInfo, name: string) => {
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.screenshot({ path: testInfo.outputPath(name), fullPage: true });
+  await page.screenshot({
+    path: testInfo.outputPath(name),
+    fullPage: false,
+    animations: "allow",
+    timeout: 30_000,
+  });
 };
 
 export const expectNoOverflow = async (page: Page) => {

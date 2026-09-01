@@ -35,7 +35,9 @@ export function FirebreakToolSurface() {
   const displayedTrace = [...trace].reverse();
 
   useEffect(() => {
-    if (trace.length === 0) {
+    if (phase === "resolved") {
+      setOpen(false);
+    } else if (trace.length === 0) {
       hasAutoOpened.current = false;
     } else if (!hasAutoOpened.current) {
       hasAutoOpened.current = true;

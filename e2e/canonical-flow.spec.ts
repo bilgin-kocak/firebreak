@@ -4,10 +4,11 @@ import {
   approve,
   boot,
   collectRuntimeErrors,
-  executeApproved,
   executeTool,
+  finishApprovedExecution,
   invokeNativePlanningJourney,
   screenshot,
+  startApprovedExecution,
   STATIC_TOOLS,
   startEmergency,
   toolNames,
@@ -70,7 +71,48 @@ test("canonical two-prompt rescue plans, authorizes, moves the fleet, and unregi
   await expect(page.getByText("ONE-USE AUTHORITY LIVE")).toBeVisible();
   await screenshot(page, testInfo, "firebreak-03-authority-live.png");
 
-  await executeApproved(page);
+  await page.evaluate(() => {
+    const recordShot = () => {
+      const label = document.querySelector(".cinematic-director")?.textContent?.trim();
+      if (!label) return;
+      const current = JSON.parse(
+        document.documentElement.dataset.cinematicShots ?? "[]",
+      ) as string[];
+      if (current.at(-1) !== label) {
+        document.documentElement.dataset.cinematicShots = JSON.stringify([...current, label]);
+      }
+    };
+    document.documentElement.dataset.cinematicShots = "[]";
+    const observer = new MutationObserver(recordShot);
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
+  await startApprovedExecution(page);
+  const cinema = page.getByRole("region", { name: "Cinematic mission view" });
+  await expect(cinema.getByText(/autonomous rescue in progress/i)).toBeVisible();
+  await expect(cinema.getByText(/8 tools live.*one-use authority/i)).toBeVisible();
+  await expect(cinema.getByText(/auto director/i)).toBeVisible();
+  await expect(cinema.getByRole("button", { name: /emergency stop/i })).toBeVisible();
+  await expect(page.getByLabel("Agent mission console")).toBeHidden();
+  await expect(page.getByRole("region", { name: /rescue two workers/i })).toBeHidden();
+  await expect(page.locator(".tool-surface")).toBeHidden();
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => JSON.parse(document.documentElement.dataset.cinematicShots ?? "[]") as string[],
+        ),
+      { timeout: 20_000 },
+    )
+    .toEqual([
+      "AUTO DIRECTOR · FOLLOWING SCOUT-1",
+      "AUTO DIRECTOR · FOLLOWING MEDIC-2",
+      "AUTO DIRECTOR · FOLLOWING SUPPRESS-3",
+      "AUTO DIRECTOR · FOLLOWING HAUL-4",
+      "AUTO DIRECTOR · FINAL WIDE",
+    ]);
+  await expect(cinema.getByText("FINAL APPROACH", { exact: true })).toBeVisible();
+
+  await finishApprovedExecution(page);
   await expect
     .poll(() => page.evaluate(() => document.documentElement.dataset.toolchangeCount))
     .toBe("2");
@@ -78,10 +120,12 @@ test("canonical two-prompt rescue plans, authorizes, moves the fleet, and unregi
   await expect(page.getByText("0 violations")).toBeVisible();
   await expect(page.getByText("One-use tool consumed and unregistered.")).toBeVisible();
   await expect(page.getByText("7 tools live")).toBeVisible();
+  await screenshot(page, testInfo, "firebreak-04-mission-complete.png");
+  await page.locator(".tool-surface summary").click();
+  await expect(trace).toBeVisible();
   await expect(trace.getByText("Authorize one mission")).toBeVisible();
   await expect(trace.getByText("7 → 8 tools")).toBeVisible();
   await expect(trace.getByText("8 → 7 tools")).toBeVisible();
-  await screenshot(page, testInfo, "firebreak-04-mission-complete.png");
 
   await expect(
     executeTool(page, "execute_rescue_mission", { strategy: "coordinated" }),

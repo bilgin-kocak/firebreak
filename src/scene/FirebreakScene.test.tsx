@@ -51,4 +51,33 @@ describe("FirebreakScene", () => {
     expect(screen.getByText(/Mara Chen.*trapped/i)).toBeVisible();
     expect(screen.getByText(/Jon Bell.*trapped/i)).toBeVisible();
   });
+
+  it("lets execution override the stored camera without changing operator preferences", async () => {
+    const synchronizer = {
+      applySnapshot: vi.fn(),
+      setCameraMode: vi.fn(),
+      setSelectedRobot: vi.fn(),
+      setReducedEffects: vi.fn(),
+      adjustCamera: vi.fn(),
+      resize: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const factory = vi.fn(async () => synchronizer) satisfies FirebreakSceneFactory;
+    const { rerender } = render(
+      <FirebreakScene factory={factory} cameraModeOverride="follow" focusRobotId="MEDIC-2" />,
+    );
+
+    await waitFor(() => expect(synchronizer.setCameraMode).toHaveBeenLastCalledWith("follow"));
+    expect(synchronizer.setSelectedRobot).toHaveBeenLastCalledWith("MEDIC-2");
+    expect(useFirebreakStore.getState().ui.cameraMode).toBe("overview");
+    expect(useFirebreakStore.getState().world.selectedRobotId).toBe("SCOUT-1");
+
+    rerender(
+      <FirebreakScene factory={factory} cameraModeOverride="overview" focusRobotId="HAUL-4" />,
+    );
+    await waitFor(() => expect(synchronizer.setCameraMode).toHaveBeenLastCalledWith("overview"));
+    expect(synchronizer.setSelectedRobot).toHaveBeenLastCalledWith("HAUL-4");
+    expect(useFirebreakStore.getState().ui.cameraMode).toBe("overview");
+    expect(useFirebreakStore.getState().world.selectedRobotId).toBe("SCOUT-1");
+  });
 });

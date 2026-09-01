@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import { useFirebreakStore } from "../store/useFirebreakStore";
+import type { RobotId } from "../domain/firebreakTypes";
+import type { PersistedUiState } from "../store/firebreakPersistence";
 import { createWarehouseScene } from "./createWarehouseScene";
 import { createSceneSynchronizer, type SceneSynchronizer } from "./sceneSynchronizer";
 
@@ -19,7 +21,17 @@ const defaultFactory: FirebreakSceneFactory = async (canvas) => {
   return synchronizer;
 };
 
-export function FirebreakScene({ factory = defaultFactory }: { factory?: FirebreakSceneFactory }) {
+interface FirebreakSceneProps {
+  factory?: FirebreakSceneFactory;
+  cameraModeOverride?: PersistedUiState["cameraMode"];
+  focusRobotId?: RobotId;
+}
+
+export function FirebreakScene({
+  factory = defaultFactory,
+  cameraModeOverride,
+  focusRobotId,
+}: FirebreakSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const synchronizerRef = useRef<SceneSynchronizer | null>(null);
   const [graphicsError, setGraphicsError] = useState(false);
@@ -27,6 +39,12 @@ export function FirebreakScene({ factory = defaultFactory }: { factory?: Firebre
   const world = useFirebreakStore((state) => state.world);
   const cameraMode = useFirebreakStore((state) => state.ui.cameraMode);
   const reducedEffects = useFirebreakStore((state) => state.ui.reducedEffects);
+  const activeCameraMode = cameraModeOverride ?? cameraMode;
+  const activeRobotId = focusRobotId ?? world.selectedRobotId;
+  const activeCameraModeRef = useRef(activeCameraMode);
+  const activeRobotIdRef = useRef(activeRobotId);
+  activeCameraModeRef.current = activeCameraMode;
+  activeRobotIdRef.current = activeRobotId;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -42,7 +60,8 @@ export function FirebreakScene({ factory = defaultFactory }: { factory?: Firebre
         }
         synchronizerRef.current = synchronizer;
         synchronizer.applySnapshot(useFirebreakStore.getState().world);
-        synchronizer.setCameraMode(useFirebreakStore.getState().ui.cameraMode);
+        synchronizer.setSelectedRobot(activeRobotIdRef.current);
+        synchronizer.setCameraMode(activeCameraModeRef.current);
         synchronizer.setReducedEffects(useFirebreakStore.getState().ui.reducedEffects);
         setSceneReady(true);
       })
@@ -67,13 +86,11 @@ export function FirebreakScene({ factory = defaultFactory }: { factory?: Firebre
 
   useEffect(() => {
     synchronizerRef.current?.applySnapshot(world);
-  }, [world]);
+    synchronizerRef.current?.setSelectedRobot(activeRobotId);
+  }, [activeRobotId, world]);
   useEffect(() => {
-    synchronizerRef.current?.setCameraMode(cameraMode);
-  }, [cameraMode]);
-  useEffect(() => {
-    synchronizerRef.current?.setSelectedRobot(world.selectedRobotId);
-  }, [world.selectedRobotId]);
+    synchronizerRef.current?.setCameraMode(activeCameraMode);
+  }, [activeCameraMode]);
   useEffect(() => {
     synchronizerRef.current?.setReducedEffects(reducedEffects);
   }, [reducedEffects]);

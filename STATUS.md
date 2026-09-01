@@ -27,6 +27,7 @@ Firebreak is implemented as a static browser application with a complete playabl
 11. In ordinary browsers, **Replay walkthrough · no agent** is explicitly identified as a deterministic fallback and never masquerades as a live agent.
 12. A bounded, non-persistent live trace shows safe input summaries, successes, refusals, the human grant, and exact 7 → 8 → 7 `toolchange` events.
 13. The 90-second active-mission clock visibly pauses during fresh-chat cold start, human review, and the approved Prompt 2 handoff; a dedicated browser regression proves those waits consume no rescue time.
+14. Live execution now clears the planning interface into a cinematic HUD, gives every robot a guaranteed camera shot before the final wide view, shows live progress and one-use authority, preserves stored operator controls, and keeps Emergency Stop visible.
 
 ## Architecture and safety evidence
 
@@ -55,12 +56,12 @@ Firebreak is implemented as a static browser application with a complete playabl
 | Prettier                   | Passed across the repository                                                                                                              |
 | ESLint                     | Passed with zero warnings                                                                                                                 |
 | Strict TypeScript          | Passed                                                                                                                                    |
-| Unit and integration tests | 18 files, 95 tests passed on Vitest 4.1.11                                                                                                |
+| Unit and integration tests | 18 files, 97 tests passed on Vitest 4.1.11                                                                                                |
 | Production build           | Passed on Vite 8.2.2; 2,151 modules transformed                                                                                           |
 | Dependency audit           | `npm audit` reports 0 vulnerabilities                                                                                                     |
-| Playwright                 | 12 tests passed in Chromium, including a dedicated fresh-chat timer-handoff regression                                                    |
-| Canonical journey          | Native-like `document.modelContext` refusal → Prompt 1 → human authorization → dynamic Prompt 2 → receipt → unregistration passed         |
-| Accessibility              | No serious or critical axe findings in ready, proposal, authority, and resolved states                                                    |
+| Playwright                 | 13 tests passed in Chromium, including camera sequencing, Emergency Stop, control locking, and fresh-chat timer handoff                   |
+| Canonical journey          | Native-like refusal → Prompt 1 → human grant → Prompt 2 → four camera cuts → final wide → receipt → unregistration passed                 |
+| Accessibility              | No serious or critical axe findings in ready, proposal, authority, executing, and resolved states                                         |
 | Target sizing              | Every visible tested interactive target is at least 44×44 CSS pixels                                                                      |
 | Keyboard and gamepad       | Keyboard-only authorization works; mocked gamepad drives, switches robots, moves camera, and opens mission control                        |
 | Persistence                | Reload revocation, completed receipt recovery, and reset isolation passed                                                                 |
@@ -77,7 +78,7 @@ The authoritative full command is `npm run check`; it runs formatting, lint, str
 ## Release assets
 
 - `README.md`: product, controls, WebMCP architecture, safety, setup, testing, deployment, and limits.
-- `DEMO_SCRIPT.md`: timed 2:20 real-agent recording plan with a visible refusal beat, explicit current-tab prompts, and paused handoffs.
+- `DEMO_SCRIPT.md`: timed 2:10 clip-by-clip real-agent recording plan with a cold open, refusal, cinematic execution, narration, and final edit checklist.
 - `SUBMISSION_DRAFT.md`: complete challenge narrative with a placeholder only for the demo-video URL.
 - `evals/webmcp-cases.json`: 21 authored tool-selection, schema, safety, lifecycle, and refusal fixtures; no live-model pass rate is claimed.
 - `robotics/README.md`: honest optional ROS 2 Jazzy, Gazebo Harmonic, Nav2, and rosbridge integration guide.

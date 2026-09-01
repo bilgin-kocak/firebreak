@@ -40,7 +40,7 @@ Firebreak solves the gap with **compiled mission authority**: the agent may coor
 
    > Use only the current Firebreak tab’s WebMCP site tools. Do not browse or search the web. Call the newly available execute_rescue_mission tool once with strategy coordinated.
 
-9. Watch four specialist robots complete the deterministic warehouse scenario. The final simulated receipt reports two workers safe, the fire contained, the load secured, and zero safety violations.
+9. Watch the planning interface clear into cinematic execution mode. The camera automatically follows the four specialist robots, colored trails and milestones show real mission progress, and a final wide view resolves into the receipt: two workers safe, fire contained, load secured, and zero safety violations.
 
 The WebMCP surface visibly changes from seven tools, to eight after authorization, and back to seven after the one-use mission is consumed.
 

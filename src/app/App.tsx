@@ -21,8 +21,10 @@ import { createInputController, type InputController } from "../control/inputCon
 import type { TouchControlState } from "../control/controlTypes";
 import { ROBOT_IDS } from "../domain/firebreakSeed";
 import { AuthorizationSheet } from "../components/AuthorizationSheet";
+import { CinematicMissionHUD } from "../components/CinematicMissionHUD";
 import { FirebreakToolSurface } from "../components/FirebreakToolSurface";
 import { FleetControls } from "../components/FleetControls";
+import type { RobotId } from "../domain/firebreakTypes";
 import { useFirebreakStore } from "../store/useFirebreakStore";
 import { bootAppRuntime, type AppRuntime } from "./runtime";
 
@@ -57,6 +59,7 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
   const consoleRef = useRef<HTMLElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [cinematicRobotIndex, setCinematicRobotIndex] = useState(0);
   const world = useFirebreakStore((state) => state.world);
   const mission = useFirebreakStore((state) => state.mission);
   const ui = useFirebreakStore((state) => state.ui);
@@ -116,6 +119,22 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
   }, [planningStarted, world.phase]);
 
   useEffect(() => {
+    if (world.phase !== "executing") {
+      setCinematicRobotIndex(0);
+      return;
+    }
+    if (ui.reducedEffects || cinematicRobotIndex >= ROBOT_IDS.length) return;
+    const cameraCut = window.setTimeout(() => {
+      setCinematicRobotIndex((current) => Math.min(current + 1, ROBOT_IDS.length));
+    }, 1_600);
+    return () => window.clearTimeout(cameraCut);
+  }, [cinematicRobotIndex, ui.reducedEffects, world.phase]);
+
+  useEffect(() => {
+    if (world.phase === "executing") setMessage("");
+  }, [world.phase]);
+
+  useEffect(() => {
     if (!runtime) return;
     const controller = createInputController();
     inputRef.current = controller;
@@ -127,24 +146,27 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
       frame = window.requestAnimationFrame(tick);
       const input = controller.getSnapshot();
       const state = useFirebreakStore.getState();
-      if (input.openMissionControl && !state.ui.missionControlOpen) {
-        state.setMissionControlOpen(true);
-        consoleRef.current?.focus();
-      }
-      if (input.cameraX !== 0 || input.cameraY !== 0) {
-        if (state.ui.cameraMode !== "free") state.setCameraMode("free");
-        window.dispatchEvent(
-          new CustomEvent("firebreak:camera-input", {
-            detail: { x: input.cameraX, y: input.cameraY },
-          }),
-        );
-      }
-      if (input.selectRobot && input.selectRobot !== state.world.selectedRobotId) {
-        state.selectRobot(input.selectRobot);
-      } else if (input.selectDelta !== 0) {
-        const current = ROBOT_IDS.indexOf(state.world.selectedRobotId);
-        const next = (current + input.selectDelta + ROBOT_IDS.length) % ROBOT_IDS.length;
-        state.selectRobot(ROBOT_IDS[next]!);
+      const controlsLocked = state.world.phase === "executing";
+      if (!controlsLocked) {
+        if (input.openMissionControl && !state.ui.missionControlOpen) {
+          state.setMissionControlOpen(true);
+          consoleRef.current?.focus();
+        }
+        if (input.cameraX !== 0 || input.cameraY !== 0) {
+          if (state.ui.cameraMode !== "free") state.setCameraMode("free");
+          window.dispatchEvent(
+            new CustomEvent("firebreak:camera-input", {
+              detail: { x: input.cameraX, y: input.cameraY },
+            }),
+          );
+        }
+        if (input.selectRobot && input.selectRobot !== state.world.selectedRobotId) {
+          state.selectRobot(input.selectRobot);
+        } else if (input.selectDelta !== 0) {
+          const current = ROBOT_IDS.indexOf(state.world.selectedRobotId);
+          const next = (current + input.selectDelta + ROBOT_IDS.length) % ROBOT_IDS.length;
+          state.selectRobot(ROBOT_IDS[next]!);
+        }
       }
       const canDrive = state.world.phase === "active";
       if (canDrive && !commanding && (input.throttle !== 0 || input.turn !== 0 || input.action)) {
@@ -224,6 +246,8 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
     (world.phase === "active" && !planningStarted) ||
     world.phase === "planned" ||
     world.phase === "authorized";
+  const cinematicFocus = ROBOT_IDS[Math.min(cinematicRobotIndex, ROBOT_IDS.length - 1)] as RobotId;
+  const cinematicFinalWide = cinematicRobotIndex >= ROBOT_IDS.length;
 
   return (
     <div className={`firebreak-app phase-${world.phase}`}>
@@ -239,7 +263,20 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
           />
         }
       >
-        <FirebreakScene />
+        <FirebreakScene
+          cameraModeOverride={
+            world.phase === "executing"
+              ? ui.reducedEffects || cinematicFinalWide
+                ? "overview"
+                : "follow"
+              : undefined
+          }
+          focusRobotId={
+            world.phase === "executing" && !ui.reducedEffects && !cinematicFinalWide
+              ? cinematicFocus
+              : undefined
+          }
+        />
       </Suspense>
       <div className="atmosphere-grid" aria-hidden="true" />
 
@@ -524,23 +561,6 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
             </div>
           ) : null}
 
-          {world.phase === "executing" ? (
-            <div className="console-content executing-panel">
-              <div className="execution-scan">
-                <span />
-              </div>
-              <strong>Fleet moving on approved routes</strong>
-              <p>{mission.progress.at(-1)?.message ?? "Dispatching four robots…"}</p>
-              <button
-                className="emergency-stop"
-                type="button"
-                onClick={() => runtime?.dynamicTools.revoke("Operator emergency stop")}
-              >
-                <CircleAlert aria-hidden="true" /> Emergency stop
-              </button>
-            </div>
-          ) : null}
-
           {world.phase === "resolved" && mission.receipt ? (
             <div className="console-content receipt-card">
               <span className="receipt-check">
@@ -583,6 +603,17 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
           ) : null}
         </aside>
       </main>
+
+      {world.phase === "executing" ? (
+        <CinematicMissionHUD
+          world={world}
+          progress={mission.progress}
+          focusRobotId={cinematicFocus}
+          finalWide={cinematicFinalWide}
+          reducedMotion={ui.reducedEffects}
+          onEmergencyStop={() => void runtime?.dynamicTools.revoke("Operator emergency stop")}
+        />
+      ) : null}
 
       <div className="camera-switcher" role="group" aria-label="Camera mode">
         {(["overview", "follow", "free"] as const).map((camera) => (

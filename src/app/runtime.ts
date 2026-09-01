@@ -67,7 +67,7 @@ export const bootAppRuntime = async (options: AppRuntimeOptions = {}): Promise<A
     new BrowserSimulationDriver({
       readSnapshot: () => getFirebreakState().world,
       commitSnapshot: (snapshot) => getFirebreakState().replaceWorld(snapshot),
-      playbackRate: options.accelerated ? 100_000 : 10,
+      playbackRate: options.accelerated ? 100_000 : 4,
       ...(options.accelerated ? { wait: async () => undefined } : {}),
     });
   await driver.connect();

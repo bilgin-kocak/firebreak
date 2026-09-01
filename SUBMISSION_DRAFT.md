@@ -12,7 +12,7 @@ One agent. Four robots. One human-approved rescue boundary.
 
 Firebreak lets a human drive one emergency robot while a WebMCP agent plans a rescue, passes eleven deterministic safety checks, and executes once after human authorization.
 
-## The problem
+## The real problem
 
 Emergency robot fleets have a coordination gap. A person can understand mission intent and make judgment calls, but cannot continuously drive several specialist robots at once. An AI agent can coordinate at machine speed, but giving it permanent, free-form movement authority creates unacceptable risk.
 
@@ -20,7 +20,23 @@ Firebreak demonstrates a third model: shared control with temporary compiled aut
 
 What can people and agents do together that was impossible before? A human can make one understandable high-stakes decision while an agent coordinates several interdependent actions inside that exact boundary at machine speed—and the website automatically removes the authority afterward.
 
-## What it does
+## Why this is a strong WebMCP use case
+
+Traditional UI automation would force the agent to scrape labels and guess the current robot state, while a broad robot API would give it more authority than the mission requires. WebMCP lets the website expose the exact typed capabilities that are safe now, enforce their order in code, and visibly add or remove authority as the shared situation changes.
+
+Firebreak is therefore not a chatbot layered over a robot game. The judged path uses a real Codex or ChatGPT agent to call live website tools. The website remains the source of truth for state, validation, policy, and execution.
+
+## How it creates a better experience
+
+The operator does not have to drive four robots, translate an AI plan into manual commands, or approve dozens of low-level actions. One prompt produces a synchronized, inspectable plan. One understandable human decision grants only that plan. A cinematic execution view then clears away the planning interface, follows the real robot movement automatically, and ends on a receipt.
+
+The live trace makes the invisible protocol legible: judges can see agent calls, a blocked request, the human grant, and the exact 7 → 8 → 7 capability lifecycle without reading source code.
+
+## What people and agents can now do together
+
+A human can make one understandable high-stakes decision while an agent coordinates several interdependent physical-world-style actions inside that exact boundary at machine speed. The website automatically removes the authority afterward. Doing all three together—multi-actor coordination, exact human-approved scope, and automatic revocation—is the new experience Firebreak demonstrates.
+
+## What the product does
 
 The browser opens on warehouse emergency WH-01: a battery fire, two trapped workers, a hazardous load, a collapse zone, and four specialist robots.
 
@@ -42,7 +58,9 @@ Fresh-chat latency does not steal emergency time: the 90-second clock runs only 
 
 Prompt 2 invokes it. Four simulated 3D robots move concurrently: SCOUT-1 maps danger, MEDIC-2 rescues one worker, SUPPRESS-3 isolates and contains the battery fire, and HAUL-4 rescues the second worker while moving the exposed load. A deterministic receipt reports two workers safe, the fire contained, the load secured, and zero violations. The one-use tool unregisters and the surface returns to seven tools.
 
-## Why WebMCP is essential
+During movement, Firebreak enters a cinematic execution mode driven by the live mission state. The planning panels and tool drawer clear away, the camera automatically follows each robot, colored progress and action milestones stay visible, and the final wide view resolves into the receipt. This is presentation of the real execution, not a video or scripted substitute for the agent.
+
+## How WebMCP is implemented
 
 Firebreak is built around a website-owned capability surface, not DOM automation or a chatbot pretending to control a scene.
 
@@ -73,7 +91,7 @@ The transferable pattern is **compiled one-use authority**. The same lifecycle c
 
 ## The “wow” moment
 
-The judge first drives one robot like a game. One prompt then draws four safe routes across the burning warehouse. One human click makes a new WebMCP tool appear live. A second prompt launches four robots at once, resolves every objective, produces a receipt, and visibly deletes its own authority.
+One prompt draws four proven routes across a burning warehouse. One human click makes a new WebMCP tool appear live. A second prompt clears the interface into an auto-directed rescue, launches four robots at once, resolves every objective, produces a receipt, and visibly deletes its own authority.
 
 ## Safety and honesty
 
@@ -105,6 +123,18 @@ React 19, TypeScript, Vite, Babylon.js, Havok, Zustand, Zod, imperative WebMCP, 
 - Live demo: [firebreak-eosin.vercel.app](https://firebreak-eosin.vercel.app/)
 - Source: [github.com/bilgin-kocak/firebreak](https://github.com/bilgin-kocak/firebreak)
 - Demo video: `[ADD VIDEO URL]`
+
+## Final submission checklist
+
+- [x] Public live URL with no login or credentials required
+- [x] Public source repository
+- [x] MIT license
+- [x] Exact judge testing instructions in README
+- [x] Specific description covering WebMCP fit, experience, collaboration, and implementation
+- [ ] Public YouTube demo under three minutes with narration audio
+- [ ] Replace the demo-video placeholder above
+- [ ] Confirm teammate names and all Devpost form fields
+- [ ] Open every submitted link in an incognito window before final submission
 
 ## License
 

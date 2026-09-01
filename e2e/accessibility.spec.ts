@@ -1,7 +1,14 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-import { approve, boot, executeApproved, invokeNativePlanningJourney } from "./helpers";
+import {
+  approve,
+  boot,
+  executeApproved,
+  finishApprovedExecution,
+  invokeNativePlanningJourney,
+  startApprovedExecution,
+} from "./helpers";
 
 const seriousOrCritical = async (page: Parameters<typeof boot>[0]) => {
   const result = await new AxeBuilder({ page }).analyze();
@@ -20,7 +27,9 @@ test("ready, proposal, authority, and resolved states have no serious axe findin
   expect(await seriousOrCritical(page)).toEqual([]);
   await approve(page);
   expect(await seriousOrCritical(page)).toEqual([]);
-  await executeApproved(page);
+  await startApprovedExecution(page);
+  expect(await seriousOrCritical(page)).toEqual([]);
+  await finishApprovedExecution(page);
   expect(await seriousOrCritical(page)).toEqual([]);
 });
 
