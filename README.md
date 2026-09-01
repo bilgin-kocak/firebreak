@@ -8,6 +8,7 @@ Firebreak is a cinematic, browser-playable warehouse rescue that demonstrates a 
 
 ## For judges
 
+- **Live demo:** [firebreak-eosin.vercel.app](https://firebreak-eosin.vercel.app/)
 - **Real agent path:** open Firebreak in the Codex or ChatGPT built-in browser, confirm **WebMCP Native**, and paste the two prompts shown on the page.
 - **What to watch:** a refused out-of-sequence call, seven planning tools, 11/11 gates, one human click, `toolchange` from **7 → 8**, one execution, then **8 → 7**.
 - **What is not AI:** an ordinary browser shows **Replay walkthrough · no agent**, a disclosed deterministic fallback for viewing the product.
@@ -128,7 +129,7 @@ npm install
 npm run dev
 ```
 
-For the tested live-agent path, use the Codex or ChatGPT desktop built-in browser with GPT-5.6 Sol, then open the local URL printed by Vite—normally `http://127.0.0.1:5173`. When site tools are available for the host account, click **Start emergency**, send the two on-screen prompts from the surrounding chat, and the page shows **WebMCP Native** while it waits for real agent tool calls.
+For the tested live-agent path, use the Codex or ChatGPT desktop built-in browser with GPT-5.6 Sol, then open [firebreak-eosin.vercel.app](https://firebreak-eosin.vercel.app/). When site tools are available for the host account, click **Start emergency**, send the two on-screen prompts from the surrounding chat, and the page shows **WebMCP Native** while it waits for real agent tool calls. You can use the local URL printed by Vite—normally `http://127.0.0.1:5173`—for development.
 
 The app requires no OpenAI API key, environment variable, camera, controller, backend, robot, or ROS installation; Codex/ChatGPT uses the account already signed into the host app. If native WebMCP is unavailable, the page shows **Replay walkthrough · no agent**. Its two local buttons exercise the same registered definitions and handlers without claiming a model is involved.
 

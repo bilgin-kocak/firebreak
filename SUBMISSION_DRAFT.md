@@ -100,7 +100,7 @@ React 19, TypeScript, Vite, Babylon.js, Havok, Zustand, Zod, imperative WebMCP, 
 
 ## Links
 
-- Live demo: `[ADD DEPLOYED URL]`
+- Live demo: [firebreak-eosin.vercel.app](https://firebreak-eosin.vercel.app/)
 - Source: [github.com/bilgin-kocak/firebreak](https://github.com/bilgin-kocak/firebreak)
 - Demo video: `[ADD VIDEO URL]`
 
