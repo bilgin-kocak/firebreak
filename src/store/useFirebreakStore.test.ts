@@ -131,4 +131,37 @@ describe("useFirebreakStore", () => {
     );
     expect(failed.world.events.at(-1)?.message).toMatch(/90-second rescue window expired/i);
   });
+
+  it("bounds the transient trace without evicting an active call and clears it on reset", () => {
+    const store = useFirebreakStore.getState();
+    store.recordWebMCPTrace({
+      id: "active",
+      kind: "tool",
+      name: "inspect_emergency",
+      status: "running",
+      at: 1,
+    });
+    for (let index = 0; index < 16; index += 1) {
+      useFirebreakStore.getState().recordWebMCPTrace({
+        id: `complete-${index}`,
+        kind: "tool",
+        name: "inspect_emergency",
+        status: "succeeded",
+        at: index + 2,
+      });
+    }
+
+    expect(useFirebreakStore.getState().webmcp.trace).toHaveLength(16);
+    expect(useFirebreakStore.getState().webmcp.trace.some((entry) => entry.id === "active")).toBe(
+      true,
+    );
+
+    useFirebreakStore.getState().updateWebMCPTrace("active", { status: "succeeded" });
+    expect(
+      useFirebreakStore.getState().webmcp.trace.find((entry) => entry.id === "active")?.status,
+    ).toBe("succeeded");
+
+    useFirebreakStore.getState().resetDemo();
+    expect(useFirebreakStore.getState().webmcp.trace).toEqual([]);
+  });
 });

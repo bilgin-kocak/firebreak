@@ -1,4 +1,14 @@
-import { Bot, ChevronDown, Radio, ShieldCheck } from "lucide-react";
+import {
+  Activity,
+  Bot,
+  Check,
+  ChevronDown,
+  CircleAlert,
+  Radio,
+  ShieldCheck,
+  UserCheck,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { useFirebreakStore } from "../store/useFirebreakStore";
 
@@ -17,7 +27,21 @@ export function FirebreakToolSurface() {
   const names = useFirebreakStore((state) => state.webmcp.registeredToolNames);
   const mode = useFirebreakStore((state) => state.webmcp.mode);
   const lastChange = useFirebreakStore((state) => state.webmcp.lastToolChangeAt);
+  const trace = useFirebreakStore((state) => state.webmcp.trace);
+  const [open, setOpen] = useState(false);
+  const hasAutoOpened = useRef(false);
   const dynamic = names.includes("execute_rescue_mission");
+  const displayedTrace = [...trace].reverse();
+
+  useEffect(() => {
+    if (trace.length === 0) {
+      hasAutoOpened.current = false;
+    } else if (!hasAutoOpened.current) {
+      hasAutoOpened.current = true;
+      setOpen(true);
+    }
+  }, [trace.length]);
+
   return (
     <>
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -25,7 +49,11 @@ export function FirebreakToolSurface() {
           ? `WebMCP tool surface changed. ${names.length} tools are now registered.`
           : `WebMCP tool surface ready with ${names.length} registered tools.`}
       </p>
-      <details className={`tool-surface ${dynamic ? "tool-surface-authorized" : ""}`}>
+      <details
+        className={`tool-surface ${dynamic ? "tool-surface-authorized" : ""}`}
+        open={open}
+        onToggle={(event) => setOpen(event.currentTarget.open)}
+      >
         <summary>
           <span className="tool-live-dot" aria-hidden="true" />
           <span>
@@ -41,11 +69,70 @@ export function FirebreakToolSurface() {
           </span>
           <ChevronDown className="details-chevron" size={16} aria-hidden="true" />
         </summary>
-        <div className="tool-surface-body">
+        <div className="tool-surface-body" tabIndex={0} aria-label="WebMCP tools and trace">
           <p className="toolchange-note">
             {lastChange ? "Tool surface changed visibly" : "Tool surface ready"}
           </p>
-          <ul>
+          <section className="webmcp-trace" role="region" aria-label="Live WebMCP trace">
+            <header>
+              <span>
+                <Activity size={14} aria-hidden="true" /> Live WebMCP trace
+              </span>
+              <small>{trace.length ? `${trace.length} events` : "waiting for agent"}</small>
+            </header>
+            {trace.length ? (
+              <ol>
+                {displayedTrace.map((entry, index) => {
+                  const Icon =
+                    entry.kind === "human"
+                      ? UserCheck
+                      : entry.kind === "toolchange"
+                        ? Activity
+                        : entry.status === "blocked"
+                          ? CircleAlert
+                          : entry.status === "succeeded"
+                            ? Check
+                            : Radio;
+                  return (
+                    <li
+                      key={entry.id}
+                      className={`trace-entry trace-${entry.kind} trace-${entry.status}`}
+                    >
+                      <span className="trace-index">
+                        {String(trace.length - index).padStart(2, "0")}
+                      </span>
+                      <Icon className="trace-icon" size={14} aria-hidden="true" />
+                      <span className="trace-main">
+                        <span className="trace-title">
+                          <code>{entry.name}</code>
+                          <strong>{entry.status}</strong>
+                        </span>
+                        {entry.inputSummary ? (
+                          <code className="trace-input">{entry.inputSummary}</code>
+                        ) : null}
+                        {entry.code || entry.message ? (
+                          <span className="trace-result">
+                            {entry.code ? <code>{entry.code}</code> : null}
+                            {entry.message ? <span>{entry.message}</span> : null}
+                          </span>
+                        ) : null}
+                      </span>
+                      {entry.durationMs !== undefined ? (
+                        <small className="trace-duration">{Math.round(entry.durationMs)} ms</small>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <p>Agent calls, refusals, human approval, and authority changes will appear here.</p>
+            )}
+          </section>
+          <div className="tool-inventory-heading">
+            <span>Registered capability surface</span>
+            <small>{names.length} active</small>
+          </div>
+          <ul className="tool-inventory">
             {names.map((name) => (
               <li key={name} className={name === "execute_rescue_mission" ? "dynamic-tool" : ""}>
                 {name === "execute_rescue_mission" ? (

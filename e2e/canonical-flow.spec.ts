@@ -6,7 +6,7 @@ import {
   collectRuntimeErrors,
   executeApproved,
   executeTool,
-  runPromptA,
+  invokeNativePlanningJourney,
   screenshot,
   STATIC_TOOLS,
   startEmergency,
@@ -45,7 +45,19 @@ test("canonical two-prompt rescue plans, authorizes, moves the fleet, and unregi
       document.documentElement.dataset.toolchangeCount = String(count + 1);
     });
   });
-  await runPromptA(page);
+
+  const refused = await executeTool(page, "simulate_mission", {
+    incidentId: "WH-01",
+    strategy: "coordinated",
+  });
+  expect(refused).toMatchObject({ ok: false, code: "HAZARD_SCAN_REQUIRED" });
+  const trace = page.getByRole("region", { name: "Live WebMCP trace" });
+  await expect(trace).toBeVisible();
+  await expect(trace.getByText("simulate_mission")).toBeVisible();
+  await expect(trace.getByText("HAZARD_SCAN_REQUIRED")).toBeVisible();
+  await expect(trace.getByText("blocked", { exact: true })).toBeVisible();
+
+  await invokeNativePlanningJourney(page);
   await expect.poll(() => toolNames(page)).toEqual([...STATIC_TOOLS]);
   await expect(page.getByText("11/11")).toBeVisible();
   await screenshot(page, testInfo, "firebreak-02-routes-and-proposal.png");
@@ -66,6 +78,9 @@ test("canonical two-prompt rescue plans, authorizes, moves the fleet, and unregi
   await expect(page.getByText("0 violations")).toBeVisible();
   await expect(page.getByText("One-use tool consumed and unregistered.")).toBeVisible();
   await expect(page.getByText("7 tools live")).toBeVisible();
+  await expect(trace.getByText("Authorize one mission")).toBeVisible();
+  await expect(trace.getByText("7 → 8 tools")).toBeVisible();
+  await expect(trace.getByText("8 → 7 tools")).toBeVisible();
   await screenshot(page, testInfo, "firebreak-04-mission-complete.png");
 
   await expect(

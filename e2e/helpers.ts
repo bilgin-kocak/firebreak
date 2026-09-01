@@ -52,13 +52,13 @@ export const boot = async (page: Page) => {
 
 export const startEmergency = async (page: Page) => {
   const start = page.getByRole("button", { name: "Start emergency" });
-  if (await start.isVisible()) await start.click();
+  if (await start.isVisible()) await start.click({ noWaitAfter: true });
   await expect(page.getByText("LIVE AGENT", { exact: true })).toBeVisible();
   await expect(page.getByText(/send prompt 1 in codex or chatgpt/i)).toBeVisible();
-  await expect(page.getByRole("button", { name: /run demo prompt 1/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /replay planning walkthrough/i })).toHaveCount(0);
 };
 
-export const runPromptA = async (page: Page) => {
+export const invokeNativePlanningJourney = async (page: Page) => {
   await startEmergency(page);
   await executeTool(page, "inspect_emergency", { incidentId: "WH-01" });
   await executeTool(page, "scan_hazards", {
@@ -88,7 +88,7 @@ export const approve = async (page: Page) => {
   await dialog.getByRole("button", { name: "Authorize one mission" }).click({ noWaitAfter: true });
   await expect.poll(() => toolNames(page)).toEqual([...STATIC_TOOLS, "execute_rescue_mission"]);
   await expect(page.getByText(/send prompt 2 in codex or chatgpt/i)).toBeVisible();
-  await expect(page.getByRole("button", { name: /run demo prompt 2/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /replay execution walkthrough/i })).toHaveCount(0);
 };
 
 export const executeApproved = async (page: Page) => {

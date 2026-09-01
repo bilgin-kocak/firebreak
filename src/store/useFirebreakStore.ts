@@ -29,6 +29,21 @@ export interface FirebreakWebMCPState {
   registeredToolNames: string[];
   lastToolChangeAt: number | null;
   toolCallCount: number;
+  trace: WebMCPTraceEntry[];
+}
+
+export type WebMCPTraceStatus = "running" | "succeeded" | "blocked" | "granted" | "changed";
+
+export interface WebMCPTraceEntry {
+  id: string;
+  kind: "tool" | "human" | "toolchange";
+  name: string;
+  status: WebMCPTraceStatus;
+  at: number;
+  inputSummary?: string;
+  code?: string;
+  message?: string;
+  durationMs?: number;
 }
 
 export interface FirebreakState {
@@ -59,6 +74,8 @@ export interface FirebreakState {
   setTouchControlsEnabled(enabled: boolean): void;
   setWebMCP(patch: Partial<FirebreakWebMCPState>): void;
   recordToolCall(): void;
+  recordWebMCPTrace(entry: WebMCPTraceEntry): void;
+  updateWebMCPTrace(id: string, patch: Partial<WebMCPTraceEntry>): void;
   resetDemo(): void;
 }
 
@@ -67,7 +84,20 @@ const initialWebMCP = (): FirebreakWebMCPState => ({
   registeredToolNames: [],
   lastToolChangeAt: null,
   toolCallCount: 0,
+  trace: [],
 });
+
+function appendBoundedTrace(
+  trace: WebMCPTraceEntry[],
+  entry: WebMCPTraceEntry,
+): WebMCPTraceEntry[] {
+  const next = [...trace, entry];
+  while (next.length > 16) {
+    const settledIndex = next.findIndex((candidate) => candidate.status !== "running");
+    next.splice(settledIndex >= 0 ? settledIndex : 0, 1);
+  }
+  return next;
+}
 
 let persistenceStorage: PersistenceStorage | undefined = browserStorage();
 
@@ -365,6 +395,24 @@ export const useFirebreakStore = create<FirebreakState>((set, get) => {
     recordToolCall() {
       set((state) => ({
         webmcp: { ...state.webmcp, toolCallCount: state.webmcp.toolCallCount + 1 },
+      }));
+    },
+    recordWebMCPTrace(entry) {
+      set((state) => ({
+        webmcp: {
+          ...state.webmcp,
+          trace: appendBoundedTrace(state.webmcp.trace, entry),
+        },
+      }));
+    },
+    updateWebMCPTrace(id, patch) {
+      set((state) => ({
+        webmcp: {
+          ...state.webmcp,
+          trace: state.webmcp.trace.map((entry) =>
+            entry.id === id ? { ...entry, ...patch, id: entry.id } : entry,
+          ),
+        },
       }));
     },
     resetDemo() {

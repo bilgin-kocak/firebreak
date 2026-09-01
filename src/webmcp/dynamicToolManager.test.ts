@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BrowserSimulationDriver } from "../control/browserSimulationDriver";
+import type { MissionRobotDriver } from "../control/controlTypes";
 import { getFirebreakState, useFirebreakStore } from "../store/useFirebreakStore";
 import { DynamicMissionToolManager } from "./dynamicToolManager";
 import { createMemoryAdapter } from "./memoryAdapter";
@@ -11,17 +12,20 @@ async function stagedSetup(
   options: {
     wait?: (ms: number, signal: AbortSignal) => Promise<void>;
     now?: () => number;
+    driver?: MissionRobotDriver;
   } = {},
 ) {
   const adapter = createMemoryAdapter();
   const registry = new ToolRegistry(adapter);
   await registerStaticTools(registry, { now: () => 1_000 });
-  const driver = new BrowserSimulationDriver({
-    readSnapshot: () => getFirebreakState().world,
-    commitSnapshot: (snapshot) => getFirebreakState().replaceWorld(snapshot),
-    wait: options.wait ?? (async () => undefined),
-    playbackRate: 4,
-  });
+  const driver =
+    options.driver ??
+    new BrowserSimulationDriver({
+      readSnapshot: () => getFirebreakState().world,
+      commitSnapshot: (snapshot) => getFirebreakState().replaceWorld(snapshot),
+      wait: options.wait ?? (async () => undefined),
+      playbackRate: 4,
+    });
   const manager = new DynamicMissionToolManager(registry, {
     driver,
     now: options.now ?? (() => 2_000),
@@ -165,5 +169,38 @@ describe("DynamicMissionToolManager", () => {
 
     await expect(execution).resolves.toMatchObject({ ok: false, code: "EXECUTION_CANCELLED" });
     expect(getFirebreakState().mission.receipt?.outcome).toBe("cancelled");
+  });
+
+  it("revokes and unregisters authority when execution and emergency stop both reject", async () => {
+    const driver: MissionRobotDriver = {
+      mode: "browser",
+      connect: async () => undefined,
+      disconnect: async () => undefined,
+      commandManual: async () => undefined,
+      executeRoute: async () => {
+        throw new Error("route driver failed");
+      },
+      stopAll: async () => {
+        throw new Error("emergency stop failed");
+      },
+    };
+    const { adapter, registry, manager } = await stagedSetup({ driver });
+    await manager.approveAndRegister(getFirebreakState().mission.proposal!.id);
+
+    await expect(
+      adapter.executeTool("execute_rescue_mission", { strategy: "coordinated" }),
+    ).resolves.toMatchObject({ ok: false, code: "OPERATION_FAILED" });
+    await registry.settleToolChanges();
+
+    expect(getFirebreakState().world.phase).toBe("active");
+    expect(getFirebreakState().mission.proposal?.status).toBe("revoked");
+    expect(
+      getFirebreakState()
+        .webmcp.trace.filter((entry) => entry.kind === "toolchange")
+        .map((entry) => entry.message),
+    ).toEqual(["7 → 8 tools", "8 → 7 tools"]);
+    await expect(
+      adapter.executeTool("execute_rescue_mission", { strategy: "coordinated" }),
+    ).rejects.toMatchObject({ code: "TOOL_NOT_FOUND" });
   });
 });

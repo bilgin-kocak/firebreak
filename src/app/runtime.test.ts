@@ -21,7 +21,7 @@ describe("Firebreak runtime", () => {
     expect((await runtime.adapter.getTools()).map((tool) => tool.name)).toEqual(STATIC_TOOL_NAMES);
 
     useFirebreakStore.getState().startEmergency();
-    await runtime.runPromptA();
+    await runtime.runDemoPlanningReplay();
     expect(getFirebreakState().mission.proposal?.status).toBe("staged");
 
     await runtime.authorizeMission(getFirebreakState().mission.proposal!.id);
@@ -29,7 +29,7 @@ describe("Firebreak runtime", () => {
       "execute_rescue_mission",
     );
 
-    await runtime.runPromptB();
+    await runtime.runDemoExecutionReplay();
     expect(getFirebreakState().world.phase).toBe("resolved");
     expect((await runtime.adapter.getTools()).map((tool) => tool.name)).toEqual(STATIC_TOOL_NAMES);
 

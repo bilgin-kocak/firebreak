@@ -49,7 +49,11 @@ describe("seven static Firebreak tools", () => {
 
     await expect(
       adapter.executeTool("inspect_emergency", { incidentId: "WH-01" }),
-    ).resolves.toMatchObject({ ok: true, code: "EMERGENCY_INSPECTED" });
+    ).resolves.toMatchObject({
+      ok: true,
+      code: "EMERGENCY_INSPECTED",
+      data: { nextStep: "scan_hazards" },
+    });
     await expect(
       adapter.executeTool("scan_hazards", {
         incidentId: "WH-01",
@@ -58,14 +62,18 @@ describe("seven static Firebreak tools", () => {
     ).resolves.toMatchObject({
       ok: true,
       code: "HAZARDS_SCANNED",
-      data: { workersLocated: 2, collapseZoneMarked: true },
+      data: {
+        workersLocated: 2,
+        collapseZoneMarked: true,
+        nextStep: "inspect_fleet",
+      },
     });
     await expect(
       adapter.executeTool("inspect_fleet", { incidentId: "WH-01" }),
     ).resolves.toMatchObject({
       ok: true,
       code: "FLEET_INSPECTED",
-      data: { robotCount: 4 },
+      data: { robotCount: 4, nextStep: "simulate_mission" },
     });
 
     const simulation = (await adapter.executeTool("simulate_mission", {
@@ -75,7 +83,11 @@ describe("seven static Firebreak tools", () => {
     expect(simulation).toMatchObject({
       ok: true,
       code: "MISSION_SIMULATED",
-      data: { feasible: true, predictedDurationMs: 43_000 },
+      data: {
+        feasible: true,
+        predictedDurationMs: 43_000,
+        nextStep: "validate_safety_envelope",
+      },
     });
 
     await expect(
@@ -85,7 +97,7 @@ describe("seven static Firebreak tools", () => {
     ).resolves.toMatchObject({
       ok: true,
       code: "SAFETY_ENVELOPE_VALIDATED",
-      data: { passed: true, checkCount: 11 },
+      data: { passed: true, checkCount: 11, nextStep: "stage_mission_tool" },
     });
 
     await expect(
@@ -96,7 +108,11 @@ describe("seven static Firebreak tools", () => {
     ).resolves.toMatchObject({
       ok: true,
       code: "MISSION_TOOL_STAGED",
-      data: { status: "staged", requiresHumanAuthorization: true },
+      data: {
+        status: "staged",
+        requiresHumanAuthorization: true,
+        nextStep: "await_human_authorization",
+      },
     });
 
     await expect(

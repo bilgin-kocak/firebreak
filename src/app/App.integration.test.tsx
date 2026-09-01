@@ -75,15 +75,16 @@ describe("Firebreak application", () => {
     );
   });
 
-  it("labels the no-model journey as Demo Autopilot", async () => {
+  it("labels the no-model journey as a replay walkthrough", async () => {
     const user = userEvent.setup();
     render(<App accelerated />);
     await waitFor(() => expect(getFirebreakState().webmcp.registeredToolNames).toHaveLength(7));
 
     await user.click(screen.getByRole("button", { name: /start emergency/i }));
-    expect(screen.getAllByText(/demo autopilot/i)).toHaveLength(2);
+    expect(screen.getAllByText(/replay walkthrough/i)).toHaveLength(2);
+    expect(screen.getAllByText(/no agent/i)).toHaveLength(2);
     expect(screen.queryByText(/live agent/i)).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /run demo prompt 1/i }));
+    await user.click(screen.getByRole("button", { name: /replay planning walkthrough/i }));
     await waitFor(() => expect(getFirebreakState().mission.proposal?.status).toBe("staged"));
 
     const proposal = screen.getByRole("dialog", { name: /authorize rescue mission/i });
@@ -97,7 +98,7 @@ describe("Firebreak application", () => {
     );
     expect(screen.getByText(/8 tools live/i)).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: /run demo prompt 2/i }));
+    await user.click(screen.getByRole("button", { name: /replay execution walkthrough/i }));
     await waitFor(() => expect(getFirebreakState().world.phase).toBe("resolved"));
     expect(screen.getByRole("heading", { name: /mission complete/i })).toBeVisible();
     expect(screen.getByText(/2 workers safe/i)).toBeVisible();
@@ -117,7 +118,9 @@ describe("Firebreak application", () => {
     await user.click(screen.getByRole("button", { name: /start emergency/i }));
     expect(screen.getByText(/live agent/i)).toBeVisible();
     expect(screen.getByText(/send prompt 1 in codex or chatgpt/i)).toBeVisible();
-    expect(screen.queryByRole("button", { name: /run demo prompt 1/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /replay planning walkthrough/i }),
+    ).not.toBeInTheDocument();
 
     await act(invokePromptOneThroughNativeWebMCP);
     await waitFor(() => expect(getFirebreakState().mission.proposal?.status).toBe("staged"));
@@ -128,7 +131,23 @@ describe("Firebreak application", () => {
       expect(getFirebreakState().webmcp.registeredToolNames).toContain("execute_rescue_mission"),
     );
     expect(screen.getByText(/send prompt 2 in codex or chatgpt/i)).toBeVisible();
-    expect(screen.queryByRole("button", { name: /run demo prompt 2/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /replay execution walkthrough/i }),
+    ).not.toBeInTheDocument();
+    expect(getFirebreakState().webmcp.trace).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "human",
+          status: "granted",
+          name: "Authorize one mission",
+        }),
+        expect.objectContaining({
+          kind: "toolchange",
+          status: "changed",
+          message: "7 → 8 tools",
+        }),
+      ]),
+    );
 
     await act(async () => {
       const modelContext = document.modelContext!;
@@ -145,5 +164,50 @@ describe("Firebreak application", () => {
     await waitFor(() =>
       expect(getFirebreakState().webmcp.registeredToolNames).toEqual(STATIC_TOOL_NAMES),
     );
+    expect(getFirebreakState().webmcp.trace).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "toolchange",
+          status: "changed",
+          message: "8 → 7 tools",
+        }),
+      ]),
+    );
+    expect(
+      getFirebreakState()
+        .webmcp.trace.filter((entry) => entry.kind === "toolchange")
+        .map((entry) => entry.message),
+    ).toEqual(["7 → 8 tools", "8 → 7 tools"]);
   }, 15_000);
+
+  it("makes a native safety refusal visible before the canonical agent journey", async () => {
+    const user = userEvent.setup();
+    installModelContextMock();
+    render(<App accelerated />);
+    await waitFor(() => expect(getFirebreakState().webmcp.mode).toBe("native"));
+    await waitFor(() => expect(getFirebreakState().webmcp.registeredToolNames).toHaveLength(7));
+    await user.click(screen.getByRole("button", { name: /start emergency/i }));
+
+    await user.click(screen.getByRole("button", { name: /copy blocked-call test/i }));
+    expect(screen.getByText(/blocked-call test copied/i)).toBeVisible();
+
+    await act(async () => {
+      const modelContext = document.modelContext!;
+      const tool = (await modelContext.getTools!()).find(
+        (candidate) => candidate.name === "simulate_mission",
+      );
+      if (!tool) throw new Error("Simulation tool is not registered.");
+      await modelContext.executeTool!(tool, {
+        incidentId: "WH-01",
+        strategy: "coordinated",
+      });
+    });
+
+    const trace = screen.getByRole("region", { name: /live webmcp trace/i });
+    expect(trace).toBeVisible();
+    expect(within(trace).getByText("simulate_mission")).toBeVisible();
+    expect(within(trace).getByText(/blocked/i)).toBeVisible();
+    expect(within(trace).getByText("HAZARD_SCAN_REQUIRED")).toBeVisible();
+    expect(getFirebreakState().world.phase).toBe("active");
+  });
 });

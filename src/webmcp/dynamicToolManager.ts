@@ -79,6 +79,14 @@ export class DynamicMissionToolManager {
     this.assertCurrent(proposal);
 
     const authorized = state.authorizeProposal(proposalId, this.now());
+    state.recordWebMCPTrace({
+      id: `human-authorization-${authorized.id}`,
+      kind: "human",
+      name: "Authorize one mission",
+      status: "granted",
+      at: Date.now(),
+      message: "Human approved one compiled mission for one use.",
+    });
     const controller = new AbortController();
     try {
       await this.registry.register(this.createDefinition(authorized.id), {
@@ -230,6 +238,12 @@ export class DynamicMissionToolManager {
         safetyViolations: result.receipt.safetyViolations,
         durationMs: result.receipt.durationMs,
       });
+    } catch (error) {
+      if (this.controller) {
+        this.revoke("Mission execution failed before a receipt could be recorded.");
+        await this.registry.settleToolChanges();
+      }
+      throw error;
     } finally {
       combined.cleanup();
     }

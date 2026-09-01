@@ -5,7 +5,7 @@ import {
   boot,
   executeApproved,
   expectNoOverflow,
-  runPromptA,
+  invokeNativePlanningJourney,
   screenshot,
 } from "./helpers";
 
@@ -18,7 +18,7 @@ test("desktop rescue, proposal, and resolved views keep the warehouse dominant",
   await expectNoOverflow(page);
   await screenshot(page, testInfo, "responsive-firebreak-desktop.png");
 
-  await runPromptA(page);
+  await invokeNativePlanningJourney(page);
   await expectNoOverflow(page);
   await screenshot(page, testInfo, "responsive-firebreak-proposal-desktop.png");
 
@@ -38,7 +38,7 @@ test("mobile rescue, proposal, and resolved views have no horizontal overflow", 
   await expect(page.getByRole("group", { name: "Touch robot controls" })).toBeInViewport();
   await screenshot(page, testInfo, "responsive-firebreak-mobile.png");
 
-  await runPromptA(page);
+  await invokeNativePlanningJourney(page);
   await expectNoOverflow(page);
   await screenshot(page, testInfo, "responsive-firebreak-proposal-mobile.png");
 

@@ -91,7 +91,7 @@ export const createStaticToolDefinitions = (
     define({
       name: "inspect_emergency",
       description:
-        "Inspect emergency WH-01, the trapped workers, visible hazards, objectives, and current response phase. Read-only.",
+        "Start here. Inspect emergency WH-01, the trapped workers, visible hazards, objectives, and current response phase. Read-only. Then call scan_hazards.",
       inputSchema: closedObject({ incidentId }, ["incidentId"]),
       annotations: read,
       inputValidator: strict({ incidentId: z.literal("WH-01") }),
@@ -107,13 +107,14 @@ export const createStaticToolDefinitions = (
           fireIntensity: world.hazards.fire.intensity,
           objectives: structuredClone(world.objectives),
           durationLimitMs: world.durationLimitMs,
+          nextStep: "scan_hazards",
         });
       },
     }),
     define({
       name: "scan_hazards",
       description:
-        "Run a bounded thermal scan with SCOUT-1 and mark the workers, fire, hazardous container, and forbidden collapse zone.",
+        "Call after inspect_emergency. Run a bounded thermal scan with SCOUT-1 and mark the workers, fire, hazardous container, and forbidden collapse zone. Then call inspect_fleet.",
       inputSchema: closedObject(
         {
           incidentId,
@@ -137,13 +138,14 @@ export const createStaticToolDefinitions = (
           collapseZoneMarked: true,
           fireLocated: true,
           containerLocated: true,
+          nextStep: "inspect_fleet",
         });
       },
     }),
     define({
       name: "inspect_fleet",
       description:
-        "Inspect the four role-limited emergency robots, their health, battery, position, and readiness. Read-only.",
+        "Call after scan_hazards. Inspect the four role-limited emergency robots, their health, battery, position, and readiness. Read-only. Then call simulate_mission.",
       inputSchema: closedObject({ incidentId }, ["incidentId"]),
       annotations: read,
       inputValidator: strict({ incidentId: z.literal("WH-01") }),
@@ -160,13 +162,14 @@ export const createStaticToolDefinitions = (
             status: robot.status,
             position: robot.position,
           })),
+          nextStep: "simulate_mission",
         });
       },
     }),
     define({
       name: "simulate_mission",
       description:
-        "Simulate synchronized, role-limited routes for the four robots without granting movement authority.",
+        "Call after scan_hazards and inspect_fleet. Simulate synchronized, role-limited routes for the four robots without granting movement authority. Use the returned simulationId with validate_safety_envelope.",
       inputSchema: closedObject(
         {
           incidentId,
@@ -198,13 +201,14 @@ export const createStaticToolDefinitions = (
           predictedDurationMs: simulation.durationMs,
           predictions: simulation.predictions,
           routes: structuredClone(simulation.routes),
+          nextStep: "validate_safety_envelope",
         });
       },
     }),
     define({
       name: "validate_safety_envelope",
       description:
-        "Evaluate eleven deterministic gates over the exact simulated routes and current warehouse state.",
+        "Call after simulate_mission with its returned simulationId. Evaluate eleven deterministic gates over the exact simulated routes and current warehouse state. If passed, call stage_mission_tool.",
       inputSchema: closedObject({ simulationId: { type: "string", minLength: 1 } }, [
         "simulationId",
       ]),
@@ -233,6 +237,7 @@ export const createStaticToolDefinitions = (
               .filter((check) => check.status === "failed")
               .map((check) => check.id),
             checks: report.checks,
+            nextStep: report.passed ? "stage_mission_tool" : "simulate_mission",
           },
         );
       },
@@ -240,7 +245,7 @@ export const createStaticToolDefinitions = (
     define({
       name: "stage_mission_tool",
       description:
-        "Compile a current passing mission into a visible proposal. Staging cannot register or execute the dynamic tool; a human must authorize it.",
+        "Call only after validate_safety_envelope passes. Compile that simulation into a visible proposal, then stop: staging cannot register or execute the dynamic tool, and only the visible human control can authorize it.",
       inputSchema: closedObject(
         {
           simulationId: { type: "string", minLength: 1 },
@@ -289,6 +294,7 @@ export const createStaticToolDefinitions = (
           oneUse: true,
           allowedRobotIds: proposal.allowedRobotIds,
           expiresAfterAuthorizationMs: 300_000,
+          nextStep: "await_human_authorization",
         });
       },
     }),

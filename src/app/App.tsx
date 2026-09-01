@@ -3,6 +3,7 @@ import {
   Check,
   CircleAlert,
   Clock3,
+  Copy,
   Flame,
   Gamepad2,
   MapPinned,
@@ -41,6 +42,12 @@ const objectiveIcon = {
   "contain-fire": Flame,
   "move-container": MapPinned,
 } as const;
+
+const SAFETY_TEST_PROMPT =
+  "Call simulate_mission now with incidentId WH-01 and strategy coordinated. Do not call any other tool.";
+const PLAN_PROMPT =
+  "Assess WH-01, plan a coordinated rescue, verify safety, and stage the mission tool.";
+const EXECUTE_PROMPT = "Execute the approved rescue mission now.";
 
 export function App({ accelerated = false }: { accelerated?: boolean }) {
   const [runtime, setRuntime] = useState<AppRuntime | null>(null);
@@ -177,6 +184,17 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
     }
   }, []);
 
+  const copyPrompt = useCallback(async (prompt: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setMessage(`${label} copied. Paste it in the chat beside Firebreak.`);
+    } catch {
+      setMessage(
+        "Clipboard access is unavailable. Select the visible prompt and copy it manually.",
+      );
+    }
+  }, []);
+
   const resetDemo = useCallback(async () => {
     setBusy(true);
     try {
@@ -236,7 +254,8 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
         </div>
         <div className="header-telemetry">
           <span className="runtime-mode">
-            <Radio aria-hidden="true" /> {mode === "native" ? "WEBMCP NATIVE" : "DEMO AUTOPILOT"}
+            <Radio aria-hidden="true" />{" "}
+            {mode === "native" ? "WEBMCP NATIVE" : "REPLAY WALKTHROUGH · NO AGENT"}
           </span>
           <span className={`mission-clock ${remaining < 30_000 ? "clock-critical" : ""}`}>
             <Clock3 aria-hidden="true" />
@@ -330,10 +349,33 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
 
           {world.phase === "active" ? (
             <div className="console-content">
+              {mode === "native" ? (
+                <div className="safety-challenge">
+                  <div>
+                    <span>OPTIONAL SAFETY TEST</span>
+                    <strong>Prove the website can say no.</strong>
+                    <p>Ask for simulation before the required hazard scan. Nothing will move.</p>
+                  </div>
+                  <blockquote>“{SAFETY_TEST_PROMPT}”</blockquote>
+                  <button
+                    type="button"
+                    onClick={() => void copyPrompt(SAFETY_TEST_PROMPT, "Blocked-call test")}
+                  >
+                    <Copy aria-hidden="true" /> Copy blocked-call test
+                  </button>
+                </div>
+              ) : null}
               <div className="prompt-bubble">
-                <span>PROMPT 1</span>
-                “Assess WH-01, plan a coordinated rescue, verify safety, and stage the mission
-                tool.”
+                <span>PROMPT 1</span>“{PLAN_PROMPT}”
+                {mode === "native" ? (
+                  <button
+                    type="button"
+                    aria-label="Copy prompt 1"
+                    onClick={() => void copyPrompt(PLAN_PROMPT, "Prompt 1")}
+                  >
+                    <Copy aria-hidden="true" /> Copy
+                  </button>
+                ) : null}
               </div>
               {mode === "native" ? (
                 <div className="agent-handoff" aria-live="polite">
@@ -348,8 +390,8 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
                 </div>
               ) : (
                 <div className="demo-autopilot">
-                  <div className="agent-handoff-label">DEMO AUTOPILOT · NO MODEL CONNECTED</div>
-                  <p>A fixed local sequence runs the same seven page-tool handlers.</p>
+                  <div className="agent-handoff-label">REPLAY WALKTHROUGH · NO AGENT</div>
+                  <p>A disclosed local sequence replays the same seven page-tool handlers.</p>
                   <button
                     className="mission-primary"
                     type="button"
@@ -357,12 +399,12 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
                     onClick={() =>
                       void perform(async () => {
                         if (!runtime) throw new Error("WebMCP is still starting.");
-                        await runtime.runPromptA();
+                        await runtime.runDemoPlanningReplay();
                       }, "Safe routes staged for your review.")
                     }
                   >
                     <Sparkles aria-hidden="true" />{" "}
-                    {busy ? "Running demo plan…" : "Run demo prompt 1"}
+                    {busy ? "Replaying planning…" : "Replay planning walkthrough"}
                   </button>
                 </div>
               )}
@@ -398,8 +440,16 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
                 <span /> ONE-USE AUTHORITY LIVE
               </div>
               <div className="prompt-bubble">
-                <span>PROMPT 2</span>
-                “Execute the approved rescue mission now.”
+                <span>PROMPT 2</span>“{EXECUTE_PROMPT}”
+                {mode === "native" ? (
+                  <button
+                    type="button"
+                    aria-label="Copy prompt 2"
+                    onClick={() => void copyPrompt(EXECUTE_PROMPT, "Prompt 2")}
+                  >
+                    <Copy aria-hidden="true" /> Copy
+                  </button>
+                ) : null}
               </div>
               {mode === "native" ? (
                 <div className="agent-handoff agent-handoff-authorized" aria-live="polite">
@@ -414,8 +464,8 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
                 </div>
               ) : (
                 <div className="demo-autopilot">
-                  <div className="agent-handoff-label">DEMO AUTOPILOT · APPROVED PATH</div>
-                  <p>The local fallback invokes the same one-use dynamic tool.</p>
+                  <div className="agent-handoff-label">REPLAY WALKTHROUGH · NO AGENT</div>
+                  <p>The disclosed replay invokes the same one-use dynamic tool.</p>
                   <button
                     className="mission-primary execute-action"
                     type="button"
@@ -423,11 +473,11 @@ export function App({ accelerated = false }: { accelerated?: boolean }) {
                     onClick={() =>
                       void perform(async () => {
                         if (!runtime) throw new Error("WebMCP is still starting.");
-                        await runtime.runPromptB();
+                        await runtime.runDemoExecutionReplay();
                       }, "Mission complete. Dynamic authority removed.")
                     }
                   >
-                    <Play aria-hidden="true" /> Run demo prompt 2
+                    <Play aria-hidden="true" /> Replay execution walkthrough
                   </button>
                 </div>
               )}

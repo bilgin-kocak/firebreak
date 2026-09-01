@@ -1,10 +1,17 @@
 import { expect, test } from "@playwright/test";
 
-import { approve, boot, executeApproved, runPromptA, STATIC_TOOLS, toolNames } from "./helpers";
+import {
+  approve,
+  boot,
+  executeApproved,
+  invokeNativePlanningJourney,
+  STATIC_TOOLS,
+  toolNames,
+} from "./helpers";
 
 test("reload removes dynamic authority and requires a fresh human decision", async ({ page }) => {
   await boot(page);
-  await runPromptA(page);
+  await invokeNativePlanningJourney(page);
   await approve(page);
   await page.reload();
 
@@ -16,7 +23,7 @@ test("reload removes dynamic authority and requires a fresh human decision", asy
 
 test("completed rescue receipt persists without restoring consumed authority", async ({ page }) => {
   await boot(page);
-  await runPromptA(page);
+  await invokeNativePlanningJourney(page);
   await approve(page);
   await executeApproved(page);
   await page.reload();
@@ -31,7 +38,7 @@ test("reset revokes authority, restores the seed, and preserves unrelated storag
 }) => {
   await boot(page);
   await page.evaluate(() => localStorage.setItem("outside-firebreak", "keep"));
-  await runPromptA(page);
+  await invokeNativePlanningJourney(page);
   await approve(page);
   await page.getByRole("button", { name: "Reset warehouse demo" }).click();
 

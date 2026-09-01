@@ -19,9 +19,9 @@ export interface AppRuntime {
   registry: ToolRegistry;
   dynamicTools: DynamicMissionToolManager;
   driver: MissionRobotDriver;
-  runPromptA(): Promise<void>;
+  runDemoPlanningReplay(): Promise<void>;
   authorizeMission(proposalId: string): Promise<void>;
-  runPromptB(): Promise<void>;
+  runDemoExecutionReplay(): Promise<void>;
   destroy(): Promise<void>;
   dispose(): void;
 }
@@ -82,7 +82,7 @@ export const bootAppRuntime = async (options: AppRuntimeOptions = {}): Promise<A
     registry,
     dynamicTools,
     driver,
-    async runPromptA() {
+    async runDemoPlanningReplay() {
       expectSuccess(await adapter.executeTool("inspect_emergency", { incidentId: "WH-01" }));
       expectSuccess(
         await adapter.executeTool("scan_hazards", {
@@ -110,7 +110,7 @@ export const bootAppRuntime = async (options: AppRuntimeOptions = {}): Promise<A
     async authorizeMission(proposalId) {
       await dynamicTools.approveAndRegister(proposalId);
     },
-    async runPromptB() {
+    async runDemoExecutionReplay() {
       expectSuccess(
         await adapter.executeTool("execute_rescue_mission", {
           strategy: "coordinated",

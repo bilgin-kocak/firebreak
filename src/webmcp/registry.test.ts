@@ -66,6 +66,98 @@ describe("WebMCP tool registry", () => {
     expect(execute).not.toHaveBeenCalled();
     expect(JSON.stringify(result).length).toBeLessThan(1_500);
     expect(getFirebreakState().webmcp.toolCallCount).toBe(1);
+    expect(getFirebreakState().webmcp.trace.at(-1)).toMatchObject({
+      status: "blocked",
+      inputSummary: '{"incidentId":"WH-01"}',
+    });
+    expect(getFirebreakState().webmcp.trace.at(-1)?.inputSummary).not.toContain("arbitraryCode");
+  });
+
+  it("marks an explicit failure result as blocked even when the handler returns it", async () => {
+    const adapter = createMemoryAdapter();
+    const registry = new ToolRegistry(adapter);
+    await registry.register(
+      definition(async () => ({
+        ok: false,
+        code: "SAFETY_CHECKS_FAILED",
+        message: "Safety proof rejected.",
+        retryable: false,
+      })),
+    );
+
+    await adapter.executeTool("inspect_emergency", { incidentId: "WH-01" });
+
+    expect(getFirebreakState().webmcp.trace.at(-1)).toMatchObject({
+      status: "blocked",
+      code: "SAFETY_CHECKS_FAILED",
+    });
+  });
+
+  it("stores only bounded code-owned result fields in the trace", async () => {
+    const adapter = createMemoryAdapter();
+    const registry = new ToolRegistry(adapter);
+    await registry.register(
+      definition(async () => ({
+        ok: false,
+        code: "X".repeat(500),
+        message: "M".repeat(500),
+        data: { secret: "must-never-enter-the-trace" },
+      })),
+    );
+
+    await adapter.executeTool("inspect_emergency", { incidentId: "WH-01" });
+
+    const trace = getFirebreakState().webmcp.trace.at(-1);
+    expect(trace?.code).toHaveLength(64);
+    expect(trace?.message).toHaveLength(180);
+    expect(JSON.stringify(trace)).not.toContain("must-never-enter-the-trace");
+  });
+
+  it("bounds opaque declared strings before storing their trace summary", async () => {
+    const adapter = createMemoryAdapter();
+    const registry = new ToolRegistry(adapter);
+    const opaqueDefinition: RegistryToolDefinition<{ simulationId: string }> = {
+      name: "validate_safety_envelope",
+      description: "Validate one opaque simulation identifier.",
+      inputSchema: {
+        type: "object",
+        properties: { simulationId: { type: "string", minLength: 1 } },
+        required: ["simulationId"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true, untrustedContentHint: false },
+      inputValidator: z.object({ simulationId: z.string().min(1) }).strict(),
+      origin: "built_in",
+      execute: async () => ({ ok: true, code: "VALIDATED", message: "Validated." }),
+    };
+    await registry.register(opaqueDefinition);
+
+    await adapter.executeTool("validate_safety_envelope", { simulationId: "x".repeat(500) });
+
+    expect(getFirebreakState().webmcp.trace.at(-1)?.inputSummary).toBe(
+      '{"simulationId":"<string:500>"}',
+    );
+  });
+
+  it("fails closed when a hostile input getter cannot be summarized", async () => {
+    const adapter = createMemoryAdapter();
+    const registry = new ToolRegistry(adapter);
+    await registry.register(definition());
+    const hostile = Object.defineProperty({}, "incidentId", {
+      enumerable: true,
+      get() {
+        throw new Error("hostile getter");
+      },
+    });
+
+    await expect(adapter.executeTool("inspect_emergency", hostile)).resolves.toMatchObject({
+      ok: false,
+      code: "OPERATION_FAILED",
+    });
+    expect(getFirebreakState().webmcp.trace.at(-1)).toMatchObject({
+      status: "blocked",
+      inputSummary: "[unavailable]",
+    });
   });
 
   it("converts domain failures into structured tool results", async () => {
@@ -90,6 +182,64 @@ describe("WebMCP tool registry", () => {
       retryable: false,
       details: { failedCheckIds: ["geofence"] },
     });
+
+    expect(getFirebreakState().webmcp.trace).toEqual([
+      expect.objectContaining({
+        kind: "tool",
+        name: "inspect_emergency",
+        status: "blocked",
+        code: "SAFETY_CHECKS_FAILED",
+        inputSummary: '{"incidentId":"WH-01"}',
+      }),
+    ]);
+  });
+
+  it("shows a tool call as running before completing it with a result and duration", async () => {
+    const adapter = createMemoryAdapter();
+    let finish!: (value: { ok: true; code: string; message: string }) => void;
+    const registry = new ToolRegistry(adapter, {
+      now: (() => {
+        let current = 1_000;
+        return () => {
+          current += 25;
+          return current;
+        };
+      })(),
+    });
+    await registry.register(
+      definition(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      ),
+    );
+
+    const execution = adapter.executeTool("inspect_emergency", { incidentId: "WH-01" });
+
+    expect(getFirebreakState().webmcp.trace).toEqual([
+      expect.objectContaining({
+        kind: "tool",
+        name: "inspect_emergency",
+        status: "running",
+        inputSummary: '{"incidentId":"WH-01"}',
+      }),
+    ]);
+
+    await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+    finish({ ok: true, code: "EMERGENCY_INSPECTED", message: "Emergency inspected." });
+    await execution;
+
+    expect(getFirebreakState().webmcp.trace).toEqual([
+      expect.objectContaining({
+        kind: "tool",
+        name: "inspect_emergency",
+        status: "succeeded",
+        code: "EMERGENCY_INSPECTED",
+        message: "Emergency inspected.",
+        durationMs: 25,
+      }),
+    ]);
   });
 
   it("reconciles metadata when AbortController unregisters a tool", async () => {

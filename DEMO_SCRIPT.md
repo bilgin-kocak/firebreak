@@ -1,91 +1,63 @@
-# Firebreak: WebMCP Emergency Robot Commander — demo script
+# Firebreak judge video script
 
 **Tagline:** One agent. Four robots. One human-approved rescue boundary.
 
-Target runtime: **2 minutes 45 seconds**. Use a desktop browser at 100% zoom with sound off. Begin from a reset warehouse.
+Target: **2 minutes 20 seconds** with narration audio. Record three short takes and edit them together so the canonical rescue gets its full 90-second incident window.
 
 ## Before recording
 
-- Run `npm run dev` or open the deployed HTTPS build.
-- Click the reset icon and confirm **7 tools live**.
-- Connect a gamepad if available; keyboard input is equally reliable.
-- Keep the camera in **Overview** until the fleet starts, then switch to **Follow** for a closer shot.
-- Open the site in the Codex or ChatGPT built-in browser. Confirm the badge reads **WebMCP Native** and the mission panel reads **Live Agent**.
-- Keep the surrounding Codex/ChatGPT chat visible enough that the two real prompts and tool activity are credible on camera.
+- Open the deployed HTTPS build in the Codex or ChatGPT built-in browser with GPT-5.6 Sol.
+- Confirm **WebMCP Native**, **7 tools live**, and a clean live trace.
+- Keep the surrounding chat visible enough to show the real prompts and tool calls.
+- Use Overview for planning and Follow briefly during execution.
+- Keep **Replay walkthrough · no agent** only as a rehearsal fallback; never present it as AI.
 
-## 0:00–0:18 — Immediate stakes
+## Take A — 0:00–0:18: playable stakes
 
-**Screen:** Full warehouse, trapped workers, four robots, battery fire, and 90-second clock. Click **Start emergency**.
+From a fresh training screen, drive SCOUT-1 with `WASD` or a gamepad, switch to MEDIC-2, then reset.
 
-**Narration:**
+> A battery warehouse is burning. Two people are trapped. One operator can drive one robot, but cannot safely coordinate four specialist robots at once.
 
-> A battery warehouse is burning. Two people are trapped. One operator can drive one robot—but cannot coordinate a whole rescue fleet at once.
+## Take B — 0:18–0:34: the website says no
 
-## 0:18–0:36 — Make it a game
+Start the emergency, copy the red **blocked-call test**, and paste it into the real chat. Hold on the red trace row: `simulate_mission · BLOCKED · HAZARD_SCAN_REQUIRED`. Show that no route appeared and no robot moved. Then reset.
 
-**Screen:** Drive SCOUT-1 with `WASD`, then tap `2` to show fleet switching. If using a controller, show the left-stick movement and one right-stick camera move.
+> A powerful agent needs a real boundary. Here it asks to simulate before scanning hazards. Firebreak refuses the call in its typed handler, and the live WebMCP trace makes that refusal visible.
 
-**Narration:**
+## Take C — 0:34–1:05: real agent plans
 
-> This is a playable robot command system, not a mock dashboard. Keyboard, touch, and gamepad commands move the selected robot through the same driver interface used by mission execution.
-
-## 0:36–1:02 — Prompt 1: coordinate four
-
-**Screen:** In the Codex or ChatGPT chat beside the page, send the visible Prompt 1:
+Reset, start the emergency, immediately copy Prompt 1, and paste it into the chat:
 
 > Assess WH-01, plan a coordinated rescue, verify safety, and stage the mission tool.
 
-**Narration:**
+Let the real agent discover and invoke the tools. Keep the newest trace rows visible as the four routes appear. Point to **11/11 safety gates** and **7 tools live**.
 
-> WebMCP gives the agent seven typed tools. It inspects the emergency and fleet, maps the hazards, synchronizes four role-specific routes, and checks the exact plan. Notice what it does not have: movement authority.
+> The page exposes seven typed planning tools. The agent inspects the emergency, scans hazards, reads the fleet, simulates synchronized routes, validates eleven deterministic gates, and stages one exact capability. It still has no movement authority.
 
-**Screen:** Let the four colored routes appear. Point to `11/11 safety gates` and `7 tools live`.
+## 1:05–1:25: one human grant
 
-## 1:02–1:35 — The human boundary
+Open **Review compiled mission proof**. Show four allowlisted robots, reviewed routes, the excluded collapse zone, one-use scope, and five-minute post-authorization expiry. Click **Authorize one mission** once. Hold on the amber human trace row and green `7 → 8 tools` row.
 
-**Screen:** Show the authorization sheet. Expand **Review compiled mission proof**.
+> The website compiled this authority from the passing proof. There is no approval tool for the agent. Only this visible human click can register the eighth tool, limited to the reviewed mission for one use.
 
-**Narration:**
+## 1:25–1:52: real agent executes
 
-> The website—not the model—compiled this capability. It is limited to four named robots, these reviewed waypoints, one coordinated strategy, one use, five minutes, and a forbidden collapse zone. Eleven deterministic gates verify revision, geofence, separation, battery, roles, duration, and recovery.
-
-**Screen:** Click **Authorize one mission**. Pause on **8 tools live** and `execute_rescue_mission`.
-
-**Narration:**
-
-> Only this visible human control can register the eighth tool. The agent cannot call an approval tool or invent a robot command.
-
-## 1:35–2:15 — Prompt 2: fleet rescue
-
-**Screen:** In the Codex or ChatGPT chat beside the page, send Prompt 2:
+Copy Prompt 2 and paste it into the chat:
 
 > Execute the approved rescue mission now.
 
-Switch the camera to **Follow** for several seconds, then return to **Overview**.
+Switch briefly to Follow, then return to Overview as the four robots complete their role-limited routes.
 
-**Narration:**
+> The agent can now coordinate all four robots inside the approved envelope. It cannot invent robots, waypoints, topics, or actions.
 
-> Now the agent can act autonomously inside the reviewed envelope. SCOUT-1 maps the danger. MEDIC-2 extracts one worker. SUPPRESS-3 isolates power and contains the fire. HAUL-4 rescues the second worker and moves the hazardous load. All four routes run together, not as four manual confirmations.
+## 1:52–2:20: receipt and self-revocation
 
-## 2:15–2:38 — Proof and revocation
+Hold on **Mission complete**, the deterministic receipt, zero violations, and the newest `8 → 7 tools` trace row.
 
-**Screen:** Hold on **Mission complete**, two workers safe, fire contained, load secured, zero violations, and the green objectives.
+> The simulated receipt records two workers safe, fire contained, load secured, and zero safety violations. The one-use tool then unregisters itself. Firebreak’s reusable idea is compiled one-use authority: inspect, simulate, prove, approve once, act once, and self-revoke—for robots, deploys, refunds, transfers, or any high-stakes web action.
 
-**Narration:**
+## Recovery notes
 
-> The receipt proves the physical outcome and final battery for every robot. On success, the one-use capability consumes itself through an AbortController.
-
-**Screen:** Point to **7 tools live** and “One-use tool consumed and unregistered.”
-
-## 2:38–2:45 — Close
-
-**Narration:**
-
-> Firebreak turns WebMCP into shared control: humans set the boundary, agents coordinate beyond human speed, and authority disappears when the job is done.
-
-## Backup if anything interrupts the recording
-
-- Press the reset icon; the complete browser journey takes under one minute at the shipped playback rate.
-- If a controller disconnects, continue with `WASD`; the app does not change modes silently.
-- If native WebMCP is unavailable, the page switches to **Demo Autopilot**. It is useful for rehearsing visuals, but do not use it for the judged live-agent recording or claim it is AI.
-- A real ROS/Gazebo bridge is optional and should only be shown if it has been validated separately.
+- Reset before every canonical take so the agent receives the full 90 seconds.
+- If native WebMCP is unavailable, stop the judged recording and restore site tools. Use the disclosed no-agent replay only to rehearse framing and camera moves.
+- Show ROS/Gazebo footage only if separately validated. The submitted browser scenario is deterministic simulation, not certified physical deployment.

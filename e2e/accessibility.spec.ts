@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-import { approve, boot, executeApproved, runPromptA } from "./helpers";
+import { approve, boot, executeApproved, invokeNativePlanningJourney } from "./helpers";
 
 const seriousOrCritical = async (page: Parameters<typeof boot>[0]) => {
   const result = await new AxeBuilder({ page }).analyze();
@@ -16,7 +16,7 @@ test("ready, proposal, authority, and resolved states have no serious axe findin
   await page.emulateMedia({ reducedMotion: "reduce" });
   await boot(page);
   expect(await seriousOrCritical(page)).toEqual([]);
-  await runPromptA(page);
+  await invokeNativePlanningJourney(page);
   expect(await seriousOrCritical(page)).toEqual([]);
   await approve(page);
   expect(await seriousOrCritical(page)).toEqual([]);
@@ -27,6 +27,7 @@ test("ready, proposal, authority, and resolved states have no serious axe findin
 test("every visible interactive target is at least 44 by 44 pixels", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await boot(page);
+  await page.getByRole("button", { name: "Start emergency" }).click();
   const controls = page.locator(
     "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary",
   );
@@ -53,7 +54,7 @@ test("human authorization is keyboard operable and agent execution stays externa
   page,
 }) => {
   await boot(page);
-  await runPromptA(page);
+  await invokeNativePlanningJourney(page);
   const authorize = page.getByRole("button", { name: "Authorize one mission" });
   await expect(authorize).toBeFocused();
   await page.keyboard.press("Enter");

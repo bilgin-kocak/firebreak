@@ -10,13 +10,15 @@ One agent. Four robots. One human-approved rescue boundary.
 
 ## One-line pitch
 
-Firebreak lets a human drive one emergency robot while a WebMCP agent plans and executes a safety-proved, human-authorized, one-use rescue across four robots.
+Firebreak lets a human drive one emergency robot while a WebMCP agent plans a rescue, passes eleven deterministic safety checks, and executes once after human authorization.
 
 ## The problem
 
 Emergency robot fleets have a coordination gap. A person can understand mission intent and make judgment calls, but cannot continuously drive several specialist robots at once. An AI agent can coordinate at machine speed, but giving it permanent, free-form movement authority creates unacceptable risk.
 
 Firebreak demonstrates a third model: shared control with temporary compiled authority. The agent can inspect, simulate, and prove a rescue. The website turns the passing proof into an exact capability. A person authorizes that mission once, then the fleet operates autonomously inside the reviewed routes and the capability disappears.
+
+What can people and agents do together that was impossible before? A human can make one understandable high-stakes decision while an agent coordinates several interdependent actions inside that exact boundary at machine speed—and the website automatically removes the authority afterward.
 
 ## What it does
 
@@ -32,9 +34,11 @@ The player can immediately select and drive any robot using keyboard, touch, or 
 6. stages a one-use mission tool; and
 7. inspects the resulting capability surface.
 
-The agent stops at a visible human decision boundary. The operator reviews four named robots, exact bounded routes, the excluded collapse zone, one-use scope, five-minute expiry, and the 11/11 proof. Clicking **Authorize one mission** registers `execute_rescue_mission` as the eighth tool.
+The live trace also makes failure legible: if the agent requests simulation before the required hazard scan, the typed handler returns `HAZARD_SCAN_REQUIRED`; no route appears and no robot moves.
 
-Prompt 2 invokes it. Four 3D robots move concurrently: SCOUT-1 maps danger, MEDIC-2 rescues one worker, SUPPRESS-3 isolates and contains the battery fire, and HAUL-4 rescues the second worker while moving the exposed load. A receipt reports two workers safe, the fire contained, the load secured, and zero violations. The one-use tool unregisters and the surface returns to seven tools.
+The agent stops at a visible human decision boundary. The operator reviews four named robots, exact bounded routes, the excluded collapse zone, one-use scope, five-minute post-authorization expiry, and the 11/11 proof. Clicking **Authorize one mission** registers `execute_rescue_mission` as the eighth tool.
+
+Prompt 2 invokes it. Four simulated 3D robots move concurrently: SCOUT-1 maps danger, MEDIC-2 rescues one worker, SUPPRESS-3 isolates and contains the battery fire, and HAUL-4 rescues the second worker while moving the exposed load. A deterministic receipt reports two workers safe, the fire contained, the load secured, and zero violations. The one-use tool unregisters and the surface returns to seven tools.
 
 ## Why WebMCP is essential
 
@@ -47,9 +51,12 @@ Firebreak is built around a website-owned capability surface, not DOM automation
 - No tool exists for human approval; registration requires the visible user action.
 - An `AbortController` owns dynamic authority and emits visible `toolchange` on registration and removal.
 - The tool surface visibly changes 7 → 8 → 7.
-- The normal-browser **Demo Autopilot** runs the same handlers as a disclosed deterministic fallback; the live judged path uses a real Codex/ChatGPT agent through native WebMCP.
+- A visible trace distinguishes agent calls, blocked results, the human grant, and `toolchange` events without storing raw tool data.
+- The normal-browser **Replay walkthrough · no agent** exercises the same handlers as a disclosed deterministic fallback; the live judged path uses a real Codex/ChatGPT agent through native WebMCP.
 
 Without WebMCP, this is only a rescue simulation with deterministic automation. With WebMCP, a real Codex or ChatGPT agent discovers and invokes live website capabilities, and the site safely creates and revokes a new capability as the shared situation changes.
+
+The transferable pattern is **compiled one-use authority**. The same lifecycle can guard production deploys, large refunds, fund transfers, bulk deletes, or incident remediation: inspect and simulate, prove policy, obtain one visible human grant, act once, emit a receipt, and self-revoke.
 
 ## What is technically distinctive
 
@@ -79,7 +86,7 @@ npm install
 npm run dev
 ```
 
-Open the printed URL in the Codex or ChatGPT built-in browser, click **Start emergency**, and send the two prompts from the surrounding chat. The application needs no API key, backend, or robot; it uses the agent already signed into the host app. In an ordinary browser, the clearly labeled **Demo Autopilot** is available for local rehearsal.
+Open the printed URL in the Codex or ChatGPT built-in browser, click **Start emergency**, and send the two prompts from the surrounding chat. The application needs no API key, backend, or robot; it uses the agent already signed into the host app. In an ordinary browser, the clearly labeled **Replay walkthrough · no agent** is available for local rehearsal.
 
 Run the entire release gate with:
 
